@@ -148,6 +148,73 @@ Prompts in this run (or a representative subset if N is large):
 1. *…*
 2. *…*
 
+## Next experiments
+
+*Structured proposals for what should run next. The goal is experimental
+soundness: each entry should make a specific, falsifiable claim and pre-register
+what result would actually update our beliefs. Vague follow-ups belong in "Open
+questions / follow-ups" below — this section is for things that have been
+designed enough to run.*
+
+**Hygiene rules (apply to every entry below):**
+
+1. **One variable per experiment.** If you change the candidate set AND the judge AND `max_tokens` in the same run, you cannot attribute a delta to any single cause. Run ablations one knob at a time.
+2. **Pre-register the prior.** State the expected outcome before the run. If you can't articulate a specific expectation, you're exploring, not testing — label it as such.
+3. **Pre-register the falsifying outcome.** What result would surprise you? If "any result fits my story," the experiment will not inform you; redesign or drop it.
+4. **Distinguish confirmatory vs exploratory.** Confirmatory: replicate a prior finding at higher N or under perturbation. Exploratory: probe a hypothesis you have not yet tested. Both are valid; mislabeling them is not.
+5. **Smoke before full.** Every new configuration knob gets a `--limit 3` shake-out before the full set. The cost is 10 minutes; the cost of skipping it was already established in `2026-06-30-smoke-test.md`.
+6. **Save state before patching.** If an experiment requires code changes, commit the prior state first so the experiment can be reproduced or rolled back. Tag the commit referenced from this report.
+
+*Entry template — copy for each proposed experiment:*
+
+### Experiment N — *<descriptive name>*
+
+- **Type**: *confirmatory | exploratory | ablation | replication*
+- **Hypothesis**: *the specific, falsifiable claim being tested. Not "investigate X" but "X correlates with Y under condition Z."*
+- **Prior**: *what outcome you expect before running, with rough magnitudes if possible. "qwen-397b will pass at least 5 pp more criteria than qwen-9b on Multistep."*
+- **What would change my mind**: *the specific outcome that would update belief away from the prior. "If the pp delta is < 2 or reverses, scaling does not help Multistep instruction-following at this scale."*
+- **Operationalization**: *the exact change to make — config edit, candidate add, judge swap, prompt mix change, seed change — and the exact command to run.*
+- **Cost / wall-clock**: *rough $ and hours. Use cost-and-timing extrapolations from the most recent full run.*
+- **Priority**: *H / M / L, with one-line reason. Reserve H for experiments that could falsify a load-bearing finding.*
+- **Depends on**: *prior runs, code commits, or data this experiment requires before it can be run. Empty if it can run today.*
+
+*Example entries demonstrating the form (delete or adapt for your run):*
+
+### Experiment 1 — *Verify CIF-001 inverse scaling*
+
+- **Type**: *confirmatory replication*
+- **Hypothesis**: *On Negative · Context · Logistics prompts, criterion-pass rate decreases monotonically with candidate size (9b > 35b > 397b).*
+- **Prior**: *Smoke (n=1) showed 13 → 7 → 4 of 19. Expectation on full sample: same direction, but smaller magnitude — likely 9b ~10–15 pp ahead of 397b.*
+- **What would change my mind**: *If the ranking on Negative · Context prompts has no significant gradient (all three within 5 pp) or reverses (397b ≥ 9b), the smoke finding was an n=1 artifact, likely driven by 397b's "no final coherent rota" failure mode being prompt-specific.*
+- **Operationalization**: *No code change. Run the full set, then filter `results.json.prompts[]` to instruction_type == "Negative" AND prompt_style == "Context prompting" and recompute per-model pass rate over that subset.*
+- **Cost / wall-clock**: *Subsumed by the full run (~$55, ~4.5 hr) — no incremental cost.*
+- **Priority**: *H — load-bearing for the scaling-story section of the writeup.*
+- **Depends on**: *Full 75-prompt run completing.*
+
+### Experiment 2 — *Reasoning-enabled ablation*
+
+- **Type**: *ablation*
+- **Hypothesis**: *Re-enabling Qwen3.5 reasoning at `max_tokens=32000` produces strictly higher criterion-pass rates than the no-CoT condition currently used, with the largest gain on Multistep prompts.*
+- **Prior**: *+5 to +15 pp on criterion-pass, concentrated on Multistep · Data-Math. Full-prompt pass rate may still be ~0 % because the gating is constraint-satisfaction, not per-constraint accuracy.*
+- **What would change my mind**: *If criterion-pass is within 2 pp of the no-CoT condition, the v1 deviation costs us nothing and the reasoning-disabled choice is vindicated. If reasoning hurts, that itself is a publishable finding.*
+- **Operationalization**: *Smoke first with `--limit 3` at the new config to confirm responses are non-empty. Then run the full set with `EXTRA_BODY={}` and `MAX_TOKENS=32000` in `pipeline/generate.py`. Write to `responses-reasoning/` and `grades-reasoning/` to avoid clobbering the v1 results.*
+- **Cost / wall-clock**: *~3–5× the v1 run on the candidate side (longer outputs), judge side unchanged. Ballpark $80–$120 and ~8–12 hr.*
+- **Priority**: *M — informs the bias-audit section's "decoding choice" subsection. Defer until v1 is shipped.*
+- **Depends on**: *v1 full-run results.json (the baseline to compare against).*
+
+### Experiment 3 — *Judge self-preference cross-check*
+
+- **Type**: *ablation*
+- **Hypothesis**: *Swapping the judge from `claude-opus-4-8` to a non-Anthropic model (e.g. `openai/o4` or `deepseek/deepseek-v4`) shifts per-criterion verdicts by less than the human-vs-Opus disagreement number from Phase 6.*
+- **Prior**: *Verdict shift < Phase 6 disagreement %, because the candidates are non-Anthropic and the Opus judge has no family stake. Decisive evidence against self-preference bias if the prior holds.*
+- **What would change my mind**: *If swapping the judge shifts verdicts by more than the human disagreement number, the eval is judge-dependent in a way that needs to be flagged prominently in the limitations panel.*
+- **Operationalization**: *Add a `--judge MODEL_ID` flag to `pipeline/grade.py`. Re-grade the existing responses with the alternate judge (no re-generation needed — candidates' outputs are already saved). Diff the two grade files at the (model, id, criterion_idx) level.*
+- **Cost / wall-clock**: *One full set of judge calls, ~$30–$50 depending on alternate judge price, ~1.5 hr.*
+- **Priority**: *H — directly supports the bias-audit deliverable.*
+- **Depends on**: *v1 full-run grades/ files (responses are re-graded, not re-generated).*
+
+*Add experiments below as they get designed. When an experiment is run, link from its entry to the resulting report file in this directory and mark it `[run YYYY-MM-DD → 2026-MM-DD-<run-name>.md]`. Do not delete completed entries — they are the lineage.*
+
 ## Judge validation (if applicable)
 
 *Only fill if `validate --mode score` was run for this experiment. Report:*
@@ -180,7 +247,7 @@ uv run python main.py validate --mode score
 
 ## Open questions / follow-ups
 
-*Anything this run surfaced that the next run should answer. Be specific — "investigate scaling" is too vague; "verify whether CIF-001 inverse scaling holds on the other 24 Negative · Context prompts" is what to write.*
+*Things this run surfaced that don't yet have a designed experiment. The bar is lower than "Next experiments" — these are leads, hunches, and "this looked weird" notes. Promote an item to a structured entry in "Next experiments" once you can write down its hypothesis, prior, and falsifying outcome.*
 
 - *…*
 - *…*
