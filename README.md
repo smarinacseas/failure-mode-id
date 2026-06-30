@@ -48,12 +48,11 @@ released by Surge AI under CC-BY-4.0.
 ### Citation
 
 ```
-@misc{surge_complex_constraints,
+@misc{complex_constraints_benchmark,
   title  = {Complex Constraints Benchmark Set},
-  author = {Surge AI},                            # TODO: confirm full author list / handles
-  year   = {2024},                                # TODO: confirm release year
-  howpublished = {\url{https://huggingface.co/datasets/surgeai/ComplexConstraints}},
-  note   = {Licensed under CC-BY-4.0},
+  author = {TODO: authors},
+  year   = {2025},
+  url    = {TODO: dataset URL}
 }
 ```
 
