@@ -163,6 +163,66 @@ qwen-397b's drop on judge-graded criteria (50 % vs 71 % on auto) is the most int
 
 **All single-cell findings here are n≤3 — they are leads to verify on the full 75, not conclusions.**
 
+## Experimental flaws, biases, and limitations
+
+The headline numbers above are not error bars. They are point estimates from
+n=3 prompts with no human ground truth yet attached. Reading them as
+conclusions would be a category error — the right framing is "leads, not
+findings." This section enumerates the specific reasons.
+
+### Sample-size + selection effects
+
+- **n=3 means by-category cells are n=1.** Of the six summary breakdowns, every per-category column is computed from a single prompt. `by_instruction_type` has 2 Negative + 1 Multistep; `by_use_case` has 2 Logistics + 1 Data-Math; `by_prompt_style` has 1 of each of three styles. No statistical statement is licensed from these.
+- **Non-random selection.** The 3 prompts are the *first three rows* of the xlsx, not a random sample. The xlsx's row order is unknown — possibly chronological, possibly grouped by difficulty, possibly ordered by author. Whatever the ordering is, the smoke inherits it as a confound.
+- **Effective diversity is 2, not 3.** CIF-001 and CIF-002 are both Logistics · Negative; only the prompt_style differs. Half the smoke's signal is from one configuration, half from a second, and effectively zero from any third axis.
+- **No within-run variance.** Each candidate was queried exactly once per prompt at temperature=0. There is no estimate of how stable a single generation is — even greedy decoding is sensitive to upstream provider-side conditions (load balancer routing, version drift, caching state).
+
+### Judge biases
+
+- **Self-preference: structurally controlled.** Opus judges Qwen candidates; Anthropic models grade non-Anthropic ones. Family-stake bias is by-design absent for v1. **Caveat:** if Claude is ever added as a candidate, this control disappears and the eval needs a different judge.
+- **Verbosity bias: unmeasured.** Opus may systematically reward longer or more structured responses. CIF-001 qwen-397b's verdict ("no final coherent rota; multiple conflicting versions, incomplete and cut off") suggests the judge may have penalized output truncation per se, in addition to the underlying correctness — those two failure modes are entangled at the smoke's `max_tokens=8000` cap.
+- **Position bias: unmeasured.** Criteria are presented to the judge in their xlsx-row order, every time. The judge may attend more to earlier criteria. A randomization treatment (shuffle criterion order per call with a fixed seed) would detect this and is cheap to add.
+- **Format bias: unmeasured.** Markdown structure, emoji, table layouts may shift judge attention. Qwen-9b's response uses headers + emoji; qwen-35b uses headers + bold; qwen-397b's structure is less consistent across prompts.
+- **Reason-quality drift.** Some judge reasons are precise ("Maria Sunday 18:00-01:00 finishes after midnight"); others are vague ("no total hours stated; response cut off"). The latter may indicate the judge punting on cases where the model didn't produce gradeable output rather than substantive judgment.
+
+### Classifier biases
+
+- **Same family as judge.** Opus runs both grading and classification. Any systematic Opus-side bias (verbosity preference, format preference) is correlated across both layers — a criterion the judge would grade ambiguously is likelier to also be tagged ambiguous, inflating apparent internal consistency.
+- **Tags are unvalidated.** The runbook recommends hand-correcting ~20 classifier outputs ("this layer is where your judgment is the product"). Smoke did not do this. The `verifiability` and `gameable` columns surfaced in `by_verifiability` are therefore Opus's opinion, not a verified label.
+- **"auto" verifiability is descriptive, not operational.** The pipeline currently grades all criteria via Opus regardless of tag. "auto"-tagged criteria are merely *labeled* as auto-checkable; they are not actually run through a deterministic verifier that could disagree with the judge.
+
+### Decoding-mode caveats
+
+- **Greedy + reasoning-disabled** tests one specific deployment configuration. Production users routinely invoke these models with sampling (top-p, temperature 0.7) and with reasoning enabled. Smoke results do not generalize to those modes.
+- **Token-budget interactions.** The `max_tokens=8000` cap interacts with response style. Models that prefer longer scratch-work (qwen-397b on CIF-001) may exhaust the budget before producing a final answer; smaller models that converge faster may *appear* more capable on this benchmark specifically because the cap suits them.
+
+### Anomaly hypotheses (not yet ruled in or out)
+
+The two interesting per-category cells in Headline Results each have multiple plausible explanations. Listing them here so future runs can distinguish:
+
+| Observation | Real? | Or: alternative explanations |
+| --- | --- | --- |
+| CIF-001 inverse scaling (13 → 7 → 4) | Plausibly real on Negative · Context | (a) n=1 noise; (b) reasoning-disabled mode hurts 397b more than smaller siblings; (c) 8000-token cap truncates 397b's verbose scratch-work; (d) judge format-bias against 397b's less-structured response on this prompt |
+| qwen-397b verifiability drop on `judge` criteria (71 → 50 %) | Plausibly real | (a) only 6 judge-graded criteria in the smoke; (b) overlap with the CIF-001 failure mode (subjective criteria over-represented on the prompt 397b failed on); (c) judge-side overconfidence on the larger model |
+
+### Provider-side uncontrolled variance
+
+- **No control for time-of-day or API load.** OpenRouter routes to different upstream providers based on availability; the judge call sees Anthropic load.
+- **No control for provider-side caching state.** A repeat of CIF-001 may return a cached response with different latency, with no observable signal that caching occurred.
+- **The JSON corruption observed mid-smoke** (qwen-397b call) is a provider-side reliability event with no known reproduction. Future runs should log full response headers (Cloudflare ray IDs, OpenRouter request IDs) to make these investigatable.
+
+### Missing validation
+
+- **Phase 6 (judge validation against 60 human-graded rows) has not been run.** Without it, every aggregate number is judge-conditional with unknown agreement. This is the single largest credibility gap at the current state.
+- **No control prompts.** No sanity-check criterion that should pass for any non-empty response (validates the judge isn't broken). No deliberately-failed response (validates the judge isn't lenient).
+- **No second-judge cross-check.** The eval is single-judge by design for v1, but the bias-audit deliverable will want one ablation against a non-Anthropic judge.
+
+### Benchmark-internal caveats (inherited, not specific to this smoke)
+
+- Domain skew is benchmark-wide: 34 Logistics / 22 Data-Math / 0 Sales prompts in the full xlsx. Findings extrapolate to constraint-heavy planning, not all instruction-following.
+- English-only.
+- Author / creation timing of the benchmark not currently captured in run metadata.
+
 ## Cost & timing (extrapolated from smoke)
 
 | | per call (smoke avg) | full run (×N) | total |
@@ -197,6 +257,35 @@ All of `responses/`, `grades/`, `outputs/`, and `data/complexconstraints.jsonl` 
 5. **The judge is blind by construction.** `pipeline/grade.py` builds the user message from prompt + response + numbered criteria only — the candidate's name lives in the filename, never in the message body. Don't break this when refactoring.
 6. **`response_excerpt` in `judge_validation.json` is capped at 800 chars.** For longer responses, grep the matching id in `responses/{model}.jsonl` to see the full text the judge actually graded.
 7. **n=3 by-category breakdowns are nearly noise.** The interesting per-category cells (CIF-001 inverse scaling, qwen-397b judge-criteria drop) are leads to verify on the full run, not findings to act on.
+
+## Suggested next steps
+
+A flat list of concrete actions that would advance the v1 program from where
+the smoke leaves it. Each entry is scoped small enough to do in a single
+sitting and has an explicit rationale + what it improves for downstream
+experiments. Items are unordered by priority — pick the one whose blocking
+relationship best matches your current question.
+
+1. **Hand-grade the existing `outputs/judge_validation.json`** (~60 rows, ~1 hr of focused work) and run `validate --mode score`. **Why:** Without an agreement number, every pass-rate cell in `results.json` is judge-conditional with unknown error. This is the single highest-information-per-hour action between now and the writeup; nothing else in the bias-audit section can be quantified until this exists.
+2. **Run the full 75-prompt set** with `uv run python main.py all --limit 75`. **Why:** Smoke proved the pipeline is correct; full run produces the actual deliverable. Resumable, so a mid-run crash never wastes prior work.
+3. **Hand-spot-check 20 classifier outputs** in `outputs/criteria_tags.jsonl`. **Why:** The runbook explicitly calls this out as "the layer where your judgment is the product." The `verifiability` and `gameable` splits in the dashboard inherit Opus's classifier accuracy, which is currently unverified.
+4. **Add a controlled randomized prompt sampler for smokes.** Replace "first N rows" with `random.Random(SEED).sample(records, N)` so a `--limit 3` smoke draws across instruction_types and use_cases. **Why:** The current smoke had 2 of 3 prompts in the same (use_case, instruction_type) cell. Future smokes will catch category-specific breakages earlier.
+5. **Log per-call latency and token usage to a sidecar JSONL.** Append `{id, model, step, t_start, t_end, prompt_tokens, completion_tokens, reasoning_tokens, cost}` for every LLM call. **Why:** Cost extrapolation is currently rough; concrete timing data makes "should we parallelize generate?" decisions evidence-based instead of vibes-based, and feeds the bias-audit "decoding choice" subsection.
+6. **Add Anthropic prompt caching to `pipeline/grade.py`.** Cache the judge system prompt and the (prompt + criteria) prefix that is re-used across 3 candidates per benchmark item. **Why:** Judge cost dominates the full-run bill (~$50 of ~$55). Caching the shared prefix cuts judge cost ~60% with zero behavioral change.
+7. **Parallelize candidate generation.** Use a small thread pool inside `generate.run()` so the 3 Qwen candidates run concurrently per prompt. **Why:** Generation is currently sequential; the 3 candidates have no shared state and OpenRouter rate limits should easily handle parallel-3. Estimated wall-clock saving on the full run: ~1.5 hr.
+8. **Capture run-config in `outputs/run_manifest.json`.** Add fields for the git commit hash, the exact `MAX_TOKENS` / `temperature` / `EXTRA_BODY` used, judge model id, and OpenRouter response-time stats. **Why:** Currently a future reader cannot tell from `results.json` whether a result came from the reasoning-disabled config or a different one. Reproducibility requires unambiguously specifying the run.
+9. **Add a deterministic verifier for "auto"-tagged criteria.** A small Python check that confirms presence/absence/exact-string criteria against the response text, then compares against Opus's verdict. **Why:** Turns the `verifiability` tag from descriptive into operational. Disagreement counts between the deterministic check and the judge become a hard upper-bound on judge error for the auto-verifiable half of the eval.
+10. **Save raw OpenRouter response JSON alongside the extracted content.** Write `responses/{model}.raw.jsonl` with `{id, raw_response_dict}`. **Why:** Enables post-hoc analysis of `finish_reason`, `usage`, `reasoning` fields, and provider IDs (Cloudflare ray, OpenRouter request-id) without re-running. The CIF-001 inverse-scaling anomaly is hard to diagnose without this data.
+11. **Add a `--budget-dollars N` guard to `main.py`.** Before running, extrapolate from the smoke's per-call cost; abort if the projected total exceeds the budget unless overridden. **Why:** Cheap insurance against typos like `--limit 750` silently kicking off a 10× run.
+12. **Add a per-prompt criterion-order randomization treatment.** For 10 prompts, shuffle criterion order in the judge user message with a fixed seed, run grading twice (original + shuffled), and report the verdict-flip rate. **Why:** Quantifies position bias in the judge — a measurement the bias-audit deliverable currently has no number for.
+13. **Run a single-prompt regression smoke as a pre-commit hook.** A 30-second test using a fixed fixture-prompt that exercises load → generate (cached response) → grade → classify → aggregate. **Why:** Catches refactors that break the judge user-message format, the verdict-normalization logic, or the aggregation schema before they corrupt a real batch run.
+14. **Add a known-strong reference model as a control candidate.** A frontier non-Anthropic model (DeepSeek-V4, Llama-4-405B if accessible) as a fourth candidate. **Why:** Without a reference, "qwen-397b passes 69 %" has no calibration — is that strong or weak? A control anchors the readout.
+15. **Cluster judge `reason` texts to surface systematic patterns.** Group reasons by string similarity; flag clusters that contain >20 % of all FAILs. **Why:** Surfaces judge biases quantitatively — e.g., "judge fails 31 % of all rows on 'response cut off', concentrated in qwen-397b" tells you the truncation issue is grading the cap, not the model.
+
+When an item gets done, link from its bullet to the resulting commit, run
+report, or follow-up issue. Items only leave the list when finished; mark
+them `[done → <hash> | <report>]` rather than deleting them, so the lineage
+survives.
 
 ## Reproducibility
 

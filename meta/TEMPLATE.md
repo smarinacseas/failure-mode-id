@@ -120,6 +120,72 @@ Prompts in this run (or a representative subset if N is large):
 
 *Comment on whether the gap between auto and judge categories looks plausible or suggests judge bias / over-confidence.*
 
+## Experimental flaws, biases, and limitations
+
+*The headline numbers above are point estimates from this run's specific
+configuration. State explicitly what would qualify or invalidate them
+before they get carried into the dashboard or the writeup. Every report
+must fill this section even when "no new biases relative to prior runs"
+is the honest answer — reproducibility requires the absence of bias to
+be stated as deliberately as its presence.*
+
+### Sample-size + selection effects
+
+*State the actual N. Are by-category cells meaningfully populated? Was the
+sample randomized or first-N? Is the effective diversity (after deduping
+the (use_case, instruction_type, prompt_style) tuples) lower than the
+nominal N? Was each cell measured once or multiple times?*
+
+### Judge biases
+
+*For each of self-preference, verbosity, position, format, family-stake:
+controlled / measured / unmeasured / not-applicable. Cite the evidence
+or note its absence. If `Phase 6` validation was run, link the agreement
+number from "Judge validation" below.*
+
+### Classifier biases
+
+*Same Opus model running both grading and classification → correlated
+artifacts. State whether any classifier outputs were hand-checked, and
+how many. Note whether the `auto` verifiability tag was actually
+operationalized via a deterministic checker or remains descriptive only.*
+
+### Decoding-mode caveats
+
+*What decoding configuration was used (temperature, top_p, max_tokens,
+reasoning-mode). Which production deployment modes does this configuration
+**not** generalize to. Did any responses hit the token cap?*
+
+### Anomaly hypotheses (not yet ruled in or out)
+
+*For each per-category cell or per-prompt result that looks surprising,
+list the plausible explanations — "real signal" + the most likely
+artifact-driven alternatives. Future runs distinguishing between them
+goes in "Next experiments" or "Suggested next steps".*
+
+| Observation | Real? | Alternative explanations |
+| --- | --- | --- |
+| *…* | *…* | *…* |
+
+### Provider-side uncontrolled variance
+
+*OpenRouter routing, Anthropic API load, time-of-day, provider-side
+caching state. Any reliability events observed (timeouts, malformed
+responses, rate-limit hits) and whether they reproduce.*
+
+### Missing validation
+
+*Anything the v1 plan calls for that this run did not do. The most
+common entry is "Phase 6 not yet run for this batch" — say so explicitly
+even when it's obvious from the absence of a Judge-validation section.*
+
+### Benchmark-internal caveats (inherited)
+
+*Caveats that apply to every run because they live in the source data:
+domain skew, language coverage, missing demographic data, IP /
+attribution constraints on what can be published. Inherit by reference
+from the prior report unless something changed.*
+
 ## Cost & timing
 
 *Use per-call averages from the run to extrapolate. Include both wall-clock and dollar figures. If different from the previous run, explain the delta.*
@@ -214,6 +280,39 @@ designed enough to run.*
 - **Depends on**: *v1 full-run grades/ files (responses are re-graded, not re-generated).*
 
 *Add experiments below as they get designed. When an experiment is run, link from its entry to the resulting report file in this directory and mark it `[run YYYY-MM-DD → 2026-MM-DD-<run-name>.md]`. Do not delete completed entries — they are the lineage.*
+
+## Suggested next steps
+
+*A flat, scoped-small list of concrete actions that advance the program
+from where this run leaves it. Distinct from "Next experiments" above:
+that section is for designed experiments testing a hypothesis. This
+section is for everything else worth doing — instrumentation upgrades,
+methodological improvements, follow-up validations, infrastructure work.
+Items should be individually small enough to do in one sitting; if an
+item needs decomposition, decompose it.*
+
+*Entry format — concrete action + brief rationale + what it improves:*
+
+1. ***<action verb> <object>*** *(<rough effort estimate>).* ***Why:*** *what gap or risk this addresses and what becomes possible / safer / cheaper / more credible afterward.*
+2. ***…***
+
+*When an item gets done, link from its bullet to the resulting commit,
+run report, or issue — `[done → <hash>]` or `[done → <report.md>]` —
+rather than deleting it. The history of what got tried (and what
+didn't) is the lineage that future-you will want.*
+
+*Common categories of suggestions, for prompting your thinking:*
+
+- *Validation work that the v1 plan called for but this run didn't do.*
+- *Instrumentation that would have made this run's diagnostics faster.*
+- *Cost / wall-clock reductions (caching, parallelism, budget guards).*
+- *Methodological hardening (randomization treatments, deterministic verifiers, control prompts, reference candidates).*
+- *Reproducibility hardening (capture more config in `run_manifest.json`, save raw response bodies, log provider request IDs).*
+- *Bias-audit measurements that need a number for the writeup.*
+- *Regression / safety nets (pre-commit smoke, budget guard, schema-version tag in outputs).*
+
+*Pick from any category — the goal is a varied list that, taken together,
+would meaningfully strengthen the next run.*
 
 ## Judge validation (if applicable)
 
