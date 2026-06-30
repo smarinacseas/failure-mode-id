@@ -10,13 +10,28 @@ def _response_path(key: str):
     return RESPONSES_DIR / f"{key}.jsonl"
 
 
+# Two deviations from the original spec's `max_tokens=4000`, both forced by
+# Qwen3.5 being a thinking-mode family:
+#   1. `reasoning.enabled: False` — without this, Qwen burns the entire
+#      token budget on internal chain-of-thought (15k+ reasoning tokens
+#      observed on the rota prompt) and emits zero visible `content`.
+#   2. `max_tokens=8000` — complex multi-constraint prompts produce 4k+
+#      token responses; at 4000 the model truncated mid-answer with
+#      finish_reason=length, which is unfair to the grader.
+# Net effect: a faithful no-CoT eval of the model's instruction-following.
+MAX_TOKENS = 8000
+EXTRA_BODY = {"reasoning": {"enabled": False}}
+
+
 def _generate_one(model_id: str, prompt: str) -> str:
     def _call():
         resp = router.chat.completions.create(
             model=model_id,
             temperature=0,
-            max_tokens=4000,
+            max_tokens=MAX_TOKENS,
             messages=[{"role": "user", "content": prompt}],
+            extra_body=EXTRA_BODY,
+            timeout=300.0,
         )
         return resp.choices[0].message.content or ""
 

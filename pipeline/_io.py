@@ -43,7 +43,12 @@ def retry(
     attempts: int = 5,
     base_delay: float = 1.0,
 ) -> T:
-    """Call fn() with exponential backoff on transient errors (429/5xx/network)."""
+    """Call fn() with exponential backoff on transient errors.
+
+    Retries 429s, 5xx, network/timeout, and provider SDK parse errors —
+    OpenRouter occasionally returns mid-stream-truncated bodies that
+    bubble up as JSONDecodeError before our code ever sees them.
+    """
     last_exc: Exception | None = None
     for i in range(attempts):
         try:
@@ -51,6 +56,7 @@ def retry(
         except Exception as e:  # noqa: BLE001 — provider SDKs raise heterogeneous types
             last_exc = e
             msg = str(e).lower()
+            name = type(e).__name__.lower()
             retriable = (
                 "429" in msg
                 or "rate" in msg
@@ -61,6 +67,11 @@ def retry(
                 or "504" in msg
                 or "500" in msg
                 or "connection" in msg
+                or "jsondecode" in name           # malformed body from upstream
+                or "remoteprotocol" in name        # httpx mid-stream cutoff
+                or "readtimeout" in name
+                or "apierror" in name
+                or "apiconnection" in name
             )
             if i == attempts - 1 or not retriable:
                 raise
