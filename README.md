@@ -1,2 +1,19 @@
-# failure-mode-id
-Evaluation of open models (Qwen family) against Complex Constraints Benchmark Set (Surge AI), LLM-as-a-judge (Opus 4.8), failure-mode analysis + bias audit
+# Failure Mode ID
+Evaluation of open models (Qwen family) against Complex Constraints Benchmark Set (Surge AI) using LLM-as-a-judge (Opus 4.8). Incudes failure-mode analysis and bias audit.
+
+
+## Data & Attribution
+This project evaluates models against the **Complex Constraints Benchmark Set**,
+released by Surge AI under CC-BY-4.0.
+- Source: <dataset URL from the HF page](https://huggingface.co/datasets/surgeai/ComplexConstraints>
+- License: CC-BY-4.0 (https://creativecommons.org/licenses/by/4.0/)
+- Citation: <@misc{complex_constraints_benchmark,
+  title  = {Complex Constraints Benchmark Set},
+  author = {TODO: authors},
+  year   = {2025},
+  url    = {TODO: dataset URL}
+}
+>
+- Modifications: generated model responses, derived per-criterion pass/fail
+  grades via an LLM judge, and classified criteria for verifiability and
+  reward-hackability. These derived artifacts and all code are MIT-licensed.
