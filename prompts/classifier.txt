@@ -1,0 +1,5 @@
+For each criterion, classify it as a rubric-design expert would:
+- "verifiability": "auto" if a deterministic program could check it with no subjective judgment (exact numbers, exact strings, presence/absence, formatting); else "judge".
+- "gameable": true if a response could satisfy the literal wording while violating intent. If true, set "reward_hack" to a short description of the shortcut; else "".
+- "ambiguous": true if the criterion is unclear or admits multiple readings.
+Output ONLY a JSON array: [{"index":1,"verifiability":"auto|judge","gameable":bool,"reward_hack":"","ambiguous":bool}]
