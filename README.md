@@ -1,4 +1,4 @@
-# Failure Mode ID
+# Failure Mode ID 🔨
 Evaluation of open models (Qwen family) against Complex Constraints Benchmark Set (Surge AI) using LLM-as-a-judge (Opus 4.8). Incudes failure-mode analysis and bias audit.
 
 
