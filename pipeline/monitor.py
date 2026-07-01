@@ -14,9 +14,16 @@ import json
 import logging
 import os
 import time
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+
+from rich.console import Console
+from rich.live import Live
+from rich.text import Text
+
+from config import CANDIDATES, LOGS_DIR, PROGRESS_PATH
 
 # Stage order + how each stage's total is derived from (limit L, n_candidates M).
 _STEP_ORDER = ("connectivity", "load", "generate", "grade", "classify", "validate", "aggregate")
@@ -377,3 +384,67 @@ class LogSink(Sink):
         self._handler.flush()
         self.logger.removeHandler(self._handler)
         self._handler.close()
+
+
+_NOTICE_LEVELS = {"WARNING": "yellow", "ERROR": "red", "NOTE": "cyan"}
+
+
+class ConsoleSink(Sink):
+    """Live rich bars in the terminal; notices print above the live region."""
+
+    def __init__(self, console: Console | None = None) -> None:
+        self.console = console or Console()
+        self._live: Live | None = None
+
+    def _render(self, monitor: "RunMonitor") -> Text:
+        return Text(render_lines(monitor.snapshot()))
+
+    def update(self, monitor: "RunMonitor") -> None:
+        if self._live is None:
+            self._live = Live(self._render(monitor), console=self.console,
+                              refresh_per_second=8, transient=False)
+            self._live.start()
+        else:
+            self._live.update(self._render(monitor))
+
+    def log(self, monitor: "RunMonitor", level: str, message: str) -> None:
+        color = _NOTICE_LEVELS.get(level)
+        if color is None:                       # INFO item ticks: bars already show them
+            return
+        self.console.print(f"[{color}]{level}[/{color}] {message}")
+
+    def close(self, monitor: "RunMonitor") -> None:
+        if self._live is not None:
+            self._live.update(self._render(monitor))
+            self._live.stop()
+            self._live = None
+        done, total = monitor._overall()
+        self.console.print(
+            f"{monitor.experiment or 'untagged'} {monitor.state} · {done}/{total} items "
+            f"· {monitor.retries} retries · {monitor.errors} errors "
+            f"· {_fmt_dur(monitor.elapsed_s)}"
+        )
+
+
+def default_sinks(experiment: str | None) -> list[Sink]:
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_path = LOGS_DIR / f"{experiment or 'untagged'}-{stamp}.log"
+    return [ConsoleSink(), LogSink(log_path), StatusSink(PROGRESS_PATH)]
+
+
+def build_monitor(step: str, limit: int, experiment: str | None = None,
+                  sinks: list[Sink] | None = None) -> RunMonitor:
+    plan = WorkPlan.for_step(step, limit, len(CANDIDATES))
+    return RunMonitor(plan, experiment=experiment,
+                      sinks=default_sinks(experiment) if sinks is None else sinks)
+
+
+def stage_ctx(monitor: "RunMonitor | None", step: str, limit_hint: int):
+    """Reuse the caller's monitor, or build a standalone one for this step.
+
+    Steps call this so they run both under `main`'s shared monitor (passed in)
+    and standalone (`python -m pipeline.generate` / tests) with a fresh one.
+    """
+    if monitor is not None:
+        return nullcontext(monitor)
+    return build_monitor(step, limit_hint)

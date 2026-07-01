@@ -1,0 +1,39 @@
+import io
+
+from rich.console import Console
+
+from pipeline.monitor import (
+    ConsoleSink, RunMonitor, WorkPlan, build_monitor, default_sinks,
+)
+
+
+def test_console_sink_runs_without_error_and_prints_notices():
+    buf = io.StringIO()
+    console = Console(file=buf, force_terminal=False, width=100)
+    m = RunMonitor(WorkPlan.for_step("grade", 2, 1), experiment="E99-test",
+                   sinks=[ConsoleSink(console=console)])
+    with m:
+        m.start_stage("grade", total=2)
+        m.item_start(model="m1", prompt_id="p1")
+        m.item_done()
+        m.record_error("grade m1 p2: boom")        # ERROR notice -> printed
+        m.note("heads up")                          # NOTE notice -> printed
+    out = buf.getvalue()
+    assert "boom" in out
+    assert "heads up" in out
+
+
+def test_default_sinks_shape(tmp_path, monkeypatch):
+    import pipeline.monitor as monitor
+    monkeypatch.setattr(monitor, "LOGS_DIR", tmp_path / "logs")
+    monkeypatch.setattr(monitor, "PROGRESS_PATH", tmp_path / "progress.json")
+    sinks = default_sinks("E02-v1-75p")
+    kinds = {type(s).__name__ for s in sinks}
+    assert kinds == {"ConsoleSink", "LogSink", "StatusSink"}
+
+
+def test_build_monitor_uses_workplan_and_candidate_count(monkeypatch):
+    import pipeline.monitor as monitor
+    monkeypatch.setattr(monitor, "CANDIDATES", {"a": "x", "b": "y"})
+    m = build_monitor("generate", limit=4, experiment=None, sinks=[])
+    assert m.plan.get("generate").total == 8      # 4 * 2 candidates
