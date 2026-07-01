@@ -21,7 +21,7 @@
 
 ---
 
-### Task A: Project setup — dependencies, config paths, test scaffolding
+### Task 1: Project setup — dependencies, config paths, test scaffolding
 
 **Files:**
 - Modify: `pyproject.toml`
@@ -113,7 +113,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task B: `Stage` + `WorkPlan` (state model, no I/O)
+### Task 2: `Stage` + `WorkPlan` (state model, no I/O)
 
 **Files:**
 - Create: `pipeline/monitor.py`
@@ -193,7 +193,7 @@ pluggable sinks (console bars, log file, progress.json). Pipeline steps emit
 semantic events and know nothing about rendering. See
 docs/superpowers/specs/2026-07-01-experiment-progress-monitoring-design.md.
 
-This file is built up across several tasks; Task B adds Stage + WorkPlan.
+This file is built up across several tasks; Task 2 adds Stage + WorkPlan.
 """
 
 from __future__ import annotations
@@ -285,14 +285,14 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task C: `RunMonitor` core — events, snapshot, render, ACTIVE
+### Task 3: `RunMonitor` core — events, snapshot, render, ACTIVE
 
 **Files:**
 - Modify: `pipeline/monitor.py` (append)
 - Create: `tests/test_monitor.py`
 
 **Interfaces:**
-- Consumes: `Stage`, `WorkPlan` (Task B).
+- Consumes: `Stage`, `WorkPlan` (Task 2).
 - Produces:
   - `class Sink` base with no-op `update(monitor)`, `log(monitor, level, message)`, `close(monitor)`.
   - `class RecordingSink(Sink)` — test helper; `.snapshots: list[dict]`, `.logs: list[tuple[str,str]]`.
@@ -604,7 +604,7 @@ class RunMonitor:
 
 
 # --------------------------------------------------------------------------- #
-# Rendering — shared by ConsoleSink (Task E) and `main.py status` (Task L).
+# Rendering — shared by ConsoleSink (Task 5) and `main.py status` (Task 12).
 # --------------------------------------------------------------------------- #
 def _fmt_dur(seconds: float | None) -> str:
     if seconds is None:
@@ -665,14 +665,14 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task D: File sinks — `StatusSink` + `LogSink`
+### Task 4: File sinks — `StatusSink` + `LogSink`
 
 **Files:**
 - Modify: `pipeline/monitor.py` (append)
 - Create: `tests/test_file_sinks.py`
 
 **Interfaces:**
-- Consumes: `Sink`, `RunMonitor` (Task C).
+- Consumes: `Sink`, `RunMonitor` (Task 3).
 - Produces:
   - `StatusSink(path: Path, min_interval: float = 1.0)` — writes `snapshot()` to `path` atomically, throttled; forces a write on `close`.
   - `LogSink(path: Path)` — a `logging.Logger` + `FileHandler`; `log()` writes `<ts> <LEVEL> <message>`; `close()` flushes/detaches. `NOTE` maps to `INFO`.
@@ -812,14 +812,14 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task E: `ConsoleSink` (rich live display) + monitor factories
+### Task 5: `ConsoleSink` (rich live display) + monitor factories
 
 **Files:**
 - Modify: `pipeline/monitor.py` (append)
 - Create: `tests/test_console_sink.py`
 
 **Interfaces:**
-- Consumes: `Sink`, `RunMonitor`, `render_lines` (Task C), `StatusSink`/`LogSink` (Task D), `config.CANDIDATES`, `config.LOGS_DIR`, `config.PROGRESS_PATH`.
+- Consumes: `Sink`, `RunMonitor`, `render_lines` (Task 3), `StatusSink`/`LogSink` (Task 4), `config.CANDIDATES`, `config.LOGS_DIR`, `config.PROGRESS_PATH`.
 - Produces:
   - `ConsoleSink(console=None)` — rich `Live`; `update()` re-renders bars; `log()` prints `WARNING`/`ERROR`/`NOTE` above the live region; `close()` stops the live and prints a one-line summary. Degrades to plain lines when not a TTY.
   - `default_sinks(experiment: str | None) -> list[Sink]`.
@@ -979,14 +979,14 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task F: Route `_io.retry` through the monitor; drop dead helper
+### Task 6: Route `_io.retry` through the monitor; drop dead helper
 
 **Files:**
 - Modify: `pipeline/_io.py:39-81` (`retry`), remove `iter_progress` (`:88-93`)
 - Create: `tests/test_io_retry.py`
 
 **Interfaces:**
-- Consumes: `pipeline.monitor.note_retry` (Task C).
+- Consumes: `pipeline.monitor.note_retry` (Task 3).
 - Produces: `retry()` calls `monitor.note_retry(...)` on each backoff instead of `print`. Signature unchanged.
 
 - [ ] **Step 1: Confirm `iter_progress` is unused**
@@ -1068,14 +1068,14 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task G: Instrument `generate` + make it continue-on-error
+### Task 7: Instrument `generate` + make it continue-on-error
 
 **Files:**
 - Modify: `pipeline/generate.py:49-63` (`run`)
 - Create: `tests/test_generate_monitor.py`
 
 **Interfaces:**
-- Consumes: `RunMonitor`, `build_monitor` (Tasks C/E).
+- Consumes: `RunMonitor`, `build_monitor` (Tasks 3/5).
 - Produces: `generate.run(limit=None, monitor=None)`. On exhausted-retry failure of a candidate call: log via `monitor.record_error`, skip writing that response, `item_done()`, continue.
 
 - [ ] **Step 1: Write the failing test**
@@ -1178,7 +1178,7 @@ def run(limit: int | None = None, monitor: RunMonitor | None = None) -> None:
         mon.end_stage()
 ```
 
-`stage_ctx` comes from `pipeline.monitor` (Task E) — Tasks H–J import it the same way.
+`stage_ctx` comes from `pipeline.monitor` (Task 5) — Tasks 8–10 import it the same way.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -1196,7 +1196,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task H: Instrument `grade` + `classify`
+### Task 8: Instrument `grade` + `classify`
 
 **Files:**
 - Modify: `pipeline/grade.py:97-119` (`run`)
@@ -1204,7 +1204,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Create: `tests/test_grade_classify_monitor.py`
 
 **Interfaces:**
-- Consumes: `RunMonitor`, `stage_ctx` (from `pipeline.monitor`, Task E).
+- Consumes: `RunMonitor`, `stage_ctx` (from `pipeline.monitor`, Task 5).
 - Produces: `grade.run(limit=None, monitor=None)` and `classify.run(limit=None, monitor=None)`, both emitting per-item events; a judge/classifier parse failure calls `monitor.record_error`.
 
 - [ ] **Step 1: Write the failing test**
@@ -1358,7 +1358,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task I: Instrument `load` + `connectivity`
+### Task 9: Instrument `load` + `connectivity`
 
 **Files:**
 - Modify: `pipeline/load.py:35-55` (`run`)
@@ -1366,7 +1366,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Create: `tests/test_load_connectivity_monitor.py`
 
 **Interfaces:**
-- Consumes: `RunMonitor`, `stage_ctx` (from `pipeline.monitor`, Task E).
+- Consumes: `RunMonitor`, `stage_ctx` (from `pipeline.monitor`, Task 5).
 - Produces: `load.run(limit=None, monitor=None) -> int` and `connectivity.run(monitor=None)`, both emitting per-item events and routing summaries through `monitor.note`.
 
 - [ ] **Step 1: Write the failing test**
@@ -1546,7 +1546,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task J: Instrument `validate` + `aggregate`
+### Task 10: Instrument `validate` + `aggregate`
 
 **Files:**
 - Modify: `pipeline/validate.py:63-78` (`sample`), `:149-155` (`run`)
@@ -1554,7 +1554,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Create: `tests/test_validate_aggregate_monitor.py`
 
 **Interfaces:**
-- Consumes: `RunMonitor`, `stage_ctx` (from `pipeline.monitor`, Task E).
+- Consumes: `RunMonitor`, `stage_ctx` (from `pipeline.monitor`, Task 5).
 - Produces: `validate.run(mode="sample", monitor=None)` and `aggregate.run(..., monitor=None)`, each wrapping its work in a `validate`/`aggregate` stage and routing prints through `monitor.note`.
 
 - [ ] **Step 1: Write the failing test**
@@ -1693,14 +1693,14 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task K: Wire the monitor into `main.py`
+### Task 11: Wire the monitor into `main.py`
 
 **Files:**
 - Modify: `main.py` (whole file)
 - Create: `tests/test_main_wiring.py`
 
 **Interfaces:**
-- Consumes: `build_monitor`, `render_lines` (Tasks C/E); every step's `run(..., monitor=...)`.
+- Consumes: `build_monitor`, `render_lines` (Tasks 3/5); every step's `run(..., monitor=...)`.
 - Produces: `main()` drives one `RunMonitor` per invocation (both `all` and single-step) and passes it into each step.
 
 - [ ] **Step 1: Write the failing test**
@@ -1882,14 +1882,14 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task L: `status` command rendering + staleness (integration)
+### Task 12: `status` command rendering + staleness (integration)
 
 **Files:**
 - Create: `tests/test_status_command.py`
 
 **Interfaces:**
-- Consumes: `main._print_status`, `main.PROGRESS_PATH` (Task K).
-- Produces: a passing end-to-end check of the status reader against a written heartbeat, including the stale case. (No production code beyond Task K — this task hardens the `status` path.)
+- Consumes: `main._print_status`, `main.PROGRESS_PATH` (Task 11).
+- Produces: a passing end-to-end check of the status reader against a written heartbeat, including the stale case. (No production code beyond Task 11 — this task hardens the `status` path.)
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1944,7 +1944,7 @@ def test_status_missing_file(tmp_path, monkeypatch, capsys):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_status_command.py -v`
-Expected: If Task K is complete, these may PASS immediately. If any fail (e.g. stale threshold), fix `main._print_status` accordingly. If they pass first try, that confirms the integration — proceed.
+Expected: If Task 11 is complete, these may PASS immediately. If any fail (e.g. stale threshold), fix `main._print_status` accordingly. If they pass first try, that confirms the integration — proceed.
 
 - [ ] **Step 3: Full suite + a real smoke render**
 
@@ -1973,30 +1973,30 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 | Spec section | Task(s) |
 | --- | --- |
-| §3 RunMonitor + sinks architecture | B, C, D, E |
-| §4.1 monitor.py (Stage/WorkPlan/RunMonitor/ACTIVE) | B, C |
-| §4.2 ConsoleSink / LogSink / StatusSink | D, E |
-| §4.3 main.py WorkPlan + `status` verb | K, L |
-| §4.4 step instrumentation + already_done seeding | G, H, I, J |
-| §4.5 config paths | A |
-| §4.6 rich dependency | A |
-| §5 WorkPlan totals (606) | B |
-| §6 progress.json schema | C (snapshot), D (StatusSink) |
-| §7 ETA rolling window + throttling | B (Stage.eta), C (RunMonitor.eta), D (StatusSink throttle) |
-| §8 console layout | C (render_lines), E (ConsoleSink) |
-| §9 generate continue-on-error | G |
-| §10 testing via recording fake sink | C (RecordingSink) + every step task |
-| §11 files touched | all tasks; `_io.iter_progress` removed in F |
-| §12 timestamped log filenames, gitignore | E (default_sinks), A (paths under outputs/) |
+| §3 RunMonitor + sinks architecture | 2, 3, 4, 5 |
+| §4.1 monitor.py (Stage/WorkPlan/RunMonitor/ACTIVE) | 2, 3 |
+| §4.2 ConsoleSink / LogSink / StatusSink | 4, 5 |
+| §4.3 main.py WorkPlan + `status` verb | 11, 12 |
+| §4.4 step instrumentation + already_done seeding | 7, 8, 9, 10 |
+| §4.5 config paths | 1 |
+| §4.6 rich dependency | 1 |
+| §5 WorkPlan totals (606) | 2 |
+| §6 progress.json schema | 3 (snapshot), 4 (StatusSink) |
+| §7 ETA rolling window + throttling | 2 (Stage.eta), 3 (RunMonitor.eta), 4 (StatusSink throttle) |
+| §8 console layout | 3 (render_lines), 5 (ConsoleSink) |
+| §9 generate continue-on-error | 7 |
+| §10 testing via recording fake sink | 3 (RecordingSink) + every step task |
+| §11 files touched | all tasks; `_io.iter_progress` removed in 6 |
+| §12 timestamped log filenames, gitignore | 5 (default_sinks), 1 (paths under outputs/) |
 
 No spec requirement is unassigned.
 
-**2. Placeholder scan** — every code step contains complete, runnable code. The one prose-described change (Task J Step 4, mechanical `print → mon.note` over aggregate's moved body) names each of the 8 print sites explicitly rather than leaving it vague; the transformation is uniform and shown by example.
+**2. Placeholder scan** — every code step contains complete, runnable code. The one prose-described change (Task 10 Step 4, mechanical `print → mon.note` over aggregate's moved body) names each of the 8 print sites explicitly rather than leaving it vague; the transformation is uniform and shown by example.
 
-**3. Type consistency** — `RunMonitor` method names (`start_stage`, `item_start`, `item_done`, `end_stage`, `record_error`, `record_retry`, `note`, `snapshot`), the `Sink` triple (`update`/`log`/`close`), module helpers (`note_retry`/`note_error`/`ACTIVE`), `render_lines`, `build_monitor`, `default_sinks`, and `stage_ctx` (defined in Task E's monitor.py, imported by G/H/I/J) are used identically across tasks. Step signatures converge on `run(..., monitor: RunMonitor | None = None)` everywhere; `load.run` additionally keeps its `-> int` return.
+**3. Type consistency** — `RunMonitor` method names (`start_stage`, `item_start`, `item_done`, `end_stage`, `record_error`, `record_retry`, `note`, `snapshot`), the `Sink` triple (`update`/`log`/`close`), module helpers (`note_retry`/`note_error`/`ACTIVE`), `render_lines`, `build_monitor`, `default_sinks`, and `stage_ctx` (defined in Task 5's monitor.py, imported by 7/8/9/10) are used identically across tasks. Step signatures converge on `run(..., monitor: RunMonitor | None = None)` everywhere; `load.run` additionally keeps its `-> int` return.
 
 ## Notes for the implementer
 
 - Run `uv run pytest -q` after each task; the suite must stay green.
-- Steps import `stage_ctx` from `pipeline.monitor` (Task E) — it needs `build_monitor`, so Task E precedes the step tasks.
+- Steps import `stage_ctx` from `pipeline.monitor` (Task 5) — it needs `build_monitor`, so Task 5 precedes the step tasks.
 - The live display and raw `print()` cannot coexist — that's why every step's per-item `print` is replaced by monitor events and every summary `print` by `mon.note`. If you spot a stray `print` in an instrumented module, route it through `mon.note`.
