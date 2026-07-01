@@ -1,5 +1,7 @@
 # Failure Mode ID
 
+Results: <https://smarinacseas.github.io/failure-mode-id/>
+
 A criterion-level instruction-following loss analysis for open language
 models. The pipeline runs Surge AI's **Complex Constraints** benchmark
 through a Qwen3.5 size ladder, grades every criterion in every response
@@ -9,7 +11,7 @@ and emits a single `outputs/results.json` for a separate dashboard to
 consume.
 
 **v1 is eval-only.** No training, no fine-tuning. The deliverable is a
-clear picture of *where* current open models fail on constraint-dense
+clear picture of _where_ current open models fail on constraint-dense
 prompts, with explicit bias controls and an honest limitations audit
 attached. Training-time interventions are v2.
 
@@ -41,11 +43,11 @@ literally-judgeable condition the response must satisfy.
 
 The prompt mix varies along three axes that v1's analysis breaks out:
 
-| axis | values |
-| --- | --- |
+| axis               | values                                                                 |
+| ------------------ | ---------------------------------------------------------------------- |
 | `instruction_type` | e.g. Negative (must-not constraints), Multistep (sequenced operations) |
-| `prompt_style` | Direct, Context prompting, Rambling/Stream-of-Consciousness |
-| `use_case` | Logistics/Scheduling/Event Planning, Data Processing/Formatting/Math |
+| `prompt_style`     | Direct, Context prompting, Rambling/Stream-of-Consciousness            |
+| `use_case`         | Logistics/Scheduling/Event Planning, Data Processing/Formatting/Math   |
 
 The benchmark skews toward constraint-heavy planning tasks, not all
 instruction-following — a domain caveat that the bias-audit deliverable
@@ -87,22 +89,22 @@ A linear, resumable pipeline driven by a single CLI:
 
 ### Per-step contracts
 
-| step | input | output | LLM calls |
-| --- | --- | --- | --- |
-| `load` | `data/ComplexConstraints.xlsx` | `data/complexconstraints.jsonl` (one JSON line per prompt with `id`, `prompt`, `use_case`, `instruction_type`, `prompt_style`, `criteria[]`) | 0 |
-| `generate` | `data/complexconstraints.jsonl`, `CANDIDATES` registry | `responses/{model}.jsonl` (one line per prompt: `{id, response}`) | 1 per (prompt, candidate) |
-| `grade` | prompts + responses + `prompts/judge.txt` | `grades/{model}.jsonl` (one line per prompt: `{id, verdicts[{index, verdict, reason}]}`) | 1 per (prompt, candidate) |
-| `classify` | prompts + `prompts/classifier.txt` | `outputs/criteria_tags.jsonl` (one line per prompt: `{id, tags[{index, verifiability, gameable, reward_hack, ambiguous}]}`) | 1 per prompt |
-| `validate --mode sample` | grades + responses | `outputs/judge_validation.json` (60 fixed-seed rows for human grading: model, id, criterion, judge_verdict, human="") | 0 |
-| `validate --mode score` | filled `judge_validation.json` | merges `judge_agreement` block into `outputs/run_manifest.json` | 0 |
-| `aggregate` | everything above | `outputs/results.json` (dashboard handoff) + `outputs/run_manifest.json` (run metadata) | 0 |
+| step                     | input                                                  | output                                                                                                                                       | LLM calls                 |
+| ------------------------ | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `load`                   | `data/ComplexConstraints.xlsx`                         | `data/complexconstraints.jsonl` (one JSON line per prompt with `id`, `prompt`, `use_case`, `instruction_type`, `prompt_style`, `criteria[]`) | 0                         |
+| `generate`               | `data/complexconstraints.jsonl`, `CANDIDATES` registry | `responses/{model}.jsonl` (one line per prompt: `{id, response}`)                                                                            | 1 per (prompt, candidate) |
+| `grade`                  | prompts + responses + `prompts/judge.txt`              | `grades/{model}.jsonl` (one line per prompt: `{id, verdicts[{index, verdict, reason}]}`)                                                     | 1 per (prompt, candidate) |
+| `classify`               | prompts + `prompts/classifier.txt`                     | `outputs/criteria_tags.jsonl` (one line per prompt: `{id, tags[{index, verifiability, gameable, reward_hack, ambiguous}]}`)                  | 1 per prompt              |
+| `validate --mode sample` | grades + responses                                     | `outputs/judge_validation.json` (60 fixed-seed rows for human grading: model, id, criterion, judge_verdict, human="")                        | 0                         |
+| `validate --mode score`  | filled `judge_validation.json`                         | merges `judge_agreement` block into `outputs/run_manifest.json`                                                                              | 0                         |
+| `aggregate`              | everything above                                       | `outputs/results.json` (dashboard handoff) + `outputs/run_manifest.json` (run metadata)                                                      | 0                         |
 
 ## Experimental process
 
 The intended workflow for any new run is:
 
 1. **Verify model IDs** — `connectivity` catches stale or mistyped IDs against the providers.
-2. **Smoke first** — `all --limit 3` exercises every step end-to-end on the cost of a coffee. Catches schema bugs, provider quirks (Qwen reasoning-mode is *the* gotcha; see `meta/2026-06-30-smoke-test.md`), JSON parse failures, and timing surprises before they cost real hours.
+2. **Smoke first** — `all --limit 3` exercises every step end-to-end on the cost of a coffee. Catches schema bugs, provider quirks (Qwen reasoning-mode is _the_ gotcha; see `meta/2026-06-30-smoke-test.md`), JSON parse failures, and timing surprises before they cost real hours.
 3. **Full run** — `all --limit 75` runs sequentially; resumable. Roughly $50–60 and 4–6 hours wall-clock on a fresh run.
 4. **Human-validate the judge** — hand-grade the 60 rows in `outputs/judge_validation.json`, run `validate --mode score`. The agreement % is the credibility keystone; the bias-audit deliverable depends on it.
 5. **Re-aggregate** — `aggregate --limit 75` to fold the agreement number into `run_manifest.json` (results.json doesn't change).
@@ -119,7 +121,7 @@ pipeline is decoupled at the JSONL boundary).
 - **Reasoning disabled** on Qwen3.5 via OpenRouter's `reasoning.enabled: false`. Forced by the empirical discovery in the v1 smoke that thinking-mode burned the entire token budget on internal CoT and emitted zero visible content on every complex prompt. The pipeline now tests these models' no-CoT instruction-following, which is the realistic production-deployment condition for many users. The diagnostic is in `pipeline/generate.py` and the full account in `meta/2026-06-30-smoke-test.md`.
 - **`max_tokens = 8000`** for candidate calls — empirically the smallest value at which complex responses finish naturally (`finish_reason: stop`) rather than truncating.
 - **Defensive JSON extraction** for judge and classifier outputs — strip code fences, parse, then fall back to balanced-bracket scanning; retry once on parse failure; fall back to all-FAIL with a clear `judge_parse_error` reason on persistent failure. A flaky judge call never crashes the batch.
-- **Broad retry predicate** — 429s, 5xx, network errors, *and* SDK-level parse errors (OpenRouter has been observed returning mid-stream-truncated JSON bodies). Exponential backoff with jitter.
+- **Broad retry predicate** — 429s, 5xx, network errors, _and_ SDK-level parse errors (OpenRouter has been observed returning mid-stream-truncated JSON bodies). Exponential backoff with jitter.
 - **Sequential by design for v1.** No parallelism between candidates or prompts. The simple model is correct; parallelism is on the suggested-next-steps list.
 
 ## Experiment tagging + dashboard handoff
@@ -135,13 +137,13 @@ E<NN>-<kebab-case-label>
 The two-digit number gives dropdown ordering. The label is 1–3
 kebab-case tokens that hint at what makes the experiment different:
 
-| slug | meaning |
-| --- | --- |
-| `E01-smoke-3p` | first smoke, 3 prompts |
-| `E02-v1-75p` | v1 full run, 75 prompts |
-| `E03-reasoning-on` | reasoning-enabled ablation |
-| `E04-judge-swap` | judge replaced by a non-Anthropic model |
-| `E05-cross-family` | DeepSeek added as a fourth candidate |
+| slug               | meaning                                 |
+| ------------------ | --------------------------------------- |
+| `E01-smoke-3p`     | first smoke, 3 prompts                  |
+| `E02-v1-75p`       | v1 full run, 75 prompts                 |
+| `E03-reasoning-on` | reasoning-enabled ablation              |
+| `E04-judge-swap`   | judge replaced by a non-Anthropic model |
+| `E05-cross-family` | DeepSeek added as a fourth candidate    |
 
 Passing `--experiment SLUG --description "..." --run-report meta/..."`
 does three things:
@@ -215,7 +217,7 @@ uv run python main.py <step> [--limit N] [--mode sample|score]
 steps:  load | generate | grade | classify | validate | aggregate | all | connectivity
 ```
 
-Every step honors `--limit`. `all` *requires* `--limit` — there is no default-to-full-set behavior, so production runs are always explicit.
+Every step honors `--limit`. `all` _requires_ `--limit` — there is no default-to-full-set behavior, so production runs are always explicit.
 
 ## Project layout
 
@@ -264,11 +266,11 @@ meta/                     # run reports
 
 ## Roadmap
 
-| | scope | status |
-| --- | --- | --- |
-| **v1** | Eval-only. Qwen size ladder. Blind Opus judge. Verifiability + gameability classifier. Judge validation against a human-graded sample. Single `results.json` for an external dashboard. Bias-audit deliverable. | pipeline complete; smoke green; awaiting full 75-prompt run + human validation |
-| **v1.5** | Add a cross-family candidate (DeepSeek) to distinguish Qwen-specific failure modes from general open-model patterns. Add Anthropic prompt caching to cut judge cost. Possibly parallelize candidate generation. | proposed; tracked in `meta/2026-06-30-smoke-test.md` next-steps |
-| **v2** | Training-time interventions. The eval surface stays; the candidates become outputs of a rubric-and-verifier RL pipeline. Out of scope for this repo. | future |
+|          | scope                                                                                                                                                                                                           | status                                                                         |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| **v1**   | Eval-only. Qwen size ladder. Blind Opus judge. Verifiability + gameability classifier. Judge validation against a human-graded sample. Single `results.json` for an external dashboard. Bias-audit deliverable. | pipeline complete; smoke green; awaiting full 75-prompt run + human validation |
+| **v1.5** | Add a cross-family candidate (DeepSeek) to distinguish Qwen-specific failure modes from general open-model patterns. Add Anthropic prompt caching to cut judge cost. Possibly parallelize candidate generation. | proposed; tracked in `meta/2026-06-30-smoke-test.md` next-steps                |
+| **v2**   | Training-time interventions. The eval surface stays; the candidates become outputs of a rubric-and-verifier RL pipeline. Out of scope for this repo.                                                            | future                                                                         |
 
 ## Data & Attribution
 
