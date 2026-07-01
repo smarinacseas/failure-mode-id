@@ -23,6 +23,13 @@ from config import (
     RESULTS_PATH,
     RUN_MANIFEST_PATH,
 )
+from pipeline._experiment import (
+    config_snapshot,
+    experiment_block,
+    git_state,
+    update_index,
+    write_experiment_copy,
+)
 from pipeline._io import read_jsonl
 
 
@@ -154,7 +161,16 @@ def _merge_manifest(update: dict) -> None:
     )
 
 
-def run(limit: int | None = None) -> None:
+def run(
+    limit: int | None = None,
+    experiment: str | None = None,
+    description: str | None = None,
+    run_report: str | None = None,
+) -> None:
+    """Join everything into results.json (canonical) and, if `experiment`
+    is a valid slug like `E01-smoke-3p`, also into
+    `outputs/experiments/<slug>.json` plus the dashboard `index.json`.
+    """
     records, responses, grades, tags = _load_all()
     if limit is not None:
         records = records[:limit]
@@ -182,14 +198,19 @@ def run(limit: int | None = None) -> None:
     prompts = [_build_prompt_entry(rec, responses, grades, tags) for rec in eligible]
     summary = _summary(prompts)
     run_date = datetime.now(timezone.utc).isoformat()
+
     meta = {
+        "experiment": experiment_block(experiment, description, run_report),
         "models": list(CANDIDATES.keys()),
         "n_prompts": len(prompts),
         "n_criteria": sum(len(p["criteria"]) for p in prompts),
         "judge": JUDGE,
         "run_date": run_date,
+        "git": git_state(),
+        "config": config_snapshot(),
     }
     results = {"meta": meta, "summary": summary, "prompts": prompts}
+
     RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     RESULTS_PATH.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
     print(
@@ -197,12 +218,23 @@ def run(limit: int | None = None) -> None:
         f"{meta['n_criteria']} criteria → {RESULTS_PATH}"
     )
 
+    if experiment:
+        exp_path = write_experiment_copy(experiment, results)
+        idx_path = update_index(experiment, meta)
+        print(f"aggregate: tagged as {experiment} → {exp_path}")
+        print(f"aggregate: updated dashboard index → {idx_path}")
+    else:
+        print("aggregate: no --experiment slug provided; only canonical results.json written.")
+
     _merge_manifest({
+        "experiment": meta["experiment"],
         "models": meta["models"],
         "n_prompts": meta["n_prompts"],
         "n_criteria": meta["n_criteria"],
         "judge": JUDGE,
         "run_date": run_date,
+        "git": meta["git"],
+        "config": meta["config"],
     })
     print(f"aggregate: merged run summary → {RUN_MANIFEST_PATH}")
 

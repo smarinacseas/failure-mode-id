@@ -2,12 +2,21 @@
 
 Usage:
     uv run python main.py <step> [--limit N] [--mode sample|score]
+                                 [--experiment SLUG] [--description STR]
+                                 [--run-report PATH]
 
 Steps: load · generate · grade · classify · validate · aggregate · all · connectivity
 
 `all` runs load → generate → grade → classify → validate(sample) → aggregate.
 `--limit N` is honored by every step. `all` REQUIRES `--limit` so that the
 full 75-prompt run is always an explicit opt-in (use `--limit 75`).
+
+`--experiment SLUG` tags the run for the dashboard dropdown. Slug convention
+is `E<NN>-<kebab-case-label>` (e.g. `E01-smoke-3p`, `E02-v1-75p`,
+`E03-reasoning-on`). When set, aggregate also writes a per-experiment copy
+under `outputs/experiments/<slug>.json` and updates
+`outputs/experiments/index.json`. Untagged runs still write the canonical
+`outputs/results.json` but do not appear in the dashboard dropdown.
 """
 
 from __future__ import annotations
@@ -47,11 +56,34 @@ def _parser() -> argparse.ArgumentParser:
         default="sample",
         help="For `validate`: sample (default) or score.",
     )
+    p.add_argument(
+        "--experiment",
+        default=None,
+        help="Experiment slug `E<NN>-<label>` (e.g. E01-smoke-3p). "
+             "Tags this run for the dashboard dropdown.",
+    )
+    p.add_argument(
+        "--description",
+        default=None,
+        help="Free-text one-liner describing what makes this experiment distinct.",
+    )
+    p.add_argument(
+        "--run-report",
+        default=None,
+        dest="run_report",
+        help="Path to the meta/ run report for this experiment (e.g. meta/2026-06-30-smoke-test.md).",
+    )
     return p
 
 
-def _run_all(limit: int) -> None:
-    print(f"=== all · limit={limit} ===\n")
+def _run_all(
+    limit: int,
+    experiment: str | None,
+    description: str | None,
+    run_report: str | None,
+) -> None:
+    tag = f" · {experiment}" if experiment else ""
+    print(f"=== all · limit={limit}{tag} ===\n")
     connectivity.run()
     print()
     load.run(limit=limit)
@@ -64,7 +96,12 @@ def _run_all(limit: int) -> None:
     print()
     validate.run(mode="sample")
     print()
-    aggregate.run(limit=limit)
+    aggregate.run(
+        limit=limit,
+        experiment=experiment,
+        description=description,
+        run_report=run_report,
+    )
     print("\n=== all done ===")
 
 
@@ -83,7 +120,7 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
-        _run_all(args.limit)
+        _run_all(args.limit, args.experiment, args.description, args.run_report)
         return 0
 
     if args.step == "load":
@@ -97,7 +134,12 @@ def main(argv: list[str] | None = None) -> int:
     elif args.step == "validate":
         validate.run(mode=args.mode)
     elif args.step == "aggregate":
-        aggregate.run(limit=args.limit)
+        aggregate.run(
+            limit=args.limit,
+            experiment=args.experiment,
+            description=args.description,
+            run_report=args.run_report,
+        )
     return 0
 
 

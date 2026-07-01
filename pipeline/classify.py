@@ -10,6 +10,7 @@ from config import (
     CRITERIA_TAGS_PATH,
     DATA_JSONL,
     JUDGE,
+    JUDGE_MAX_TOKENS,
     PROMPTS_DIR,
     anthropic,
 )
@@ -28,7 +29,7 @@ def _classifier_call(user_msg: str) -> str:
     def _call():
         msg = anthropic.messages.create(
             model=JUDGE,
-            max_tokens=4000,
+            max_tokens=JUDGE_MAX_TOKENS,
             system=CLASSIFIER_SYSTEM,
             messages=[{"role": "user", "content": user_msg}],
         )

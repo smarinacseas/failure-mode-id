@@ -36,7 +36,23 @@ CANDIDATES: dict[str, str] = {
     # "deepseek": "deepseek/deepseek-v4",  # cross-family robustness check (later)
 }
 
-# Paths
+# --- Run-time knobs (change these deliberately; every change gets its own experiment slug) ---
+
+# Candidate generation (see pipeline/generate.py for the reasoning-mode rationale).
+CANDIDATE_TEMPERATURE: float = 0.0
+CANDIDATE_MAX_TOKENS: int = 8000
+CANDIDATE_EXTRA_BODY: dict = {"reasoning": {"enabled": False}}
+CANDIDATE_TIMEOUT_S: float = 300.0
+
+# Judge / classifier calls.
+JUDGE_MAX_TOKENS: int = 4000
+
+# Validate sampler.
+VALIDATE_SEED: int = 20260101
+VALIDATE_SAMPLE_TARGET: int = 60
+VALIDATE_RESPONSE_EXCERPT_CHARS: int = 800
+
+# --- Paths ---
 ROOT = Path(__file__).resolve().parent
 DATA_XLSX = ROOT / "data" / "ComplexConstraints.xlsx"
 DATA_JSONL = ROOT / "data" / "complexconstraints.jsonl"
@@ -49,3 +65,8 @@ CRITERIA_TAGS_PATH = OUTPUTS_DIR / "criteria_tags.jsonl"
 RESULTS_PATH = OUTPUTS_DIR / "results.json"
 RUN_MANIFEST_PATH = OUTPUTS_DIR / "run_manifest.json"
 JUDGE_VALIDATION_PATH = OUTPUTS_DIR / "judge_validation.json"
+
+# Per-experiment results storage — dashboard reads `index.json` for the dropdown
+# and fetches the individual `<slug>.json` files on selection.
+EXPERIMENTS_DIR = OUTPUTS_DIR / "experiments"
+EXPERIMENT_INDEX_PATH = EXPERIMENTS_DIR / "index.json"

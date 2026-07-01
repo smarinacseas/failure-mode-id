@@ -12,6 +12,7 @@ from config import (
     DATA_JSONL,
     GRADES_DIR,
     JUDGE,
+    JUDGE_MAX_TOKENS,
     PROMPTS_DIR,
     RESPONSES_DIR,
     anthropic,
@@ -42,7 +43,7 @@ def _judge_call(user_msg: str) -> str:
     def _call():
         msg = anthropic.messages.create(
             model=JUDGE,
-            max_tokens=4000,
+            max_tokens=JUDGE_MAX_TOKENS,
             system=JUDGE_SYSTEM,
             messages=[{"role": "user", "content": user_msg}],
         )

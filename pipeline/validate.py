@@ -20,12 +20,11 @@ from config import (
     JUDGE_VALIDATION_PATH,
     RESPONSES_DIR,
     RUN_MANIFEST_PATH,
+    VALIDATE_RESPONSE_EXCERPT_CHARS,
+    VALIDATE_SAMPLE_TARGET,
+    VALIDATE_SEED,
 )
 from pipeline._io import read_jsonl
-
-SEED = 20260101
-SAMPLE_TARGET = 60
-RESPONSE_EXCERPT_CHARS = 800
 
 
 def _build_pool() -> list[dict]:
@@ -53,7 +52,7 @@ def _build_pool() -> list[dict]:
                     "criterion_index": idx,
                     "criterion_text": criteria[idx - 1],
                     "prompt_text": rec["prompt"],
-                    "response_excerpt": (responses.get(g["id"], "") or "")[:RESPONSE_EXCERPT_CHARS],
+                    "response_excerpt": (responses.get(g["id"], "") or "")[:VALIDATE_RESPONSE_EXCERPT_CHARS],
                     "judge_verdict": v["verdict"],
                     "judge_reason": v["reason"],
                     "human": "",
@@ -65,8 +64,8 @@ def sample() -> None:
     pool = _build_pool()
     if not pool:
         raise RuntimeError("No graded rows found. Run `grade` first.")
-    n = min(SAMPLE_TARGET, len(pool))
-    rng = random.Random(SEED)
+    n = min(VALIDATE_SAMPLE_TARGET, len(pool))
+    rng = random.Random(VALIDATE_SEED)
     rows = rng.sample(pool, n)
     JUDGE_VALIDATION_PATH.parent.mkdir(parents=True, exist_ok=True)
     JUDGE_VALIDATION_PATH.write_text(
