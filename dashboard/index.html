@@ -5,6 +5,74 @@
 
 
 <script src="support.js"></script>
+<!-- responsive-overrides v1 -->
+<style id="responsive-overrides-v1">
+@media (min-width: 1600px) {
+  div[style*="max-width: 1320px"] {
+    max-width: min(1600px, 96vw) !important;
+  }
+}
+@media (max-width: 1024px) {
+  div[style*="max-width: 1320px"] {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+  div[style*="grid-template-columns: repeat(4, 1fr)"],
+  div[style*="grid-template-columns: repeat(5, 1fr)"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  /* `1fr 1fr` inner grids (comparison cards, filter rows) hold content
+     that won't shrink below its natural min-width. Substituting
+     minmax(0, 1fr) lets them compress into the tablet's 2-col chrome
+     without breaking. Below 640px they collapse to 1-col via the
+     mobile rule instead. */
+  div[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  }
+}
+@media (max-width: 640px) {
+  div[style*="max-width: 1320px"] {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+  div[style*="grid-template-columns: repeat(4, 1fr)"],
+  div[style*="grid-template-columns: repeat(5, 1fr)"],
+  div[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  /* Header topbar and footer both need to wrap on narrow viewports. */
+  div[style*="max-width: 1320px"][style*="padding: 13px 30px"],
+  div[style*="max-width: 1320px"][style*="padding: 0px 30px 30px"] {
+    flex-wrap: wrap !important;
+    row-gap: 10px !important;
+  }
+  /* Popovers must stay inside the viewport. Without this the run
+     selector's 262px-min-width dropdown blows out a 320px screen. */
+  div[style*="position: absolute"][style*="top: calc(100% + 8px)"],
+  div[style*="position: absolute"][style*="top: calc(100% + 5px)"] {
+    max-width: calc(100vw - 24px) !important;
+    min-width: 0 !important;
+  }
+  /* Truncate the mono date/count caption inside the run selector so
+     the header topbar doesn't overflow. font-size:10.5px is unique to
+     that one span in the header, hence the specificity. */
+  div[style*="max-width: 1320px"][style*="padding: 13px 30px"] span[style*="font-size: 10.5px"] {
+    max-width: 120px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  /* Tables become horizontally scrollable rather than overflowing. */
+  sc-raw-table, table {
+    display: block !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  h1 { font-size: 20px !important; }
+  /* Compact panel padding to reclaim horizontal space. */
+  div[style*="padding: 16px 20px 18px"] { padding: 14px 14px 16px !important; }
+}
+</style>
 </head>
 <body>
 
@@ -377,7 +445,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 body{background:var(--bg,#f4f2ea);font-family:'Hanken Grotesk',system-ui,sans-serif;color:var(--ink,#2a2722);-webkit-font-smoothing:antialiased;font-feature-settings:"tnum"}
-::selection{background:#e3d4bf}
+::selection{background:#8a5736;color:#faf8f2}::-moz-selection{background:#8a5736;color:#faf8f2}
 button{font-family:inherit}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-thumb{background:var(--ink-5,#cdd2da);border-radius:6px;border:2px solid var(--bg,#f1f3f6)}
@@ -671,9 +739,9 @@ button{font-family:inherit}
         <sc-raw-tbody>
           <sc-for list="{{ drillRows }}" as="r" hint-placeholder-count="12"><sc-raw-tr onclick="{{ r.onClick }}" data-glide-row="" style="border-bottom:1px solid var(--line,#eef0f3);cursor:pointer">
               <sc-raw-td style="padding:11px 16px;font-family:'IBM Plex Mono',monospace;font-weight:500;color:var(--ink-1,#3a4150)">{{ r.id }}</sc-raw-td>
-              <sc-raw-td style="padding:11px 12px;color:var(--ink-1,#2a2f3a)">{{ r.useLabel }}</sc-raw-td>
-              <sc-raw-td style="padding:11px 12px"><span style="{{ r.instrCss }}">{{ r.instrLabel }}</span></sc-raw-td>
-              <sc-raw-td style="padding:11px 12px;color:var(--ink-2,#5b616d)">{{ r.styleLabel }}</sc-raw-td>
+              <sc-raw-td style="padding:11px 12px;color:var(--ink-1,#2a2f3a)"><span title="{{ r.useTitle }}">{{ r.useLabel }}</span></sc-raw-td>
+              <sc-raw-td style="padding:11px 12px"><span title="{{ r.instrTitle }}" style="{{ r.instrCss }}">{{ r.instrLabel }}</span></sc-raw-td>
+              <sc-raw-td style="padding:11px 12px;color:var(--ink-2,#5b616d)"><span title="{{ r.styleTitle }}">{{ r.styleLabel }}</span></sc-raw-td>
               <sc-raw-td style="padding:11px 12px">
                 <div style="display:flex;align-items:center;gap:10px">
                   <div style="width:80px;height:7px;background:var(--line,#eef0f3);border-radius:4px;overflow:hidden;flex:none"><div style="{{ r.ratioBar }}"></div></div>
@@ -700,9 +768,9 @@ button{font-family:inherit}
     <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;flex-wrap:wrap">
       <div style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;letter-spacing:-.01em">{{ detailId }}</div>
       <div style="display:flex;gap:7px;flex-wrap:wrap;padding-top:3px">
-        <span style="font-size:11.5px;background:var(--line,#eef0f3);color:var(--ink-1,#3a4150);padding:3px 9px;border-radius:6px">{{ dUseLabel }}</span>
-        <span style="{{ dInstrCss }}">{{ dInstrLabel }}</span>
-        <span style="font-size:11.5px;background:var(--line,#eef0f3);color:var(--ink-1,#3a4150);padding:3px 9px;border-radius:6px">{{ dStyleLabel }}</span>
+        <span title="{{ dUseTitle }}" style="font-size:11.5px;background:var(--line,#eef0f3);color:var(--ink-1,#3a4150);padding:3px 9px;border-radius:6px">{{ dUseLabel }}</span>
+        <span title="{{ dInstrTitle }}" style="{{ dInstrCss }}">{{ dInstrLabel }}</span>
+        <span title="{{ dStyleTitle }}" style="font-size:11.5px;background:var(--line,#eef0f3);color:var(--ink-1,#3a4150);padding:3px 9px;border-radius:6px">{{ dStyleLabel }}</span>
       </div>
       <div style="flex:1"></div>
       <div style="text-align:right">
@@ -767,12 +835,28 @@ button{font-family:inherit}
   </sc-if>
 
   <div style="max-width:1320px;margin:0 auto;padding:0 30px 30px;display:flex;gap:20px;font-size:11px;color:var(--ink-4,#aab0bb);font-family:'IBM Plex Mono',monospace">
-    <span>run: {{ footDate }}</span><span>judge: {{ footJudge }}</span><span>{{ footCrit }} criteria · {{ footPrompts }} prompts</span><span>{{ footModels }} models</span>
+    <span>run: {{ footDate }}</span><span>judge: {{ footJudge }}</span><span>{{ footCrit }} criteria · {{ footPrompts }} prompts</span><span>{{ footModels }} models</span><span style="flex:1"></span><a href="https://github.com/smarinacseas/failure-mode-id#glossary" target="_blank" rel="noopener" title="Definitions for every tag pill on this dashboard" style="color:var(--ink-4,#aab0bb);text-decoration:none;border-bottom:1px dotted currentColor">Glossary ↗</a>
   </div>
 
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100%&quot;,&quot;height&quot;:820},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;,&quot;section&quot;:&quot;Feel&quot;,&quot;label&quot;:&quot;Theme&quot;},&quot;signal&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;calm&quot;,&quot;vivid&quot;],&quot;default&quot;:&quot;vivid&quot;,&quot;tsType&quot;:&quot;'calm'|'vivid'&quot;,&quot;section&quot;:&quot;Feel&quot;,&quot;label&quot;:&quot;Signal intensity&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;clay&quot;,&quot;ochre&quot;,&quot;sage&quot;],&quot;default&quot;:&quot;sage&quot;,&quot;tsType&quot;:&quot;'clay'|'ochre'|'sage'&quot;,&quot;section&quot;:&quot;Feel&quot;,&quot;label&quot;:&quot;Accent&quot;}}">
+const GLOSSARY = {
+  use_case: {
+    'Data Processing, Formatting & Math': 'Structured output under numerical + formatting constraints. Spreadsheets, reports, JSON schemas with arithmetic that must reconcile.',
+    'Logistics, Scheduling & Event Planning': 'Multi-entity plans under real-world constraints. Rotas with union/age/shift rules, routing with prohibitions, event flows.'
+  },
+  instruction_type: {
+    'Negative': "Must-not constraints (\"avoid X\", \"no Y\"). Canonical failure: introducing the forbidden element anyway.",
+    'Multistep': 'Sequenced operations where step N depends on step N−1. Canonical failure: intermediate-step errors compounding.'
+  },
+  prompt_style: {
+    'Direct prompting': 'Clear, numbered/bulleted instructions.',
+    'Context prompting': 'Instructions embedded in a narrative scenario (a stakeholder message, a briefing).',
+    'Rambling/Stream-of-Consciousness': 'Instructions buried in conversational, redundant, or noisy prose.'
+  }
+};
+function describe(field, value){ return (GLOSSARY[field] && GLOSSARY[field][value]) || ''; }
 const PILL_BASE='font-size:11px;padding:3px 9px;border-radius:6px;font-weight:500;white-space:nowrap;';
 const PILL_TONES=[
   ['var(--fail-bg,#f1e1d8)','var(--fail,#a8483b)'],
@@ -1011,7 +1095,7 @@ class Component extends DCLogic {
       const pn=tot?Math.round(pc/tot*100):0;
       const ratioColor= full?'var(--pass,#4f7a51)': pn>=70?'var(--ink-3,#8c8678)':'var(--fail,#a8483b)';
       return { id:p.id, useLabel:p.use_case, instrLabel:p.instruction_type, instrCss:instrPill(instrIndex[p.instruction_type]||0),
-        styleLabel:p.prompt_style, ratioStr:pc+'/'+tot, ratioBar:this.barFill(pn, ratioColor),
+        styleLabel:p.prompt_style, useTitle:describe('use_case',p.use_case), instrTitle:describe('instruction_type',p.instruction_type), styleTitle:describe('prompt_style',p.prompt_style), ratioStr:pc+'/'+tot, ratioBar:this.barFill(pn, ratioColor),
         statusLabel: full?'PASS':'FAIL', statusCss:this.badge(full, vivid, false),
         onClick:()=>this.openPrompt(p.id) };
     });
@@ -1111,7 +1195,7 @@ class Component extends DCLogic {
       onSortId:()=>this.setSort('id'), onSortUse:()=>this.setSort('use'), onSortInstr:()=>this.setSort('instr'),
       onSortStyle:()=>this.setSort('style'), onSortRatio:()=>this.setSort('ratio'), onSortStatus:()=>this.setSort('status'),
       arrowId:arrow('id'), arrowUse:arrow('use'), arrowInstr:arrow('instr'), arrowStyle:arrow('style'), arrowRatio:arrow('ratio'), arrowStatus:arrow('status'),
-      dUseLabel:dPrompt.use_case||'', dStyleLabel:dPrompt.prompt_style||'',
+      dUseLabel:dPrompt.use_case||'', dStyleLabel:dPrompt.prompt_style||'', dUseTitle:describe('use_case',dPrompt.use_case), dStyleTitle:describe('prompt_style',dPrompt.prompt_style), dInstrTitle:describe('instruction_type',dPrompt.instruction_type),
       dInstrLabel:dPrompt.instruction_type||'', dInstrCss:instrPill(instrIndex[dPrompt.instruction_type]||0),
       dRatioStr:dpc+' / '+dtot, dRatioColor: dfull?'color:var(--pass,#4f7a51)':dpn>=70?'color:var(--ink-2,#6c6759)':'color:var(--fail,#a8483b)',
       dPromptText:dPrompt.prompt_text||'', dResponseText:(dPrompt.responses&&dPrompt.responses[model])||('(no response recorded for '+modelLabel+')'),

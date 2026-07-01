@@ -72,6 +72,265 @@ _EXTRA_RUN_DETAIL_ROWS = (
 )
 
 
+# Responsive shim: the design ships every layout as inline styles, so
+# attribute selectors + !important is the only way to override without
+# forking the source. Rules only fire at their breakpoints — desktop
+# stays pixel-identical.
+#
+# The browser normalizes inline styles when parsing (adds a space after
+# every colon, after every comma inside function values). Substring
+# selectors must match the NORMALIZED form the DOM presents, not the
+# unnormalized form in the source HTML. Every selector below uses the
+# normalized form.
+_RESPONSIVE_CSS = """<!-- responsive-overrides v1 -->
+<style id="responsive-overrides-v1">
+@media (min-width: 1600px) {
+  div[style*="max-width: 1320px"] {
+    max-width: min(1600px, 96vw) !important;
+  }
+}
+@media (max-width: 1024px) {
+  div[style*="max-width: 1320px"] {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+  div[style*="grid-template-columns: repeat(4, 1fr)"],
+  div[style*="grid-template-columns: repeat(5, 1fr)"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  /* `1fr 1fr` inner grids (comparison cards, filter rows) hold content
+     that won't shrink below its natural min-width. Substituting
+     minmax(0, 1fr) lets them compress into the tablet's 2-col chrome
+     without breaking. Below 640px they collapse to 1-col via the
+     mobile rule instead. */
+  div[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  }
+}
+@media (max-width: 640px) {
+  div[style*="max-width: 1320px"] {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+  div[style*="grid-template-columns: repeat(4, 1fr)"],
+  div[style*="grid-template-columns: repeat(5, 1fr)"],
+  div[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  /* Header topbar and footer both need to wrap on narrow viewports. */
+  div[style*="max-width: 1320px"][style*="padding: 13px 30px"],
+  div[style*="max-width: 1320px"][style*="padding: 0px 30px 30px"] {
+    flex-wrap: wrap !important;
+    row-gap: 10px !important;
+  }
+  /* Popovers must stay inside the viewport. Without this the run
+     selector's 262px-min-width dropdown blows out a 320px screen. */
+  div[style*="position: absolute"][style*="top: calc(100% + 8px)"],
+  div[style*="position: absolute"][style*="top: calc(100% + 5px)"] {
+    max-width: calc(100vw - 24px) !important;
+    min-width: 0 !important;
+  }
+  /* Truncate the mono date/count caption inside the run selector so
+     the header topbar doesn't overflow. font-size:10.5px is unique to
+     that one span in the header, hence the specificity. */
+  div[style*="max-width: 1320px"][style*="padding: 13px 30px"] span[style*="font-size: 10.5px"] {
+    max-width: 120px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  /* Tables become horizontally scrollable rather than overflowing. */
+  sc-raw-table, table {
+    display: block !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  h1 { font-size: 20px !important; }
+  /* Compact panel padding to reclaim horizontal space. */
+  div[style*="padding: 16px 20px 18px"] { padding: 14px 14px 16px !important; }
+}
+</style>
+"""
+
+
+def _fix_selection_color(html: str) -> str:
+    """Replace the design's washed-out selection highlight in-place.
+
+    The shipped rule is `background:#e3d4bf` with no `color` set, so the
+    original text color survives on top of a pale cream. On the design's
+    muted-gray metadata (`var(--ink-4,#a8a294)` etc.) the contrast drops
+    to near-invisible when the user drags-selects. Swapping in the
+    design's warm accent (matches `--pill-imp`) with an explicit light
+    text color guarantees legibility across every text tone. Idempotent
+    on the source string — a design update that changes the color just
+    skips this patch.
+    """
+    source = "::selection{background:#e3d4bf}"
+    if source not in html:
+        return html
+    replacement = (
+        "::selection{background:#8a5736;color:#faf8f2}"
+        "::-moz-selection{background:#8a5736;color:#faf8f2}"
+    )
+    return html.replace(source, replacement, 1)
+
+
+def _inject_responsive_css(html: str) -> str:
+    """Add media-query rules to the design's <head>.
+
+    The design's layout is inline-styled top-to-bottom; !important on an
+    attribute selector is the only way to override without editing the
+    source. Idempotent gate on the marker id.
+    """
+    if "responsive-overrides-v1" in html:
+        return html
+    marker = "</head>"
+    idx = html.find(marker)
+    if idx < 0:
+        return html
+    return html[:idx] + _RESPONSIVE_CSS + html[idx:]
+
+
+# Descriptions match README §Glossary. Kept terse for native title="…"
+# tooltips (browsers truncate long titles and don't honor newlines).
+_GLOSSARY_JS = r"""
+const GLOSSARY = {
+  use_case: {
+    'Data Processing, Formatting & Math': 'Structured output under numerical + formatting constraints. Spreadsheets, reports, JSON schemas with arithmetic that must reconcile.',
+    'Logistics, Scheduling & Event Planning': 'Multi-entity plans under real-world constraints. Rotas with union/age/shift rules, routing with prohibitions, event flows.'
+  },
+  instruction_type: {
+    'Negative': "Must-not constraints (\"avoid X\", \"no Y\"). Canonical failure: introducing the forbidden element anyway.",
+    'Multistep': 'Sequenced operations where step N depends on step N−1. Canonical failure: intermediate-step errors compounding.'
+  },
+  prompt_style: {
+    'Direct prompting': 'Clear, numbered/bulleted instructions.',
+    'Context prompting': 'Instructions embedded in a narrative scenario (a stakeholder message, a briefing).',
+    'Rambling/Stream-of-Consciousness': 'Instructions buried in conversational, redundant, or noisy prose.'
+  }
+};
+function describe(field, value){ return (GLOSSARY[field] && GLOSSARY[field][value]) || ''; }
+"""
+
+
+def _add_tag_glossary(html: str) -> str:
+    """Wire native title="…" tooltips onto tag pills and category cells.
+
+    Four coordinated edits (all idempotent):
+      1. Inject GLOSSARY + describe() at the top of the Logic block.
+      2. Append useTitle/instrTitle/styleTitle to the drill-row builder.
+      3. Append dUseTitle/dInstrTitle/dStyleTitle to the detail row.
+      4. Add title="…" to the six template spans that render tags.
+
+    Follows the design's own pattern — `title="{{ c.gameTitle }}"` on the
+    gameable pill already relies on native browser tooltips, so this
+    keeps the vocabulary consistent.
+    """
+    if "const GLOSSARY" in html:
+        return html
+
+    # (1) Insert GLOSSARY + describe just before the design's first
+    # top-level `const PILL_BASE` declaration, which sits at the top of
+    # the Logic block right after the <script type="text/x-dc"> tag.
+    anchor_1 = "const PILL_BASE="
+    if anchor_1 not in html:
+        return html
+    html = html.replace(anchor_1, _GLOSSARY_JS.strip() + "\n" + anchor_1, 1)
+
+    # (2) Extend the drill-row return literal — insert titles right after
+    # the styleLabel field so the object stays legible.
+    anchor_2 = "styleLabel:p.prompt_style,"
+    replacement_2 = (
+        "styleLabel:p.prompt_style, "
+        "useTitle:describe('use_case',p.use_case), "
+        "instrTitle:describe('instruction_type',p.instruction_type), "
+        "styleTitle:describe('prompt_style',p.prompt_style),"
+    )
+    if anchor_2 in html and replacement_2 not in html:
+        html = html.replace(anchor_2, replacement_2, 1)
+
+    # (3) Extend the detail-row (dPrompt) literal similarly.
+    anchor_3 = "dUseLabel:dPrompt.use_case||'', dStyleLabel:dPrompt.prompt_style||'',"
+    replacement_3 = (
+        "dUseLabel:dPrompt.use_case||'', dStyleLabel:dPrompt.prompt_style||'', "
+        "dUseTitle:describe('use_case',dPrompt.use_case), "
+        "dStyleTitle:describe('prompt_style',dPrompt.prompt_style), "
+        "dInstrTitle:describe('instruction_type',dPrompt.instruction_type),"
+    )
+    if anchor_3 in html and replacement_3 not in html:
+        html = html.replace(anchor_3, replacement_3, 1)
+
+    # (4a) Drill table — use_case cell (plain text) gets a title span.
+    html = html.replace(
+        '<sc-raw-td style="padding:11px 12px;color:var(--ink-1,#2a2f3a)">{{ r.useLabel }}</sc-raw-td>',
+        '<sc-raw-td style="padding:11px 12px;color:var(--ink-1,#2a2f3a)"><span title="{{ r.useTitle }}">{{ r.useLabel }}</span></sc-raw-td>',
+        1,
+    )
+
+    # (4b) Drill table — instruction pill.
+    html = html.replace(
+        '<span style="{{ r.instrCss }}">{{ r.instrLabel }}</span>',
+        '<span title="{{ r.instrTitle }}" style="{{ r.instrCss }}">{{ r.instrLabel }}</span>',
+        1,
+    )
+
+    # (4c) Drill table — prompt style cell.
+    html = html.replace(
+        '<sc-raw-td style="padding:11px 12px;color:var(--ink-2,#5b616d)">{{ r.styleLabel }}</sc-raw-td>',
+        '<sc-raw-td style="padding:11px 12px;color:var(--ink-2,#5b616d)"><span title="{{ r.styleTitle }}">{{ r.styleLabel }}</span></sc-raw-td>',
+        1,
+    )
+
+    # (4d) Detail modal — use case pill.
+    html = html.replace(
+        '<span style="font-size:11.5px;background:var(--line,#eef0f3);color:var(--ink-1,#3a4150);padding:3px 9px;border-radius:6px">{{ dUseLabel }}</span>',
+        '<span title="{{ dUseTitle }}" style="font-size:11.5px;background:var(--line,#eef0f3);color:var(--ink-1,#3a4150);padding:3px 9px;border-radius:6px">{{ dUseLabel }}</span>',
+        1,
+    )
+
+    # (4e) Detail modal — instruction pill.
+    html = html.replace(
+        '<span style="{{ dInstrCss }}">{{ dInstrLabel }}</span>',
+        '<span title="{{ dInstrTitle }}" style="{{ dInstrCss }}">{{ dInstrLabel }}</span>',
+        1,
+    )
+
+    # (4f) Detail modal — prompt style pill.
+    html = html.replace(
+        '<span style="font-size:11.5px;background:var(--line,#eef0f3);color:var(--ink-1,#3a4150);padding:3px 9px;border-radius:6px">{{ dStyleLabel }}</span>',
+        '<span title="{{ dStyleTitle }}" style="font-size:11.5px;background:var(--line,#eef0f3);color:var(--ink-1,#3a4150);padding:3px 9px;border-radius:6px">{{ dStyleLabel }}</span>',
+        1,
+    )
+
+    return html
+
+
+_GLOSSARY_LINK_HTML = (
+    '<span style="flex:1"></span>'
+    '<a href="https://github.com/smarinacseas/failure-mode-id#glossary" '
+    'target="_blank" rel="noopener" '
+    'title="Definitions for every tag pill on this dashboard" '
+    'style="color:var(--ink-4,#aab0bb);text-decoration:none;'
+    'border-bottom:1px dotted currentColor">Glossary ↗</a>'
+)
+
+
+def _inject_glossary_link(html: str) -> str:
+    """Add a discreet 'Glossary ↗' link at the far right of the footer.
+
+    Chosen over the topbar because the footer is where reference-type
+    metadata already lives (run/judge/counts) — the link matches the
+    footer's IBM Plex Mono chrome and doesn't crowd the model tabs.
+    Idempotent on the anchor href.
+    """
+    if "#glossary" in html and "Glossary" in html:
+        return html
+    anchor = '<span>{{ footModels }} models</span>'
+    if anchor not in html:
+        return html
+    return html.replace(anchor, anchor + _GLOSSARY_LINK_HTML, 1)
+
+
 def _augment_run_details(html: str) -> str:
     """Insert three extra rows into the design's runDetails literal.
 
@@ -230,6 +489,24 @@ def unpack(bundle_path: Path, out_dir: Path) -> dict:
     # back to real tags at render time via its RAW_UNWRAP map. Idempotent —
     # only the exact bare tag names are matched, `sc-raw-table` is safe.
     unpacked = _encode_table_tags(unpacked)
+
+    # Tooltips on tag pills. Must run AFTER _encode_table_tags because four
+    # of the six template patches target `<sc-raw-td>`, which only exists
+    # after encoding. Also patches the Logic block to add GLOSSARY + a
+    # describe() helper + tag-title fields on drill and detail row builders.
+    unpacked = _add_tag_glossary(unpacked)
+
+    # Responsive shim: single stylesheet in <head>, media-query-gated. The
+    # design ships every layout as inline styles, so this uses attribute
+    # selectors + !important to override without touching the source.
+    unpacked = _inject_responsive_css(unpacked)
+
+    # Legibility fix on ::selection — the shipped rule is background-only
+    # and drops muted-gray text to near-invisible when highlighted.
+    unpacked = _fix_selection_color(unpacked)
+
+    # Discreet link out to the repo's Glossary section from the footer.
+    unpacked = _inject_glossary_link(unpacked)
 
     # Any references to live-data UUIDs are stale (design's sample data). The
     # template usually references them only via ext_resources → __resources
