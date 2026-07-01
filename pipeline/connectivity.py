@@ -6,53 +6,57 @@ openrouter.ai/models or anthropic docs before paying for a batch run.
 
 from __future__ import annotations
 
+from contextlib import nullcontext
+
 from config import CANDIDATES, JUDGE, anthropic, router
+from pipeline.monitor import RunMonitor, build_monitor
 
 
-def _ping_candidate(key: str, model_id: str) -> None:
-    print(f"  → candidate {key} ({model_id}) ...", end=" ", flush=True)
+def _ping_candidate(key: str, model_id: str) -> str:
     resp = router.chat.completions.create(
-        model=model_id,
-        temperature=0,
-        max_tokens=4,
+        model=model_id, temperature=0, max_tokens=4,
         messages=[{"role": "user", "content": "Say 'ok'."}],
     )
-    txt = (resp.choices[0].message.content or "").strip()
-    print(f"ok ({txt[:40]!r})")
+    return (resp.choices[0].message.content or "").strip()
 
 
-def _ping_judge() -> None:
-    print(f"  → judge ({JUDGE}) ...", end=" ", flush=True)
+def _ping_judge() -> str:
     resp = anthropic.messages.create(
-        model=JUDGE,
-        max_tokens=4,
+        model=JUDGE, max_tokens=4,
         messages=[{"role": "user", "content": "Say 'ok'."}],
     )
-    txt = "".join(b.text for b in resp.content if hasattr(b, "text")).strip()
-    print(f"ok ({txt[:40]!r})")
+    return "".join(b.text for b in resp.content if hasattr(b, "text")).strip()
 
 
-def run() -> None:
-    print("connectivity check:")
-    failures: list[tuple[str, str, str]] = []
-    for key, model_id in CANDIDATES.items():
+def run(monitor: RunMonitor | None = None) -> None:
+    ctx = nullcontext(monitor) if monitor is not None else build_monitor("connectivity", 0)
+    with ctx as mon:
+        mon.start_stage("connectivity", total=len(CANDIDATES) + 1)
+        failures: list[tuple[str, str, str]] = []
+        for key, model_id in CANDIDATES.items():
+            mon.item_start(model=key, prompt_id=model_id)
+            try:
+                txt = _ping_candidate(key, model_id)
+                mon.note(f"candidate {key} ({model_id}) ok ({txt[:40]!r})")
+            except Exception as e:  # noqa: BLE001
+                mon.record_error(f"candidate {key} ({model_id}): {type(e).__name__}: {e}")
+                failures.append((key, model_id, f"{type(e).__name__}: {e}"))
+            mon.item_done()
+
+        mon.item_start(model="judge", prompt_id=JUDGE)
         try:
-            _ping_candidate(key, model_id)
+            txt = _ping_judge()
+            mon.note(f"judge ({JUDGE}) ok ({txt[:40]!r})")
         except Exception as e:  # noqa: BLE001
-            print(f"FAIL ({type(e).__name__}: {e})")
-            failures.append((key, model_id, f"{type(e).__name__}: {e}"))
-    try:
-        _ping_judge()
-    except Exception as e:  # noqa: BLE001
-        print(f"FAIL ({type(e).__name__}: {e})")
-        failures.append(("judge", JUDGE, f"{type(e).__name__}: {e}"))
+            mon.record_error(f"judge ({JUDGE}): {type(e).__name__}: {e}")
+            failures.append(("judge", JUDGE, f"{type(e).__name__}: {e}"))
+        mon.item_done()
+        mon.end_stage()
 
-    if failures:
-        print("\nconnectivity check FAILED. Fix these IDs and retry:")
-        for key, model_id, err in failures:
-            print(f"  - {key}: {model_id}  →  {err}")
-        raise SystemExit(2)
-    print("connectivity check passed.")
+        if failures:
+            for key, model_id, err in failures:
+                mon.note(f"FAILED {key}: {model_id} → {err}")
+            raise SystemExit(2)
 
 
 if __name__ == "__main__":
