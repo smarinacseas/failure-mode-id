@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.0",
+  "schema_version": "2.1",
   "meta": {
     "experiment": {
       "slug": "E01-smoke-3p",
@@ -7,7 +7,7 @@
       "label": "smoke-3p",
       "description": "First end-to-end pipeline exercise. Three prompts, three Qwen candidates, blind Opus judge. Two in-flight configuration adjustments: reasoning disabled + retry predicate broadened.",
       "run_report": "meta/2026-06-30-smoke-test.md",
-      "run_date": "2026-07-01T01:41:52.020643+00:00"
+      "run_date": "2026-07-01T02:06:39.752684+00:00"
     },
     "dataset": {
       "name": "Complex Constraints Benchmark Set",
@@ -82,7 +82,7 @@
       "validate_response_excerpt_chars": 800
     },
     "git": {
-      "commit": "1d2c03f",
+      "commit": "19cfcca",
       "dirty": true
     },
     "validation": {
@@ -91,7 +91,10 @@
       "n_scored": 0,
       "agreement_pct": null,
       "scored_at": null
-    }
+    },
+    "run_date": "2026-07-01T02:06:39.752684+00:00",
+    "max_tokens": 8000,
+    "reasoning_enabled": false
   },
   "summary": {
     "criterion_pass_rate": {

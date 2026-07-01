@@ -1089,7 +1089,7 @@ class Component extends DCLogic {
         {label:'Run date', value: meta.run_date ? (meta.run_date.replace('T',' ').slice(0,16)+' UTC') : '—'},
         {label:'Token limits', value: (meta.token_limit||meta.max_tokens||'Not recorded')},
         {label:'Benchmark', value:'ComplexConstraints (CIF)'},
-        {label:'Coverage', value: useCases.length+' use cases · '+promptStyles.length+' prompt styles'},
+        {label:'Coverage', value: useCases.length+' use cases · '+promptStyles.length+' prompt styles'},{label:'Reasoning mode', value: meta.reasoning_enabled === false ? 'Disabled' : (meta.reasoning_enabled === true ? 'Enabled' : (meta.reasoning_enabled==null ? 'Not recorded' : String(meta.reasoning_enabled)))},{label:'Judge validation', value: (meta.validation && meta.validation.status === 'scored' && meta.validation.agreement_pct != null) ? (fmtPct(meta.validation.agreement_pct)+' agreement (n='+(meta.validation.n_scored||0)+')') : ((meta.validation && meta.validation.status === 'sampled')     ? ('sample drawn (n='+(meta.validation.n_sampled||0)+', ungraded)')     : 'not run')},{label:'Git commit', value: (meta.git && meta.git.commit) ? (meta.git.commit + (meta.git.dirty?' (dirty)':'')) : '—'},
       ],
       footDate:(meta.run_date||'').slice(0,10), footJudge:meta.judge||'—', footCrit:String(nCrit), footPrompts:String(nPrompts), footModels:String(models.length),
       isOverview:screen==='overview', isDrill:screen==='drilldown', isDetail:screen==='detail',

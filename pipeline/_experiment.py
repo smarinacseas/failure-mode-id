@@ -43,7 +43,7 @@ from config import (
     VALIDATE_SEED,
 )
 
-SCHEMA_VERSION = "2.0"
+SCHEMA_VERSION = "2.1"
 
 DATASET = {
     "name": "Complex Constraints Benchmark Set",
@@ -282,6 +282,27 @@ def validation_block() -> dict:
     }
 
 
+def _promoted_config_fields() -> dict:
+    """Top-level meta fields lifted out of `meta.config` for the dashboard.
+
+    The ConstraintLens dashboard's Logic reads a fixed set of `meta.*` keys
+    when rendering the run-details panel. Fields it wants to surface (token
+    budget, reasoning-mode) live nested in `meta.config` in our schema, so
+    we duplicate them at the top level here. Nested versions stay authoritative;
+    these are display-only aliases — never edit them in-place downstream.
+
+    Additive since schema 2.1 — dashboards that pre-date these fields still
+    render fine (they fall back to "Not recorded" / omitted rows).
+    """
+    reasoning = CANDIDATE_EXTRA_BODY.get("reasoning") if isinstance(CANDIDATE_EXTRA_BODY, dict) else None
+    reasoning_enabled = reasoning.get("enabled") if isinstance(reasoning, dict) else None
+    return {
+        "run_date": None,  # filled by build_meta from run_date_iso
+        "max_tokens": CANDIDATE_MAX_TOKENS,
+        "reasoning_enabled": reasoning_enabled,
+    }
+
+
 def build_meta(
     slug: str | None,
     description: str | None,
@@ -289,7 +310,15 @@ def build_meta(
     run_date_iso: str,
     prompts: list[dict],
 ) -> dict:
-    """Assemble the entire `meta` block from the standardized sub-blocks."""
+    """Assemble the entire `meta` block from the standardized sub-blocks.
+
+    Dashboard-facing top-level fields (`run_date`, `max_tokens`,
+    `reasoning_enabled`) are promoted from their canonical homes in
+    `meta.experiment` / `meta.config` so the design's Logic can read them
+    without knowing our nesting.
+    """
+    promoted = _promoted_config_fields()
+    promoted["run_date"] = run_date_iso
     return {
         "experiment": experiment_block(slug, description, run_report, run_date_iso),
         "dataset": dataset_block(),
@@ -302,6 +331,8 @@ def build_meta(
         "config": config_block(),
         "git": git_block(),
         "validation": validation_block(),
+        # --- Promoted display-only aliases (dashboard reads these) ---
+        **promoted,
     }
 
 

@@ -12,7 +12,18 @@ automatically for tagged runs.
 The compact registry at `outputs/experiments/index.json` is a legacy /
 back-compat index for consumers other than the dashboard.
 
-Current schema version: **`2.0`**.
+Current schema version: **`2.1`**.
+
+### Changes in `2.1` (additive)
+
+Three top-level dashboard-facing fields promoted from `meta.experiment` /
+`meta.config` so the ConstraintLens design's Logic can read them without
+knowing our nesting. Nested versions remain authoritative; these are
+display-only aliases.
+
+- `meta.run_date` — mirrors `meta.experiment.run_date`.
+- `meta.max_tokens` — mirrors `meta.config.candidate_max_tokens`.
+- `meta.reasoning_enabled` — extracted from `meta.config.candidate_extra_body.reasoning.enabled`; `null` if the pipeline didn't set it explicitly.
 
 ### Breaking changes since `1.0`
 
@@ -35,7 +46,7 @@ Current schema version: **`2.0`**.
 
 ```json
 {
-  "schema_version": "2.0",
+  "schema_version": "2.1",
   "meta":    { … },
   "summary": { … },
   "prompts": [ … ]

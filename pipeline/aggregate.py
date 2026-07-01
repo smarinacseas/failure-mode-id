@@ -198,6 +198,18 @@ def run(
     is a valid slug like `E01-smoke-3p`, also into
     `outputs/experiments/<slug>.json` plus the dashboard `index.json`.
     """
+    # A missing --run-report path silently misses the whole "each experiment
+    # produces a standardized MD summary" discipline — every meta/*.md is
+    # meant to derive from meta/TEMPLATE.md. Warn early rather than embed a
+    # dead path into the JSON meta.
+    if run_report:
+        report_path = ROOT / run_report if not Path(run_report).is_absolute() else Path(run_report)
+        if not report_path.exists():
+            print(
+                f"aggregate: WARNING — --run-report path does not exist: {run_report}\n"
+                f"           Copy meta/TEMPLATE.md → {run_report} and fill it in.",
+            )
+
     records, responses, grades, tags = _load_all()
     if limit is not None:
         records = records[:limit]

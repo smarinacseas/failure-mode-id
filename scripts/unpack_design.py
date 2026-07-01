@@ -54,6 +54,44 @@ def _encode_table_tags(html: str) -> str:
     return html
 
 
+_EXTRA_RUN_DETAIL_ROWS = (
+    "{label:'Reasoning mode', value:"
+    " meta.reasoning_enabled === false ? 'Disabled'"
+    " : (meta.reasoning_enabled === true ? 'Enabled'"
+    " : (meta.reasoning_enabled==null ? 'Not recorded' : String(meta.reasoning_enabled)))},"
+    "{label:'Judge validation', value:"
+    " (meta.validation && meta.validation.status === 'scored' && meta.validation.agreement_pct != null)"
+    " ? (fmtPct(meta.validation.agreement_pct)+' agreement (n='+(meta.validation.n_scored||0)+')')"
+    " : ((meta.validation && meta.validation.status === 'sampled')"
+    "     ? ('sample drawn (n='+(meta.validation.n_sampled||0)+', ungraded)')"
+    "     : 'not run')},"
+    "{label:'Git commit', value:"
+    " (meta.git && meta.git.commit)"
+    " ? (meta.git.commit + (meta.git.dirty?' (dirty)':''))"
+    " : '—'},"
+)
+
+
+def _augment_run_details(html: str) -> str:
+    """Insert three extra rows into the design's runDetails literal.
+
+    The design's Logic hardcodes `runDetails:[…]` inside a `<script
+    type="text/x-dc">` block. We locate the shipped `Coverage` row (a
+    stable landmark that closes the array) and append the extra items
+    directly after it. Idempotent — bails out if the marker Reasoning
+    mode row is already present.
+    """
+    if "'Reasoning mode'" in html:
+        return html
+    coverage_re = re.compile(
+        r"(\{label:'Coverage',\s*value:\s*useCases\.length\+' use cases · '\+promptStyles\.length\+' prompt styles'\},)",
+    )
+    m = coverage_re.search(html)
+    if not m:
+        return html  # design's runDetails changed shape — patch would be brittle
+    return html[: m.end()] + _EXTRA_RUN_DETAIL_ROWS + html[m.end():]
+
+
 def _patch_scfor_around_tr(html: str, list_expr: str, tr_var: str) -> str:
     """Wrap the `<tr onclick="{{ <tr_var>.onClick }}">…</tr>` inside its
     surrounding `<tbody>` with a `<sc-for list="{{ <list_expr> }}" as="<tr_var>">`.
@@ -178,6 +216,13 @@ def unpack(bundle_path: Path, out_dir: Path) -> dict:
     unpacked = _patch_scfor_around_tr(
         unpacked, list_expr="drillRows", tr_var="r"
     )
+
+    # Design extension: the shipped runDetails array covers models / judge /
+    # counts / date / token / benchmark / coverage. Reasoning-mode,
+    # judge-validation status, and git commit are equally load-bearing for
+    # interpreting a run — append them here so the pipeline's config is
+    # visible on the dashboard without touching the design source.
+    unpacked = _augment_run_details(unpacked)
 
     # HTML parser applies table-parsing rules to <table>/<tbody>/<tr>/<td>/etc.
     # and will hoist any non-table children (like <sc-for>) OUT of the table.
