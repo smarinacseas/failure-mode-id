@@ -10,12 +10,12 @@ dependencies = [
     "openpyxl>=3.1.5",
     "pandas>=3.0.3",
     "python-dotenv>=1.2.2",
-    "rich>=15.0.0",
+    "rich>=13",
 ]
 
 [dependency-groups]
 dev = [
-    "pytest>=9.1.1",
+    "pytest",
 ]
 
 [tool.pytest.ini_options]
