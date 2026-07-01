@@ -60,6 +60,8 @@ RESPONSES_DIR = ROOT / "responses"
 GRADES_DIR = ROOT / "grades"
 OUTPUTS_DIR = ROOT / "outputs"
 PROMPTS_DIR = ROOT / "prompts"
+LOGS_DIR = OUTPUTS_DIR / "logs"
+PROGRESS_PATH = OUTPUTS_DIR / "progress.json"
 
 CRITERIA_TAGS_PATH = OUTPUTS_DIR / "criteria_tags.jsonl"
 RESULTS_PATH = OUTPUTS_DIR / "results.json"
