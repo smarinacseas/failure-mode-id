@@ -1,15 +1,18 @@
-"""Experiment tagging + config snapshot helpers.
+"""Experiment tagging + deliverable-schema helpers.
 
-Every aggregate run produces two things a dashboard needs:
-1. A `meta` block on the results.json that fully specifies the run's
-   configuration (models, knobs, prompt-file fingerprints, git commit).
-2. If the run was tagged with an `--experiment` slug, a copy of the
-   results file under `outputs/experiments/<slug>.json` plus an entry
-   in `outputs/experiments/index.json` (the dashboard dropdown source).
+Every aggregate run produces the standardized deliverable defined in
+`meta/RESULTS_SCHEMA.md`. The shape is fixed across experiments so the
+dashboard can bind once and render any run; changes to the shape bump
+`SCHEMA_VERSION` and get documented in that file.
 
-Slug convention: `E<NN>-<kebab-case-slug>`, e.g. `E01-smoke-3p`,
-`E02-v1-75p`, `E03-reasoning-on`. The number gives dropdown ordering;
-the kebab-case portion hints at the axis under investigation.
+Two files per tagged run land in `outputs/`:
+1. `outputs/experiments/<slug>.json` — the full deliverable.
+2. `outputs/experiments/index.json` — the dashboard dropdown, one
+   compact entry per experiment, ordered by experiment number.
+
+Slug convention: `E<NN>-<kebab-case-slug>` (e.g. `E01-smoke-3p`,
+`E02-v1-75p`, `E03-reasoning-on`). Two-digit number gives ordering;
+label hints at the axis under investigation.
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ import hashlib
 import json
 import re
 import subprocess
+from collections import Counter
 from pathlib import Path
 
 from config import (
@@ -30,11 +34,29 @@ from config import (
     EXPERIMENTS_DIR,
     JUDGE,
     JUDGE_MAX_TOKENS,
+    JUDGE_VALIDATION_PATH,
     PROMPTS_DIR,
     ROOT,
+    RUN_MANIFEST_PATH,
     VALIDATE_RESPONSE_EXCERPT_CHARS,
     VALIDATE_SAMPLE_TARGET,
     VALIDATE_SEED,
+)
+
+SCHEMA_VERSION = "1.0"
+
+DATASET = {
+    "name": "Complex Constraints Benchmark Set",
+    "source": "https://huggingface.co/datasets/surgeai/ComplexConstraints",
+    "license": "CC-BY-4.0",
+    "publisher": "Surge AI",
+}
+
+JUDGE_PROVIDER = "Anthropic"
+JUDGE_ROLE = "grader + classifier"
+JUDGE_FAMILY_NOTE = (
+    "Non-candidate family (Anthropic judge, non-Anthropic candidates) → "
+    "self-preference bias is structurally absent by v1 design."
 )
 
 SLUG_RE = re.compile(r"^E(\d{2,})-[a-z0-9]+(-[a-z0-9]+)*$")
@@ -84,20 +106,94 @@ def _git(*args: str) -> str | None:
     return out.stdout.strip() or None
 
 
-def config_snapshot() -> dict:
-    """The full run-time configuration used for THIS aggregate.
+def experiment_block(
+    slug: str | None,
+    description: str | None,
+    run_report: str | None,
+    run_date_iso: str,
+) -> dict:
+    """`meta.experiment` — identity + description + when.
 
-    Every knob that could change between experiments is captured here.
-    Prompt files are fingerprinted by SHA256 prefix so a dashboard can
-    flag runs where the judge or classifier prompt was edited.
+    When `slug` is None the run is "untagged"; the block still carries
+    every key so the shape stays stable.
+    """
+    if slug is None:
+        return {
+            "slug": None,
+            "number": None,
+            "label": None,
+            "description": description or "",
+            "run_report": run_report or "",
+            "run_date": run_date_iso,
+        }
+    number, label = parse_slug(slug)
+    return {
+        "slug": slug,
+        "number": number,
+        "label": label,
+        "description": description or "",
+        "run_report": run_report or "",
+        "run_date": run_date_iso,
+    }
+
+
+def dataset_block() -> dict:
+    """`meta.dataset` — benchmark identity + license."""
+    return dict(DATASET)
+
+
+def models_block() -> list[dict]:
+    """`meta.models` — one entry per candidate, {key, id, role}."""
+    return [{"key": k, "id": v, "role": "candidate"} for k, v in CANDIDATES.items()]
+
+
+def judge_block() -> dict:
+    """`meta.judge` — grader identity + role + family-stake note."""
+    return {
+        "id": JUDGE,
+        "provider": JUDGE_PROVIDER,
+        "role": JUDGE_ROLE,
+        "family_stake_note": JUDGE_FAMILY_NOTE,
+    }
+
+
+def counts_block(prompts: list[dict]) -> dict:
+    """`meta.counts` — cross-referencing sums the dashboard prints as headers."""
+    n_prompts = len(prompts)
+    n_criteria = sum(len(p["criteria"]) for p in prompts)
+    n_models = len(CANDIDATES)
+    return {
+        "n_prompts": n_prompts,
+        "n_criteria": n_criteria,
+        "n_models": n_models,
+        "n_grade_cells": n_criteria * n_models,
+    }
+
+
+def categories_block(prompts: list[dict]) -> dict:
+    """`meta.categories` — distinct values + counts, for dashboard filter UI."""
+    it = Counter(p["instruction_type"] for p in prompts)
+    ps = Counter(p["prompt_style"] for p in prompts)
+    uc = Counter(p["use_case"] for p in prompts)
+    return {
+        "instruction_type": dict(sorted(it.items())),
+        "prompt_style": dict(sorted(ps.items())),
+        "use_case": dict(sorted(uc.items())),
+    }
+
+
+def config_block() -> dict:
+    """`meta.config` — every knob that could differ across experiments.
+
+    `candidates` and `judge id` live in `meta.models` / `meta.judge`
+    respectively; this block is the tunables the dashboard cares about
+    when explaining "what was different about this run."
     """
     return {
-        "candidates": dict(CANDIDATES),
         "candidate_temperature": CANDIDATE_TEMPERATURE,
         "candidate_max_tokens": CANDIDATE_MAX_TOKENS,
         "candidate_extra_body": CANDIDATE_EXTRA_BODY,
         "candidate_timeout_s": CANDIDATE_TIMEOUT_S,
-        "judge": JUDGE,
         "judge_max_tokens": JUDGE_MAX_TOKENS,
         "judge_prompt_sha256_12": _sha256_prefix(PROMPTS_DIR / "judge.txt"),
         "classifier_prompt_sha256_12": _sha256_prefix(PROMPTS_DIR / "classifier.txt"),
@@ -107,7 +203,7 @@ def config_snapshot() -> dict:
     }
 
 
-def git_state() -> dict:
+def git_block() -> dict:
     commit = _git("rev-parse", "--short", "HEAD")
     dirty_out = _git("status", "--porcelain")
     return {
@@ -116,36 +212,75 @@ def git_state() -> dict:
     }
 
 
-def experiment_block(
+def validation_block() -> dict:
+    """`meta.validation` — judge-validation status for the dashboard limitations panel.
+
+    Read-only view of two files:
+      - outputs/judge_validation.json (written by `validate --mode sample`)
+      - outputs/run_manifest.json's judge_agreement block (merged in by
+        `validate --mode score`)
+
+    Status transitions: not_run → sampled → scored. Never reverses.
+    """
+    status = "not_run"
+    n_sampled = 0
+    n_scored = 0
+    agreement_pct: float | None = None
+    scored_at: str | None = None
+
+    if JUDGE_VALIDATION_PATH.exists():
+        try:
+            rows = json.loads(JUDGE_VALIDATION_PATH.read_text(encoding="utf-8"))
+            n_sampled = len(rows) if isinstance(rows, list) else 0
+            status = "sampled"
+        except json.JSONDecodeError:
+            pass
+
+    if RUN_MANIFEST_PATH.exists():
+        try:
+            manifest = json.loads(RUN_MANIFEST_PATH.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            manifest = {}
+        ja = manifest.get("judge_agreement")
+        if isinstance(ja, dict) and ja.get("n_filled"):
+            status = "scored"
+            n_scored = int(ja.get("n_filled") or 0)
+            pct = ja.get("agreement_pct")
+            agreement_pct = float(pct) if pct is not None else None
+            scored_at = ja.get("scored_at") or None
+
+    return {
+        "status": status,
+        "n_sampled": n_sampled,
+        "n_scored": n_scored,
+        "agreement_pct": agreement_pct,
+        "scored_at": scored_at,
+    }
+
+
+def build_meta(
     slug: str | None,
     description: str | None,
     run_report: str | None,
+    run_date_iso: str,
+    prompts: list[dict],
 ) -> dict:
-    """The `experiment` sub-block of the meta section.
-
-    When `slug` is None the run is "untagged" — the meta still carries an
-    `experiment` block with slug=None so downstream schemas stay stable.
-    """
-    if slug is None:
-        return {
-            "slug": None,
-            "number": None,
-            "label": None,
-            "description": description or "",
-            "run_report": run_report or "",
-        }
-    number, label = parse_slug(slug)
+    """Assemble the entire `meta` block from the standardized sub-blocks."""
     return {
-        "slug": slug,
-        "number": number,
-        "label": label,
-        "description": description or "",
-        "run_report": run_report or "",
+        "experiment": experiment_block(slug, description, run_report, run_date_iso),
+        "dataset": dataset_block(),
+        "models": models_block(),
+        "judge": judge_block(),
+        "counts": counts_block(prompts),
+        "categories": categories_block(prompts),
+        "config": config_block(),
+        "git": git_block(),
+        "validation": validation_block(),
     }
 
 
 def write_experiment_copy(slug: str, results: dict) -> Path:
-    """Write results.json under `outputs/experiments/<slug>.json`."""
+    """Write the full deliverable under `outputs/experiments/<slug>.json`."""
     EXPERIMENTS_DIR.mkdir(parents=True, exist_ok=True)
     path = EXPERIMENTS_DIR / f"{slug}.json"
     path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -155,39 +290,44 @@ def write_experiment_copy(slug: str, results: dict) -> Path:
 def update_index(slug: str, meta: dict) -> Path:
     """Insert or replace this experiment's entry in `experiments/index.json`.
 
-    Entries are ordered by experiment number.
+    Index entries are the dashboard dropdown's data source. They are
+    compact by design — everything else lives in the per-experiment
+    results file. Ordered by experiment number.
     """
     EXPERIMENTS_DIR.mkdir(parents=True, exist_ok=True)
-    existing: dict = {"experiments": []}
+    existing: dict = {"schema_version": SCHEMA_VERSION, "experiments": []}
     if EXPERIMENT_INDEX_PATH.exists():
         try:
             existing = json.loads(EXPERIMENT_INDEX_PATH.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
-            existing = {"experiments": []}
+            existing = {"schema_version": SCHEMA_VERSION, "experiments": []}
     entries: list[dict] = list(existing.get("experiments", []))
 
     exp = meta["experiment"]
+    v = meta["validation"]
     entry = {
         "slug": exp["slug"],
         "number": exp["number"],
         "label": exp["label"],
         "description": exp["description"],
-        "n_prompts": meta["n_prompts"],
-        "n_criteria": meta["n_criteria"],
-        "n_models": len(meta["models"]),
-        "models": meta["models"],
-        "judge": meta["judge"],
-        "run_date": meta["run_date"],
+        "run_date": exp["run_date"],
+        "run_report": exp["run_report"],
+        "n_prompts": meta["counts"]["n_prompts"],
+        "n_criteria": meta["counts"]["n_criteria"],
+        "n_models": meta["counts"]["n_models"],
+        "models": [m["key"] for m in meta["models"]],
+        "judge": meta["judge"]["id"],
+        "validation_status": v["status"],
+        "agreement_pct": v["agreement_pct"],
         "git_commit": meta["git"]["commit"],
         "results_path": f"experiments/{slug}.json",
-        "run_report": exp["run_report"],
     }
     entries = [e for e in entries if e.get("slug") != slug]
     entries.append(entry)
     entries.sort(key=lambda e: (e.get("number") is None, e.get("number") or 0, e.get("slug", "")))
 
     EXPERIMENT_INDEX_PATH.write_text(
-        json.dumps({"experiments": entries}, ensure_ascii=False, indent=2),
+        json.dumps({"schema_version": SCHEMA_VERSION, "experiments": entries}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     return EXPERIMENT_INDEX_PATH

@@ -18,15 +18,13 @@ from config import (
     CRITERIA_TAGS_PATH,
     DATA_JSONL,
     GRADES_DIR,
-    JUDGE,
     RESPONSES_DIR,
     RESULTS_PATH,
     RUN_MANIFEST_PATH,
 )
 from pipeline._experiment import (
-    config_snapshot,
-    experiment_block,
-    git_state,
+    SCHEMA_VERSION,
+    build_meta,
     update_index,
     write_experiment_copy,
 )
@@ -199,23 +197,25 @@ def run(
     summary = _summary(prompts)
     run_date = datetime.now(timezone.utc).isoformat()
 
-    meta = {
-        "experiment": experiment_block(experiment, description, run_report),
-        "models": list(CANDIDATES.keys()),
-        "n_prompts": len(prompts),
-        "n_criteria": sum(len(p["criteria"]) for p in prompts),
-        "judge": JUDGE,
-        "run_date": run_date,
-        "git": git_state(),
-        "config": config_snapshot(),
+    meta = build_meta(
+        slug=experiment,
+        description=description,
+        run_report=run_report,
+        run_date_iso=run_date,
+        prompts=prompts,
+    )
+    results = {
+        "schema_version": SCHEMA_VERSION,
+        "meta": meta,
+        "summary": summary,
+        "prompts": prompts,
     }
-    results = {"meta": meta, "summary": summary, "prompts": prompts}
 
     RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     RESULTS_PATH.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
     print(
-        f"aggregate: wrote {len(prompts)} prompts × "
-        f"{meta['n_criteria']} criteria → {RESULTS_PATH}"
+        f"aggregate: wrote {meta['counts']['n_prompts']} prompts × "
+        f"{meta['counts']['n_criteria']} criteria → {RESULTS_PATH}"
     )
 
     if experiment:
@@ -227,14 +227,15 @@ def run(
         print("aggregate: no --experiment slug provided; only canonical results.json written.")
 
     _merge_manifest({
+        "schema_version": SCHEMA_VERSION,
         "experiment": meta["experiment"],
-        "models": meta["models"],
-        "n_prompts": meta["n_prompts"],
-        "n_criteria": meta["n_criteria"],
-        "judge": JUDGE,
+        "models": [m["key"] for m in meta["models"]],
+        "counts": meta["counts"],
+        "judge": meta["judge"]["id"],
         "run_date": run_date,
         "git": meta["git"],
         "config": meta["config"],
+        "validation": meta["validation"],
     })
     print(f"aggregate: merged run summary → {RUN_MANIFEST_PATH}")
 
