@@ -1,3 +1,5 @@
+import pytest
+
 from pipeline.monitor import RecordingSink, RunMonitor, WorkPlan, render_lines
 import pipeline.monitor as monitor
 
@@ -42,25 +44,45 @@ def test_retry_and_error_counters_via_module_helpers():
     assert monitor.ACTIVE is None            # cleared on exit
 
 
-def test_eta_is_time_weighted_across_remaining_stages():
-    m = RunMonitor(WorkPlan.for_step("all", limit=1, n_candidates=1), sinks=[])
+def test_eta_none_before_data_then_exact():
+    m = RunMonitor(WorkPlan.for_step("all", 1, 1), sinks=[])
     with m:
         m.start_stage("generate", total=1)
-        m.plan.get("generate").record_duration(10.0)   # 10s/item observed
-        eta = m.snapshot()["eta_s"]
-    # remaining items across not-done stages × observed/fallback rate (10s):
-    # load1 + generate0(after done? not ended) ... at least > 0 and finite
-    assert eta is not None and eta > 0
+        assert m.snapshot()["eta_s"] is None            # no duration recorded yet
+        m.plan.get("generate").record_duration(10.0)    # 10s/item observed
+        # remaining items across all not-done stages, all at the 10s fallback rate:
+        # connectivity2 + load1 + generate1 + grade1 + classify1 + validate1 + aggregate1 = 8 -> 80.0
+        assert m.snapshot()["eta_s"] == 80.0
 
 
-def test_error_state_on_exception_in_context():
-    m = _mon()
-    try:
+def test_error_state_and_active_cleared_on_exception():
+    rec = RecordingSink()
+    m = RunMonitor(WorkPlan.for_step("all", 2, 1), sinks=[rec])
+    with pytest.raises(RuntimeError):
         with m:
             raise RuntimeError("boom")
-    except RuntimeError:
-        pass
     assert m.snapshot()["state"] == "error"
+    assert monitor.ACTIVE is None
+    assert rec.closes >= 1
+
+
+def test_note_logs_to_sink():
+    rec = RecordingSink()
+    m = RunMonitor(WorkPlan.for_step("all", 2, 1), sinks=[rec])
+    with m:
+        m.note("hello")
+    assert ("NOTE", "hello") in rec.logs
+
+
+def test_multi_sink_fan_out():
+    rec1, rec2 = RecordingSink(), RecordingSink()
+    m = RunMonitor(WorkPlan.for_step("generate", limit=2, n_candidates=1),
+                   sinks=[rec1, rec2])
+    with m:
+        m.start_stage("generate", total=2)
+        m.item_start(model="m1", prompt_id="p1")
+        m.item_done()
+    assert rec1.snapshots and rec2.snapshots
 
 
 def test_render_lines_contains_key_fields():
@@ -84,3 +106,4 @@ def test_render_lines_contains_key_fields():
     assert "qwen-397b" in out and "prompt-50" in out
     assert "retries: 3" in out and "errors: 0" in out
     assert "✓ done" in out
+    assert "pending" in out

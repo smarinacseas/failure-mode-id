@@ -101,12 +101,16 @@ class RecordingSink(Sink):
     def __init__(self) -> None:
         self.snapshots: list[dict] = []
         self.logs: list[tuple[str, str]] = []
+        self.closes = 0
 
     def update(self, monitor: "RunMonitor") -> None:
         self.snapshots.append(monitor.snapshot())
 
     def log(self, monitor: "RunMonitor", level: str, message: str) -> None:
         self.logs.append((level, message))
+
+    def close(self, monitor: "RunMonitor") -> None:
+        self.closes += 1
 
 
 # --------------------------------------------------------------------------- #
