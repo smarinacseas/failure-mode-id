@@ -824,6 +824,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
   - `ConsoleSink(console=None)` — rich `Live`; `update()` re-renders bars; `log()` prints `WARNING`/`ERROR`/`NOTE` above the live region; `close()` stops the live and prints a one-line summary. Degrades to plain lines when not a TTY.
   - `default_sinks(experiment: str | None) -> list[Sink]`.
   - `build_monitor(step: str, limit: int, experiment: str | None = None, sinks: list[Sink] | None = None) -> RunMonitor`.
+  - `stage_ctx(monitor: RunMonitor | None, step: str, limit_hint: int)` — returns `nullcontext(monitor)` when a monitor is supplied, else a fresh standalone `build_monitor(step, limit_hint)`. **All step tasks (G–J) import this from `pipeline.monitor`.**
 
 - [ ] **Step 1: Write the failing test**
 
@@ -881,6 +882,8 @@ Expected: FAIL with `ImportError: cannot import name 'ConsoleSink'`.
 Add to the imports at the top of `pipeline/monitor.py`:
 
 ```python
+from contextlib import nullcontext
+
 from rich.console import Console
 from rich.live import Live
 from rich.text import Text
@@ -942,6 +945,17 @@ def build_monitor(step: str, limit: int, experiment: str | None = None,
     plan = WorkPlan.for_step(step, limit, len(CANDIDATES))
     return RunMonitor(plan, experiment=experiment,
                       sinks=default_sinks(experiment) if sinks is None else sinks)
+
+
+def stage_ctx(monitor: "RunMonitor | None", step: str, limit_hint: int):
+    """Reuse the caller's monitor, or build a standalone one for this step.
+
+    Steps call this so they run both under `main`'s shared monitor (passed in)
+    and standalone (`python -m pipeline.generate` / tests) with a fresh one.
+    """
+    if monitor is not None:
+        return nullcontext(monitor)
+    return build_monitor(step, limit_hint)
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -1124,31 +1138,21 @@ Expected: FAIL — `generate.run()` has no `monitor` parameter (`TypeError`).
 
 - [ ] **Step 3: Rewrite `generate.run` (and add a helper)**
 
-In `pipeline/generate.py`, add imports near the top:
+In `pipeline/generate.py`, add imports near the top (`CANDIDATES` is already imported — keep it):
 
 ```python
-from contextlib import nullcontext
-
-from config import CANDIDATES  # (already imported; keep as-is)
-from pipeline.monitor import RunMonitor, build_monitor
+from pipeline.monitor import RunMonitor, stage_ctx
 ```
 
 Replace the whole `run` function (`:49-63`) with:
 
 ```python
-def _stage_ctx(monitor: RunMonitor | None, step: str, limit_hint: int):
-    """Reuse the caller's monitor, or build a standalone one for this step."""
-    if monitor is not None:
-        return nullcontext(monitor)
-    return build_monitor(step, limit_hint)
-
-
 def run(limit: int | None = None, monitor: RunMonitor | None = None) -> None:
     records = limited(read_jsonl(DATA_JSONL), limit)
     if not records:
         raise RuntimeError(f"No records in {DATA_JSONL}. Run `load` first.")
 
-    with _stage_ctx(monitor, "generate", len(records)) as mon:
+    with stage_ctx(monitor, "generate", len(records)) as mon:
         total = len(records) * len(CANDIDATES)
         plan: list[tuple[str, str, list[dict]]] = []
         already = 0
@@ -1174,7 +1178,7 @@ def run(limit: int | None = None, monitor: RunMonitor | None = None) -> None:
         mon.end_stage()
 ```
 
-Note the `_stage_ctx` helper is defined here and **reused by later step tasks** — Tasks H–J import it from `pipeline.generate`.
+`stage_ctx` comes from `pipeline.monitor` (Task E) — Tasks H–J import it the same way.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -1200,7 +1204,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Create: `tests/test_grade_classify_monitor.py`
 
 **Interfaces:**
-- Consumes: `RunMonitor`, `_stage_ctx` (from `pipeline.generate`, Task G).
+- Consumes: `RunMonitor`, `stage_ctx` (from `pipeline.monitor`, Task E).
 - Produces: `grade.run(limit=None, monitor=None)` and `classify.run(limit=None, monitor=None)`, both emitting per-item events; a judge/classifier parse failure calls `monitor.record_error`.
 
 - [ ] **Step 1: Write the failing test**
@@ -1256,8 +1260,7 @@ Expected: FAIL — neither `run` accepts `monitor`.
 In `pipeline/grade.py` add imports:
 
 ```python
-from pipeline.generate import _stage_ctx
-from pipeline.monitor import RunMonitor
+from pipeline.monitor import RunMonitor, stage_ctx
 ```
 
 Replace `run` (`:97-119`) with:
@@ -1269,7 +1272,7 @@ def run(limit: int | None = None, monitor: RunMonitor | None = None) -> None:
         raise RuntimeError(f"No records in {DATA_JSONL}. Run `load` first.")
     by_id = {r["id"]: r for r in records}
 
-    with _stage_ctx(monitor, "grade", len(records)) as mon:
+    with stage_ctx(monitor, "grade", len(records)) as mon:
         total = len(records) * len(CANDIDATES)
         plan: list[tuple[str, list[dict]]] = []
         already = 0
@@ -1302,8 +1305,7 @@ def run(limit: int | None = None, monitor: RunMonitor | None = None) -> None:
 In `pipeline/classify.py` add imports:
 
 ```python
-from pipeline.generate import _stage_ctx
-from pipeline.monitor import RunMonitor
+from pipeline.monitor import RunMonitor, stage_ctx
 ```
 
 Replace `run` (`:93-106`) with:
@@ -1314,7 +1316,7 @@ def run(limit: int | None = None, monitor: RunMonitor | None = None) -> None:
     if not records:
         raise RuntimeError(f"No records in {DATA_JSONL}. Run `load` first.")
 
-    with _stage_ctx(monitor, "classify", len(records)) as mon:
+    with stage_ctx(monitor, "classify", len(records)) as mon:
         done_ids = {r["id"] for r in read_jsonl(CRITERIA_TAGS_PATH)}
         todo = [r for r in records if r["id"] not in done_ids]
         mon.start_stage("classify", total=len(records), already_done=len(done_ids))
@@ -1364,7 +1366,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Create: `tests/test_load_connectivity_monitor.py`
 
 **Interfaces:**
-- Consumes: `RunMonitor`, `_stage_ctx` (Task G).
+- Consumes: `RunMonitor`, `stage_ctx` (from `pipeline.monitor`, Task E).
 - Produces: `load.run(limit=None, monitor=None) -> int` and `connectivity.run(monitor=None)`, both emitting per-item events and routing summaries through `monitor.note`.
 
 - [ ] **Step 1: Write the failing test**
@@ -1434,8 +1436,7 @@ Expected: FAIL — neither `run` accepts `monitor`.
 In `pipeline/load.py` add imports:
 
 ```python
-from pipeline.generate import _stage_ctx
-from pipeline.monitor import RunMonitor
+from pipeline.monitor import RunMonitor, stage_ctx
 ```
 
 Replace `run` (`:35-55`) with:
@@ -1449,7 +1450,7 @@ def run(limit: int | None = None, monitor: RunMonitor | None = None) -> int:
     if limit is not None:
         df = df.head(limit)
 
-    with _stage_ctx(monitor, "load", len(df)) as mon:
+    with stage_ctx(monitor, "load", len(df)) as mon:
         mon.start_stage("load", total=len(df))
         records: list[dict] = []
         for _, row in df.iterrows():
@@ -1553,7 +1554,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Create: `tests/test_validate_aggregate_monitor.py`
 
 **Interfaces:**
-- Consumes: `RunMonitor`, `_stage_ctx` (Task G).
+- Consumes: `RunMonitor`, `stage_ctx` (from `pipeline.monitor`, Task E).
 - Produces: `validate.run(mode="sample", monitor=None)` and `aggregate.run(..., monitor=None)`, each wrapping its work in a `validate`/`aggregate` stage and routing prints through `monitor.note`.
 
 - [ ] **Step 1: Write the failing test**
@@ -1596,8 +1597,7 @@ Expected: FAIL — neither `run` accepts `monitor`.
 In `pipeline/validate.py` add imports:
 
 ```python
-from pipeline.generate import _stage_ctx
-from pipeline.monitor import RunMonitor
+from pipeline.monitor import RunMonitor, stage_ctx
 ```
 
 Change `sample()` to accept and use a monitor for its summary line. Replace its signature and the final `print(...)` (`:63`, `:74-78`):
@@ -1625,7 +1625,7 @@ Replace `run` (`:149-155`) with:
 def run(mode: str = "sample", monitor: RunMonitor | None = None) -> None:
     if mode not in {"sample", "score"}:
         raise ValueError(f"validate mode must be 'sample' or 'score', got {mode!r}")
-    with _stage_ctx(monitor, "validate", 1) as mon:
+    with stage_ctx(monitor, "validate", 1) as mon:
         mon.start_stage("validate", total=1)
         mon.item_start()
         if mode == "sample":
@@ -1643,8 +1643,7 @@ def run(mode: str = "sample", monitor: RunMonitor | None = None) -> None:
 In `pipeline/aggregate.py` add imports:
 
 ```python
-from pipeline.generate import _stage_ctx
-from pipeline.monitor import RunMonitor
+from pipeline.monitor import RunMonitor, stage_ctx
 ```
 
 Wrap the existing `run` body in a stage context and convert its `print(...)` calls to `mon.note(...)`. Change the signature and bracket the body:
@@ -1657,7 +1656,7 @@ def run(
     run_report: str | None = None,
     monitor: RunMonitor | None = None,
 ) -> None:
-    with _stage_ctx(monitor, "aggregate", 1) as mon:
+    with stage_ctx(monitor, "aggregate", 1) as mon:
         mon.start_stage("aggregate", total=1)
         mon.item_start()
         _run(limit, experiment, description, run_report, mon)
@@ -1994,10 +1993,10 @@ No spec requirement is unassigned.
 
 **2. Placeholder scan** — every code step contains complete, runnable code. The one prose-described change (Task J Step 4, mechanical `print → mon.note` over aggregate's moved body) names each of the 8 print sites explicitly rather than leaving it vague; the transformation is uniform and shown by example.
 
-**3. Type consistency** — `RunMonitor` method names (`start_stage`, `item_start`, `item_done`, `end_stage`, `record_error`, `record_retry`, `note`, `snapshot`), the `Sink` triple (`update`/`log`/`close`), module helpers (`note_retry`/`note_error`/`ACTIVE`), `render_lines`, `build_monitor`, `default_sinks`, and `_stage_ctx` (defined in Task G, imported by H/I/J) are used identically across tasks. Step signatures converge on `run(..., monitor: RunMonitor | None = None)` everywhere; `load.run` additionally keeps its `-> int` return.
+**3. Type consistency** — `RunMonitor` method names (`start_stage`, `item_start`, `item_done`, `end_stage`, `record_error`, `record_retry`, `note`, `snapshot`), the `Sink` triple (`update`/`log`/`close`), module helpers (`note_retry`/`note_error`/`ACTIVE`), `render_lines`, `build_monitor`, `default_sinks`, and `stage_ctx` (defined in Task E's monitor.py, imported by G/H/I/J) are used identically across tasks. Step signatures converge on `run(..., monitor: RunMonitor | None = None)` everywhere; `load.run` additionally keeps its `-> int` return.
 
 ## Notes for the implementer
 
 - Run `uv run pytest -q` after each task; the suite must stay green.
-- Steps import `_stage_ctx` from `pipeline.generate` (Task G) — do Tasks in order; G precedes H/I/J.
+- Steps import `stage_ctx` from `pipeline.monitor` (Task E) — it needs `build_monitor`, so Task E precedes the step tasks.
 - The live display and raw `print()` cannot coexist — that's why every step's per-item `print` is replaced by monitor events and every summary `print` by `mon.note`. If you spot a stray `print` in an instrumented module, route it through `mon.note`.
