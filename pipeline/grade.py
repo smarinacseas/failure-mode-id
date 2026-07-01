@@ -19,6 +19,7 @@ from config import (
 )
 from pipeline._io import append_jsonl, limited, read_jsonl, retry
 from pipeline._json_extract import extract_json_array
+from pipeline.monitor import RunMonitor, stage_ctx
 
 JUDGE_SYSTEM = (PROMPTS_DIR / "judge.txt").read_text(encoding="utf-8")
 
@@ -86,7 +87,6 @@ def _grade_one(prompt: str, response: str, criteria: list[str]) -> list[dict]:
             last_err = f"{type(e).__name__}: {e}"
             if attempt == 2:
                 break
-            print(f"  judge parse failed, retrying once ({last_err})")
     # Both attempts failed → record all FAIL with the error note.
     return [
         {"index": i, "verdict": "FAIL", "reason": f"judge_parse_error: {last_err}"}
@@ -94,29 +94,38 @@ def _grade_one(prompt: str, response: str, criteria: list[str]) -> list[dict]:
     ]
 
 
-def run(limit: int | None = None) -> None:
+def run(limit: int | None = None, monitor: RunMonitor | None = None) -> None:
     records = limited(read_jsonl(DATA_JSONL), limit)
     if not records:
         raise RuntimeError(f"No records in {DATA_JSONL}. Run `load` first.")
     by_id = {r["id"]: r for r in records}
 
-    for key, _model_id in CANDIDATES.items():
-        responses = read_jsonl(RESPONSES_DIR / f"{key}.jsonl")
-        if not responses:
-            print(f"grade · {key}: no responses yet — skipping.")
-            continue
-        out_path = _grade_path(key)
-        done_ids = {r["id"] for r in read_jsonl(out_path)}
-        todo = [r for r in responses if r["id"] in by_id and r["id"] not in done_ids]
-        print(f"grade · {key}: {len(todo)} todo / {len(responses)} responses (skipping {len(done_ids)} done)")
+    with stage_ctx(monitor, "grade", len(records)) as mon:
+        total = len(records) * len(CANDIDATES)
+        plan: list[tuple[str, list[dict]]] = []
+        already = 0
+        for key in CANDIDATES:
+            responses = read_jsonl(RESPONSES_DIR / f"{key}.jsonl")
+            done_ids = {r["id"] for r in read_jsonl(_grade_path(key))}
+            todo = [r for r in responses if r["id"] in by_id and r["id"] not in done_ids]
+            already += len(done_ids)
+            if not responses:
+                mon.note(f"grade {key}: no responses yet — skipping.")
+            plan.append((key, todo))
 
-        for resp_rec in todo:
-            rid = resp_rec["id"]
-            rec = by_id[rid]
-            verdicts = _grade_one(rec["prompt"], resp_rec["response"], rec["criteria"])
-            append_jsonl(out_path, {"id": rid, "verdicts": verdicts})
-            n_pass = sum(1 for v in verdicts if v["verdict"] == "PASS")
-            print(f"  grade {rid} · {key}: {n_pass}/{len(verdicts)} pass ✓")
+        mon.start_stage("grade", total=total, already_done=already)
+        for key, todo in plan:
+            out_path = _grade_path(key)
+            for resp_rec in todo:
+                rid = resp_rec["id"]
+                rec = by_id[rid]
+                mon.item_start(model=key, prompt_id=rid)
+                verdicts = _grade_one(rec["prompt"], resp_rec["response"], rec["criteria"])
+                append_jsonl(out_path, {"id": rid, "verdicts": verdicts})
+                if verdicts and str(verdicts[0].get("reason", "")).startswith("judge_parse_error"):
+                    mon.record_error(f"grade {key} {rid}: judge parse failure")
+                mon.item_done()
+        mon.end_stage()
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ from config import (
 )
 from pipeline._io import append_jsonl, limited, read_jsonl, retry
 from pipeline._json_extract import extract_json_array
+from pipeline.monitor import RunMonitor, stage_ctx
 
 CLASSIFIER_SYSTEM = (PROMPTS_DIR / "classifier.txt").read_text(encoding="utf-8")
 
@@ -85,25 +86,26 @@ def _classify_one(criteria: list[str]) -> list[dict]:
             last_err = f"{type(e).__name__}: {e}"
             if attempt == 2:
                 break
-            print(f"  classifier parse failed, retrying once ({last_err})")
-    print(f"  classifier failed twice: {last_err} — defaulting all tags.")
+    from pipeline.monitor import note_error
+    note_error(f"classifier failed twice: {last_err} — defaulting all tags.")
     return _normalize_tags([], len(criteria))
 
 
-def run(limit: int | None = None) -> None:
+def run(limit: int | None = None, monitor: RunMonitor | None = None) -> None:
     records = limited(read_jsonl(DATA_JSONL), limit)
     if not records:
         raise RuntimeError(f"No records in {DATA_JSONL}. Run `load` first.")
 
-    done_ids = {r["id"] for r in read_jsonl(CRITERIA_TAGS_PATH)}
-    todo = [r for r in records if r["id"] not in done_ids]
-    print(f"classify: {len(todo)} todo / {len(records)} total (skipping {len(done_ids)} done)")
-    for rec in todo:
-        tags = _classify_one(rec["criteria"])
-        append_jsonl(CRITERIA_TAGS_PATH, {"id": rec["id"], "tags": tags})
-        n_auto = sum(1 for t in tags if t["verifiability"] == "auto")
-        n_game = sum(1 for t in tags if t["gameable"])
-        print(f"  classify {rec['id']}: auto={n_auto}/{len(tags)} · gameable={n_game} ✓")
+    with stage_ctx(monitor, "classify", len(records)) as mon:
+        done_ids = {r["id"] for r in read_jsonl(CRITERIA_TAGS_PATH)}
+        todo = [r for r in records if r["id"] not in done_ids]
+        mon.start_stage("classify", total=len(records), already_done=len(done_ids))
+        for rec in todo:
+            mon.item_start(prompt_id=rec["id"])
+            tags = _classify_one(rec["criteria"])
+            append_jsonl(CRITERIA_TAGS_PATH, {"id": rec["id"], "tags": tags})
+            mon.item_done()
+        mon.end_stage()
 
 
 if __name__ == "__main__":
