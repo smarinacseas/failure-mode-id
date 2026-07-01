@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 import pipeline.connectivity as connectivity
 import pipeline.load as load
@@ -48,3 +49,31 @@ def test_connectivity_pings_all_and_reports(monkeypatch):
         connectivity.run(monitor=m)
     # 2 candidates + 1 judge = 3 pings
     assert m.snapshot()["stages"][0]["done"] == 3
+
+
+def test_connectivity_reports_failures_and_exits(monkeypatch):
+    class _FailRouter:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**_k):
+                    raise RuntimeError("bad model id")
+
+    class _OkAnthropic:
+        class messages:
+            @staticmethod
+            def create(**_k):
+                b = type("B", (), {"text": "ok"})()
+                return type("R", (), {"content": [b]})()
+
+    monkeypatch.setattr(connectivity, "router", _FailRouter)
+    monkeypatch.setattr(connectivity, "anthropic", _OkAnthropic)
+    monkeypatch.setattr(connectivity, "CANDIDATES", {"m1": "x"})
+
+    m = RunMonitor(WorkPlan.for_step("connectivity", 1, 1), sinks=[RecordingSink()])
+    with pytest.raises(SystemExit) as exc:
+        with m:
+            connectivity.run(monitor=m)
+    assert exc.value.code == 2                        # fails loudly on bad IDs
+    assert m.snapshot()["errors"] == 1                # the one failed candidate ping recorded
+    assert m.snapshot()["stages"][0]["done"] == 2     # candidate + judge both item_done'd before exit
