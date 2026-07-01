@@ -146,11 +146,11 @@ kebab-case tokens that hint at what makes the experiment different:
 Passing `--experiment SLUG --description "..." --run-report meta/..."`
 does three things:
 
-1. Enriches the `meta` block of `results.json` with an `experiment` sub-block (slug, number, label, description, path to the run report), a `git` block (short commit + dirty flag), and a `config` block (every knob that could differ between runs — candidate temperature, `max_tokens`, `extra_body`, judge model, `max_tokens`, prompt-file SHA prefixes, validate seed).
-2. Writes a per-experiment copy under `outputs/experiments/<slug>.json`.
-3. Updates `outputs/experiments/index.json` — the dashboard reads this file for the dropdown, ordered by experiment number.
+1. Assembles the standardized deliverable — schema version `1.0`, `meta` block (experiment identity, dataset provenance, models array, judge block, counts, per-category populations, config snapshot, git state, judge-validation status), the six aggregate summaries, and the per-prompt array with per-model verdicts + reasons. Full field-by-field contract in [`meta/RESULTS_SCHEMA.md`](meta/RESULTS_SCHEMA.md).
+2. Writes a per-experiment copy under `outputs/experiments/<slug>.json` — the sole file the dashboard reads for that experiment.
+3. Updates `outputs/experiments/index.json` — a compact registry of every tagged experiment (slug, number, label, description, counts, validation status, run report link). The dashboard reads this for the dropdown, ordered by experiment number.
 
-Untagged runs still write `outputs/results.json` normally but do not
+Untagged runs still write `outputs/results.json` (same shape) but do not
 appear in the dashboard dropdown.
 
 Concrete example (the current smoke, backfilled):
@@ -244,8 +244,9 @@ meta/                     # run reports
 
 ## Documentation
 
-- **`meta/TEMPLATE.md`** is the canonical run-report shape. Every section is required, including the experimental-flaws audit and the suggested-next-steps list. The template enforces structure: TL;DR, scope, initial configuration, attempt-by-attempt run timeline, configuration adjustments + justifications, models evaluated, headline results (with explicit n caveats), experimental flaws and biases, cost & timing, output schema, lessons, next experiments (structured hypothesis tests), suggested next steps (procedural improvements), judge validation, reproducibility, open questions.
-- **`meta/2026-06-30-smoke-test.md`** is the first end-to-end exercise of the pipeline (3 prompts). Documents the two reliability surprises that surfaced (Qwen reasoning-mode trap, OpenRouter mid-stream JSON truncation), the configuration adjustments made in response, and a 15-item next-steps list. Read this before extending the pipeline or kicking off a new full run.
+- **[`meta/RESULTS_SCHEMA.md`](meta/RESULTS_SCHEMA.md)** — the dashboard input contract. Field-by-field spec for `outputs/experiments/<slug>.json` and `outputs/experiments/index.json`, plus the versioning policy for shape changes. The dashboard should read this file and nothing else to know what it's binding against.
+- **[`meta/TEMPLATE.md`](meta/TEMPLATE.md)** — canonical run-report shape. Every section is required, including the experimental-flaws audit and the suggested-next-steps list. Sections: TL;DR, scope, initial configuration, attempt-by-attempt run timeline, configuration adjustments + justifications, models evaluated, headline results (with explicit n caveats), experimental flaws and biases, cost & timing, output schema, lessons, next experiments (structured hypothesis tests), suggested next steps (procedural improvements), judge validation, reproducibility, open questions.
+- **[`meta/2026-06-30-smoke-test.md`](meta/2026-06-30-smoke-test.md)** — first end-to-end exercise of the pipeline (3 prompts, slug `E01-smoke-3p`). Documents the two reliability surprises that surfaced (Qwen reasoning-mode trap, OpenRouter mid-stream JSON truncation), the configuration adjustments made in response, and a 15-item next-steps list. Read this before extending the pipeline or kicking off a new full run.
 - The pre-implementation runbook (`ComplexConstraints-v1-master-runbook.md`) is the design spec and is gitignored — present locally as the source-of-truth for what v1 should be, intentionally not shipped.
 
 ## Roadmap

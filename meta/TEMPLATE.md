@@ -211,11 +211,17 @@ from the prior report unless something changed.*
 
 ## Output schema (what gets produced)
 
-*Either list the artifact files and what each contains (if the schema changed since the last run), or write "unchanged — see <prior report>".*
+*The dashboard-facing deliverable shape is fixed by [`meta/RESULTS_SCHEMA.md`](RESULTS_SCHEMA.md).
+This section is for run-specific artifacts (sidecar files, ad-hoc dumps,
+regenerated intermediates). Note any deviation from the schema — an
+added optional field, a `schema_version` bump, an unusual sidecar
+produced only by this experiment. Otherwise write "unchanged — deliverable
+matches `meta/RESULTS_SCHEMA.md` at v<schema_version>".*
 
 | path | content |
 | --- | --- |
-| *outputs/results.json* | *…* |
+| *outputs/experiments/<slug>.json* | *deliverable — see schema doc* |
+| *outputs/experiments/index.json* | *dashboard dropdown source — this experiment appended / replaced* |
 
 ## Lessons / notes for the next experimenter
 
