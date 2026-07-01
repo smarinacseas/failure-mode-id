@@ -6,7 +6,7 @@ import json
 import random
 import time
 from pathlib import Path
-from typing import Callable, Iterable, Iterator, TypeVar
+from typing import Callable, Iterable, TypeVar
 
 T = TypeVar("T")
 
@@ -76,18 +76,11 @@ def retry(
             if i == attempts - 1 or not retriable:
                 raise
             delay = base_delay * (2**i) + random.uniform(0, 0.5)
-            print(f"  retry {label} in {delay:.1f}s ({type(e).__name__}: {e})")
+            from pipeline import monitor
+            monitor.note_retry(f"{label} in {delay:.1f}s ({type(e).__name__})")
             time.sleep(delay)
     raise last_exc  # type: ignore[misc]
 
 
 def limited(records: list[dict], limit: int | None) -> list[dict]:
     return records if limit is None else records[:limit]
-
-
-def iter_progress(records: list[dict], label: str) -> Iterator[tuple[int, dict]]:
-    n = len(records)
-    for i, r in enumerate(records, start=1):
-        yield i, r
-        if i % 25 == 0:
-            print(f"  {label}: {i}/{n}")
