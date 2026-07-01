@@ -10,10 +10,13 @@ This file is built up across several tasks; Task 2 adds Stage + WorkPlan.
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 
 # Stage order + how each stage's total is derived from (limit L, n_candidates M).
 _STEP_ORDER = ("connectivity", "load", "generate", "grade", "classify", "validate", "aggregate")
@@ -324,3 +327,53 @@ def render_lines(snap: dict) -> str:
     lines.append(f"retries: {snap['retries']}   errors: {snap['errors']}   "
                  f"elapsed: {_fmt_dur(snap['elapsed_s'])}")
     return "\n".join(lines)
+
+
+class StatusSink(Sink):
+    """Write snapshot() to a JSON heartbeat, throttled, with atomic replace."""
+
+    def __init__(self, path: Path, min_interval: float = 1.0) -> None:
+        self.path = path
+        self.min_interval = min_interval
+        self._last: float | None = None         # None → the first update always writes
+
+    def _write(self, monitor: "RunMonitor") -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+        tmp.write_text(json.dumps(monitor.snapshot(), ensure_ascii=False, indent=2),
+                       encoding="utf-8")
+        os.replace(tmp, self.path)              # atomic: readers never see a partial file
+        self._last = time.monotonic()
+
+    def update(self, monitor: "RunMonitor") -> None:
+        if self._last is None or time.monotonic() - self._last >= self.min_interval:
+            self._write(monitor)
+
+    def close(self, monitor: "RunMonitor") -> None:
+        self._write(monitor)                    # always flush the terminal state
+
+
+_LEVELS = {"NOTE": logging.INFO, "INFO": logging.INFO,
+           "WARNING": logging.WARNING, "ERROR": logging.ERROR}
+
+
+class LogSink(Sink):
+    """Append every event to a timestamped log file via stdlib logging."""
+
+    def __init__(self, path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.path = path
+        self.logger = logging.getLogger(f"failure_mode_id.monitor.{id(self)}")
+        self.logger.setLevel(logging.INFO)
+        self.logger.propagate = False
+        self._handler = logging.FileHandler(path, encoding="utf-8")
+        self._handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+        self.logger.addHandler(self._handler)
+
+    def log(self, monitor: "RunMonitor", level: str, message: str) -> None:
+        self.logger.log(_LEVELS.get(level, logging.INFO), message)
+
+    def close(self, monitor: "RunMonitor") -> None:
+        self._handler.flush()
+        self.logger.removeHandler(self._handler)
+        self._handler.close()
