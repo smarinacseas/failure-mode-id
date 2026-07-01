@@ -21,13 +21,18 @@ import json
 import sys
 from datetime import datetime, timezone
 
-from config import PROGRESS_PATH
+from config import CANDIDATE_TIMEOUT_S, PROGRESS_PATH
 from pipeline import (
     aggregate, classify, connectivity, generate, grade, load, validate,
 )
 from pipeline.monitor import build_monitor, render_lines
 
 STEPS = ("load", "generate", "grade", "classify", "validate", "aggregate")
+
+# A heartbeat only refreshes between items; a single in-flight model call can
+# legitimately freeze `updated_at` for up to CANDIDATE_TIMEOUT_S. Only warn well
+# beyond that, so a healthy slow call is never mistaken for a dead process.
+_STALE_AFTER_S = CANDIDATE_TIMEOUT_S + 60.0
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -75,7 +80,7 @@ def _print_status() -> None:
             age = (datetime.now(timezone.utc) - updated).total_seconds()
         except (KeyError, ValueError, TypeError):
             age = None
-        if age is not None and age > 90:
+        if age is not None and age > _STALE_AFTER_S:
             print(f"\n⚠ possibly stalled — last update {int(age)}s ago (pid {snap.get('pid')}).")
 
 

@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timedelta, timezone
 
 import main
+from config import CANDIDATE_TIMEOUT_S
 
 
 def _snap(state, updated):
@@ -30,11 +31,21 @@ def test_status_renders_heartbeat(tmp_path, monkeypatch, capsys):
 
 def test_status_flags_stale_running_run(tmp_path, monkeypatch, capsys):
     path = tmp_path / "progress.json"
-    old = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+    old = (datetime.now(timezone.utc) - timedelta(seconds=CANDIDATE_TIMEOUT_S + 120)).isoformat()
     path.write_text(json.dumps(_snap("running", old)))
     monkeypatch.setattr(main, "PROGRESS_PATH", path)
     main._print_status()
     assert "possibly stalled" in capsys.readouterr().out
+
+
+def test_status_does_not_flag_healthy_in_flight_run(tmp_path, monkeypatch, capsys):
+    path = tmp_path / "progress.json"
+    # frozen mid model-call, still within one CANDIDATE_TIMEOUT_S -> healthy, not stalled
+    recent = (datetime.now(timezone.utc) - timedelta(seconds=CANDIDATE_TIMEOUT_S - 30)).isoformat()
+    path.write_text(json.dumps(_snap("running", recent)))
+    monkeypatch.setattr(main, "PROGRESS_PATH", path)
+    main._print_status()
+    assert "stalled" not in capsys.readouterr().out
 
 
 def test_status_missing_file(tmp_path, monkeypatch, capsys):
