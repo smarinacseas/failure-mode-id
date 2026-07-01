@@ -146,12 +146,25 @@ kebab-case tokens that hint at what makes the experiment different:
 Passing `--experiment SLUG --description "..." --run-report meta/..."`
 does three things:
 
-1. Assembles the standardized deliverable — schema version `1.0`, `meta` block (experiment identity, dataset provenance, models array, judge block, counts, per-category populations, config snapshot, git state, judge-validation status), the six aggregate summaries, and the per-prompt array with per-model verdicts + reasons. Full field-by-field contract in [`meta/RESULTS_SCHEMA.md`](meta/RESULTS_SCHEMA.md).
-2. Writes a per-experiment copy under `outputs/experiments/<slug>.json` — the sole file the dashboard reads for that experiment.
-3. Updates `outputs/experiments/index.json` — a compact registry of every tagged experiment (slug, number, label, description, counts, validation status, run report link). The dashboard reads this for the dropdown, ordered by experiment number.
+1. Assembles the standardized deliverable — schema version `2.0`, `meta` block (experiment identity, dataset provenance, model keys, judge id, counts, per-category populations, config snapshot, git state, judge-validation status), the six aggregate summaries, and the per-prompt array with per-model verdicts + reasons. Full field-by-field contract in [`meta/RESULTS_SCHEMA.md`](meta/RESULTS_SCHEMA.md).
+2. Writes a per-experiment copy under `outputs/experiments/<slug>.json`.
+3. Updates `outputs/experiments/index.json` — a compact registry of every tagged experiment.
+4. **Syncs the ConstraintLens dashboard**: copies each `<slug>.json` into `dashboard/` and rebuilds `dashboard/runs.json` (the design's dropdown source). Fires automatically at the end of every tagged `aggregate`; also runnable standalone via `uv run python scripts/dashboard_sync.py`. On failure the sync is skipped (aggregate never blocks).
 
 Untagged runs still write `outputs/results.json` (same shape) but do not
 appear in the dashboard dropdown.
+
+The dashboard itself lives at `dashboard/index.html` — a static bundle
+unpacked from the Claude Design deliverable
+(`design/ConstraintLens Dashboard.html`) via `scripts/unpack_design.py`.
+That script decodes the base64-gzipped assets, writes them under
+`dashboard/` (fonts, `support.js`, `index.html`), patches a known design
+export bug (the drill-table row loop shipped with an empty `<sc-for>`),
+and encodes `<table>`/`<tbody>`/`<tr>` to `sc-raw-*` so the HTML parser
+doesn't hoist template directives out of tables. Re-run whenever a new
+design revision drops. GitHub Pages serves `dashboard/` as-is (no build
+step); the `.github/workflows/dashboard-deploy.yml` workflow uploads on
+every push to `main` that touches `dashboard/**`.
 
 Concrete example (the current smoke, backfilled):
 

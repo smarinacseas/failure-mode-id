@@ -1,0 +1,8 @@
+# The dashboard folder is deployed as-is to GitHub Pages. Everything under
+# it (index.html, support.js, fonts/, runs.json, per-experiment <slug>.json)
+# ships to production — do NOT hide those.
+.DS_Store
+*.log
+
+# Local http.server / editor scratch
+.playwright-mcp/

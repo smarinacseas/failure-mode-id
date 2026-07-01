@@ -43,7 +43,7 @@ from config import (
     VALIDATE_SEED,
 )
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "2.0"
 
 DATASET = {
     "name": "Complex Constraints Benchmark Set",
@@ -142,13 +142,37 @@ def dataset_block() -> dict:
     return dict(DATASET)
 
 
-def models_block() -> list[dict]:
-    """`meta.models` — one entry per candidate, {key, id, role}."""
+def models_block() -> list[str]:
+    """`meta.models` — ordered candidate KEYS.
+
+    Dashboards use these keys directly to index `summary.criterion_pass_rate`,
+    `prompt.responses`, `criterion.results`, etc. — i.e. the same short
+    strings the pipeline uses as its model handles.
+    """
+    return list(CANDIDATES.keys())
+
+
+def model_details_block() -> list[dict]:
+    """`meta.model_details` — the {key, id, role} rich variant.
+
+    Optional companion to `meta.models`. Kept for future dashboards / analyses
+    that want provider-side IDs or role tags; the ConstraintLens dashboard
+    doesn't read this.
+    """
     return [{"key": k, "id": v, "role": "candidate"} for k, v in CANDIDATES.items()]
 
 
-def judge_block() -> dict:
-    """`meta.judge` — grader identity + role + family-stake note."""
+def judge_block() -> str:
+    """`meta.judge` — grader model ID (short string).
+
+    Dashboards render this verbatim in metadata panels/footers. Richer info
+    (provider, role, self-preference bias note) lives in `meta.judge_details`.
+    """
+    return JUDGE
+
+
+def judge_details_block() -> dict:
+    """`meta.judge_details` — provider + role + family-stake note."""
     return {
         "id": JUDGE,
         "provider": JUDGE_PROVIDER,
@@ -270,7 +294,9 @@ def build_meta(
         "experiment": experiment_block(slug, description, run_report, run_date_iso),
         "dataset": dataset_block(),
         "models": models_block(),
+        "model_details": model_details_block(),
         "judge": judge_block(),
+        "judge_details": judge_details_block(),
         "counts": counts_block(prompts),
         "categories": categories_block(prompts),
         "config": config_block(),
@@ -315,8 +341,8 @@ def update_index(slug: str, meta: dict) -> Path:
         "n_prompts": meta["counts"]["n_prompts"],
         "n_criteria": meta["counts"]["n_criteria"],
         "n_models": meta["counts"]["n_models"],
-        "models": [m["key"] for m in meta["models"]],
-        "judge": meta["judge"]["id"],
+        "models": list(meta["models"]),
+        "judge": meta["judge"],
         "validation_status": v["status"],
         "agreement_pct": v["agreement_pct"],
         "git_commit": meta["git"]["commit"],

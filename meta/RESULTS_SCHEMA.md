@@ -1,12 +1,28 @@
 # `results.json` — deliverable schema
 
 Every experiment produces one JSON file (`outputs/experiments/<slug>.json`)
-with the shape defined here. The dashboard binds against this schema
-once and renders any run. The compact registry at
-`outputs/experiments/index.json` is the dropdown source; on selection,
-the dashboard fetches the corresponding `results_path`.
+with the shape defined here. The **ConstraintLens dashboard**
+(`dashboard/index.html`, unpacked from the Claude Design bundle) binds
+against this schema once and renders any run — its Logic reads
+`./runs.json` on load, then each run's JSON on selection.
+`scripts/dashboard_sync.py` mirrors every experiment into `dashboard/`
+and rebuilds `dashboard/runs.json`; `pipeline/aggregate.py` calls it
+automatically for tagged runs.
 
-Current schema version: **`1.0`**.
+The compact registry at `outputs/experiments/index.json` is a legacy /
+back-compat index for consumers other than the dashboard.
+
+Current schema version: **`2.0`**.
+
+### Breaking changes since `1.0`
+
+- `meta.models` used to be `[{key, id, role}, …]`; is now an array of the
+  key strings (`["qwen-9b", "qwen-35b", "qwen-397b"]`), matching how the
+  dashboard indexes into `summary.criterion_pass_rate[key]`,
+  `prompt.responses[key]`, `criterion.results[key]`. The rich variant
+  moved to `meta.model_details`.
+- `meta.judge` used to be `{id, provider, role, family_stake_note}`; is
+  now the id string. The rich variant moved to `meta.judge_details`.
 
 ## Design principles
 
@@ -19,7 +35,7 @@ Current schema version: **`1.0`**.
 
 ```json
 {
-  "schema_version": "1.0",
+  "schema_version": "2.0",
   "meta":    { … },
   "summary": { … },
   "prompts": [ … ]
@@ -63,21 +79,39 @@ Benchmark identity + license. Constants for v1 (only changes if the benchmark it
 
 ### `meta.models`
 
-Ordered array — one entry per candidate. The array order is the order the dashboard should render columns.
+Ordered array of candidate **key strings** — the same short mnemonics used
+everywhere else in the file (`prompt.responses[key]`,
+`summary.criterion_pass_rate[key]`, `criterion.results[key]`). Array
+order is the order the dashboard renders model tabs / columns.
+
+```json
+"models": ["qwen-9b", "qwen-35b", "qwen-397b"]
+```
+
+### `meta.model_details`
+
+Optional companion to `meta.models` — richer per-model info. The
+ConstraintLens dashboard doesn't read this; kept for future consumers
+that need the provider-side IDs.
 
 | key | type | notes |
 | --- | --- | --- |
-| `key` | str | Short mnemonic used as the map key everywhere else in the file (`qwen-9b`, `qwen-35b`, `qwen-397b`). |
+| `key` | str | Same short mnemonic as the corresponding entry in `meta.models`. |
 | `id` | str | Provider-side model ID. |
 | `role` | str | Always `candidate` in v1; kept for forward compat. |
 
 ### `meta.judge`
 
-Grader / classifier identity.
+String — the grader/classifier model ID (e.g. `"claude-opus-4-8"`). The
+dashboard renders this verbatim in the run-details panel and footer.
+
+### `meta.judge_details`
+
+Optional richer variant of `meta.judge`.
 
 | key | type | notes |
 | --- | --- | --- |
-| `id` | str | Provider-side model ID. |
+| `id` | str | Same string as `meta.judge`. |
 | `provider` | str | e.g. `Anthropic`. |
 | `role` | str | e.g. `grader + classifier`. |
 | `family_stake_note` | str | Human-readable statement of the self-preference-bias control. |
@@ -203,16 +237,42 @@ Each `criteria[]` entry:
 
 ---
 
-## `index.json` — dashboard dropdown source
+## Dashboard dropdown files
 
-`outputs/experiments/index.json` carries one compact entry per tagged
-experiment. Everything the dropdown needs to render + everything a
-"badge" annotation would use lives here; everything else lives in the
-per-experiment file.
+### `dashboard/runs.json` — the ConstraintLens design's dropdown source
+
+Written by `scripts/dashboard_sync.py` (which is also invoked by
+`pipeline/aggregate.py` at the end of every tagged run). The design's
+Logic fetches `./runs.json` on load and, on selection, fetches each
+run's own JSON at `./<path>`.
 
 ```json
 {
-  "schema_version": "1.0",
+  "runs": [
+    {
+      "id": "E01-smoke-3p",
+      "label": "E01-smoke-3p — First end-to-end pipeline exercise",
+      "date": "2026-07-01",
+      "path": "./E01-smoke-3p.json",
+      "n_prompts": 3,
+      "n_models": 3
+    }
+  ],
+  "synced_at": "2026-07-01T01:41:52…"
+}
+```
+
+The design only reads `id`, `label`, `date`, `path`; the extra fields
+are metadata for external tools.
+
+### `outputs/experiments/index.json` — legacy dashboard registry
+
+Carries one compact entry per tagged experiment. Kept because non-dashboard
+consumers (analysis notebooks, batch scripts) may still index off it.
+
+```json
+{
+  "schema_version": "2.0",
   "experiments": [
     {
       "slug": "E01-smoke-3p",
@@ -235,18 +295,18 @@ per-experiment file.
 }
 ```
 
-Entries are sorted by `number` ascending. Re-tagging (running `aggregate
---experiment E01-smoke-3p` twice) replaces the existing entry with the
-same slug rather than duplicating.
+Entries are sorted by `number` ascending. Re-tagging replaces the existing
+entry with the same slug rather than duplicating.
 
 ---
 
 ## Versioning policy
 
-- **Patch bumps (`1.0` → `1.0.1`)**: fixes to this document only, no shape change.
-- **Minor bumps (`1.0` → `1.1`)**: additive-only. New optional key with a documented default. Existing dashboards keep rendering.
-- **Major bumps (`1.0` → `2.0`)**: breaking change — key removed, renamed, or has an incompatible type change. Dashboards must gate rendering on `schema_version` prefix.
+- **Patch bumps (`2.0` → `2.0.1`)**: fixes to this document only, no shape change.
+- **Minor bumps (`2.0` → `2.1`)**: additive-only. New optional key with a documented default. Existing dashboards keep rendering.
+- **Major bumps (`2.0` → `3.0`)**: breaking change — key removed, renamed, or has an incompatible type change. Dashboards must gate rendering on `schema_version` prefix.
 
 When bumping, update `SCHEMA_VERSION` in `pipeline/_experiment.py`, add
-the change to this file, and note the bump in the run report of the
-first experiment produced under the new version.
+the change to this file (including a "Breaking changes since" section
+under the header), and note the bump in the run report of the first
+experiment produced under the new version.

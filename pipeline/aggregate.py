@@ -6,12 +6,21 @@ comparison apples-to-apples; partial prompts are skipped with a note.
 
 `run_manifest.json` is merged (not overwritten) so a prior
 `validate score` run's `judge_agreement` survives.
+
+For tagged runs, the ConstraintLens dashboard's static data folder
+(`dashboard/public/data/`) is refreshed at the end so the deliverable
+is immediately visible in `vite dev` (and shipped by the next GH Pages
+build). Sync failures are non-fatal — aggregate's canonical artifacts
+still land regardless.
 """
 
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 from config import (
     CANDIDATES,
@@ -20,6 +29,7 @@ from config import (
     GRADES_DIR,
     RESPONSES_DIR,
     RESULTS_PATH,
+    ROOT,
     RUN_MANIFEST_PATH,
 )
 from pipeline._experiment import (
@@ -29,6 +39,8 @@ from pipeline._experiment import (
     write_experiment_copy,
 )
 from pipeline._io import read_jsonl
+
+DASHBOARD_SYNC_SCRIPT: Path = ROOT / "scripts" / "dashboard_sync.py"
 
 
 def _pct(num: int, den: int) -> float:
@@ -145,6 +157,23 @@ def _summary(prompts: list[dict]) -> dict:
     }
 
 
+def _sync_dashboard() -> None:
+    """Best-effort copy of every experiment deliverable into the dashboard's
+    static data folder. Failure here never blocks aggregation — the sync is
+    a convenience, not a correctness requirement."""
+    if not DASHBOARD_SYNC_SCRIPT.exists():
+        return
+    try:
+        subprocess.run(
+            [sys.executable, str(DASHBOARD_SYNC_SCRIPT)],
+            check=True,
+            cwd=str(ROOT),
+            timeout=20,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+        print(f"aggregate: dashboard sync skipped ({type(e).__name__}: {e})")
+
+
 def _merge_manifest(update: dict) -> None:
     existing: dict = {}
     if RUN_MANIFEST_PATH.exists():
@@ -223,15 +252,16 @@ def run(
         idx_path = update_index(experiment, meta)
         print(f"aggregate: tagged as {experiment} → {exp_path}")
         print(f"aggregate: updated dashboard index → {idx_path}")
+        _sync_dashboard()
     else:
         print("aggregate: no --experiment slug provided; only canonical results.json written.")
 
     _merge_manifest({
         "schema_version": SCHEMA_VERSION,
         "experiment": meta["experiment"],
-        "models": [m["key"] for m in meta["models"]],
+        "models": list(meta["models"]),
         "counts": meta["counts"],
-        "judge": meta["judge"]["id"],
+        "judge": meta["judge"],
         "run_date": run_date,
         "git": meta["git"],
         "config": meta["config"],
