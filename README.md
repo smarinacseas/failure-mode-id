@@ -122,6 +122,55 @@ pipeline is decoupled at the JSONL boundary).
 - **Broad retry predicate** — 429s, 5xx, network errors, *and* SDK-level parse errors (OpenRouter has been observed returning mid-stream-truncated JSON bodies). Exponential backoff with jitter.
 - **Sequential by design for v1.** No parallelism between candidates or prompts. The simple model is correct; parallelism is on the suggested-next-steps list.
 
+## Experiment tagging + dashboard handoff
+
+Every `aggregate` step can be tagged with an **experiment slug** so the
+dashboard's dropdown has a stable identifier for each run. The
+convention is:
+
+```
+E<NN>-<kebab-case-label>
+```
+
+The two-digit number gives dropdown ordering. The label is 1–3
+kebab-case tokens that hint at what makes the experiment different:
+
+| slug | meaning |
+| --- | --- |
+| `E01-smoke-3p` | first smoke, 3 prompts |
+| `E02-v1-75p` | v1 full run, 75 prompts |
+| `E03-reasoning-on` | reasoning-enabled ablation |
+| `E04-judge-swap` | judge replaced by a non-Anthropic model |
+| `E05-cross-family` | DeepSeek added as a fourth candidate |
+
+Passing `--experiment SLUG --description "..." --run-report meta/..."`
+does three things:
+
+1. Enriches the `meta` block of `results.json` with an `experiment` sub-block (slug, number, label, description, path to the run report), a `git` block (short commit + dirty flag), and a `config` block (every knob that could differ between runs — candidate temperature, `max_tokens`, `extra_body`, judge model, `max_tokens`, prompt-file SHA prefixes, validate seed).
+2. Writes a per-experiment copy under `outputs/experiments/<slug>.json`.
+3. Updates `outputs/experiments/index.json` — the dashboard reads this file for the dropdown, ordered by experiment number.
+
+Untagged runs still write `outputs/results.json` normally but do not
+appear in the dashboard dropdown.
+
+Concrete example (the current smoke, backfilled):
+
+```bash
+uv run python main.py aggregate --limit 3 \
+    --experiment E01-smoke-3p \
+    --description "First end-to-end pipeline exercise (3 prompts, 3 Qwen candidates)." \
+    --run-report meta/2026-06-30-smoke-test.md
+```
+
+For a full run:
+
+```bash
+uv run python main.py all --limit 75 \
+    --experiment E02-v1-75p \
+    --description "v1 full run, reasoning disabled, max_tokens=8000." \
+    --run-report meta/2026-07-02-v1-full-run.md
+```
+
 ## Quickstart
 
 ```bash

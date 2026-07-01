@@ -1,5 +1,9 @@
 # Smoke run · 2026-06-30 · `all --limit 3`
 
+**Experiment slug:** `E01-smoke-3p` — the identifier under which this run
+appears in `outputs/experiments/index.json` and the dashboard dropdown.
+Corresponding results file: `outputs/experiments/E01-smoke-3p.json`.
+
 First end-to-end exercise of the v1 evaluation pipeline. Three prompts of
 the Complex Constraints benchmark, three Qwen3.5 candidates via OpenRouter,
 graded by `claude-opus-4-8` via Anthropic. Goal: prove the pipeline runs

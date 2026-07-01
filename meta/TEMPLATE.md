@@ -19,6 +19,16 @@ write a new one and link to the earlier one if you're following up.
 
 # <run name> · <YYYY-MM-DD> · `<exact command run>`
 
+**Experiment slug:** `E<NN>-<kebab-case-label>` — the identifier under which this
+run appears in the dashboard dropdown and in `outputs/experiments/index.json`.
+Convention: two-digit zero-padded number for ordering, then a 1–3-token
+kebab-case label that hints at the axis under investigation (e.g.
+`E01-smoke-3p`, `E02-v1-75p`, `E03-reasoning-on`, `E04-judge-swap`). Slug is
+passed to `main.py` via `--experiment` alongside `--description` and
+`--run-report`; the full `config` snapshot (candidate knobs, judge, prompt
+SHAs, git commit) is captured automatically by aggregate.
+
+
 *One-paragraph framing: what was the goal of this run, what's the relationship to the previous run, and what would success look like? Should be readable as the abstract of the report — someone scanning the directory should learn from this paragraph alone what the run was for.*
 
 ## TL;DR
