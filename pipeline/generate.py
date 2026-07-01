@@ -13,6 +13,7 @@ from config import (
     router,
 )
 from pipeline._io import append_jsonl, limited, read_jsonl, retry
+from pipeline.monitor import RunMonitor, stage_ctx
 
 
 def _response_path(key: str):
@@ -46,20 +47,35 @@ def _generate_one(model_id: str, prompt: str) -> str:
     return retry(_call, label=f"openrouter:{model_id}")
 
 
-def run(limit: int | None = None) -> None:
+def run(limit: int | None = None, monitor: RunMonitor | None = None) -> None:
     records = limited(read_jsonl(DATA_JSONL), limit)
     if not records:
         raise RuntimeError(f"No records in {DATA_JSONL}. Run `load` first.")
 
-    for key, model_id in CANDIDATES.items():
-        out_path = _response_path(key)
-        done_ids = {r["id"] for r in read_jsonl(out_path)}
-        todo = [r for r in records if r["id"] not in done_ids]
-        print(f"generate · {key}: {len(todo)} todo / {len(records)} total (skipping {len(done_ids)} done)")
-        for rec in todo:
-            text = _generate_one(model_id, rec["prompt"])
-            append_jsonl(out_path, {"id": rec["id"], "response": text})
-            print(f"  gen {rec['id']} · {key} ✓")
+    with stage_ctx(monitor, "generate", len(records)) as mon:
+        total = len(records) * len(CANDIDATES)
+        plan: list[tuple[str, str, list[dict]]] = []
+        already = 0
+        for key, model_id in CANDIDATES.items():
+            done_ids = {r["id"] for r in read_jsonl(_response_path(key))}
+            todo = [r for r in records if r["id"] not in done_ids]
+            already += len(done_ids)
+            plan.append((key, model_id, todo))
+
+        mon.start_stage("generate", total=total, already_done=already)
+        for key, model_id, todo in plan:
+            out_path = _response_path(key)
+            for rec in todo:
+                mon.item_start(model=key, prompt_id=rec["id"])
+                try:
+                    text = _generate_one(model_id, rec["prompt"])
+                except Exception as e:  # noqa: BLE001 — post-retry failure
+                    mon.record_error(f"generate {key} {rec['id']}: {type(e).__name__}: {e}")
+                    mon.item_done()
+                    continue
+                append_jsonl(out_path, {"id": rec["id"], "response": text})
+                mon.item_done()
+        mon.end_stage()
 
 
 if __name__ == "__main__":
