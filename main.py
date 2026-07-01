@@ -21,7 +21,7 @@ import json
 import sys
 from datetime import datetime, timezone
 
-from config import CANDIDATES, PROGRESS_PATH
+from config import PROGRESS_PATH
 from pipeline import (
     aggregate, classify, connectivity, generate, grade, load, validate,
 )
@@ -63,13 +63,17 @@ def _print_status() -> None:
     if not PROGRESS_PATH.exists():
         print("no run found (outputs/progress.json missing).")
         return
-    snap = json.loads(PROGRESS_PATH.read_text(encoding="utf-8"))
+    try:
+        snap = json.loads(PROGRESS_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        print("no run found (outputs/progress.json is unreadable).")
+        return
     print(render_lines(snap))
     if snap.get("state") == "running":
         try:
             updated = datetime.fromisoformat(snap["updated_at"])
             age = (datetime.now(timezone.utc) - updated).total_seconds()
-        except (KeyError, ValueError):
+        except (KeyError, ValueError, TypeError):
             age = None
         if age is not None and age > 90:
             print(f"\n⚠ possibly stalled — last update {int(age)}s ago (pid {snap.get('pid')}).")
