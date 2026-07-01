@@ -39,6 +39,7 @@ from pipeline._experiment import (
     write_experiment_copy,
 )
 from pipeline._io import read_jsonl
+from pipeline.monitor import RunMonitor, stage_ctx
 
 DASHBOARD_SYNC_SCRIPT: Path = ROOT / "scripts" / "dashboard_sync.py"
 
@@ -157,7 +158,7 @@ def _summary(prompts: list[dict]) -> dict:
     }
 
 
-def _sync_dashboard() -> None:
+def _sync_dashboard(mon) -> None:
     """Best-effort copy of every experiment deliverable into the dashboard's
     static data folder. Failure here never blocks aggregation — the sync is
     a convenience, not a correctness requirement."""
@@ -171,7 +172,7 @@ def _sync_dashboard() -> None:
             timeout=20,
         )
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
-        print(f"aggregate: dashboard sync skipped ({type(e).__name__}: {e})")
+        mon.note(f"aggregate: dashboard sync skipped ({type(e).__name__}: {e})")
 
 
 def _merge_manifest(update: dict) -> None:
@@ -193,7 +194,17 @@ def run(
     experiment: str | None = None,
     description: str | None = None,
     run_report: str | None = None,
+    monitor: RunMonitor | None = None,
 ) -> None:
+    with stage_ctx(monitor, "aggregate", 1) as mon:
+        mon.start_stage("aggregate", total=1)
+        mon.item_start()
+        _run(limit, experiment, description, run_report, mon)
+        mon.item_done()
+        mon.end_stage()
+
+
+def _run(limit, experiment, description, run_report, mon) -> None:
     """Join everything into results.json (canonical) and, if `experiment`
     is a valid slug like `E01-smoke-3p`, also into
     `outputs/experiments/<slug>.json` plus the dashboard `index.json`.
@@ -205,7 +216,7 @@ def run(
     if run_report:
         report_path = ROOT / run_report if not Path(run_report).is_absolute() else Path(run_report)
         if not report_path.exists():
-            print(
+            mon.note(
                 f"aggregate: WARNING — --run-report path does not exist: {run_report}\n"
                 f"           Copy meta/TEMPLATE.md → {run_report} and fill it in.",
             )
@@ -228,11 +239,11 @@ def run(
         eligible.append(rec)
 
     if skipped:
-        print(f"aggregate: skipping {len(skipped)} incomplete prompt(s):")
+        mon.note(f"aggregate: skipping {len(skipped)} incomplete prompt(s):")
         for s in skipped[:10]:
-            print(f"  · {s}")
+            mon.note(f"  · {s}")
         if len(skipped) > 10:
-            print(f"  · …and {len(skipped) - 10} more")
+            mon.note(f"  · …and {len(skipped) - 10} more")
 
     prompts = [_build_prompt_entry(rec, responses, grades, tags) for rec in eligible]
     summary = _summary(prompts)
@@ -254,7 +265,7 @@ def run(
 
     RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     RESULTS_PATH.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(
+    mon.note(
         f"aggregate: wrote {meta['counts']['n_prompts']} prompts × "
         f"{meta['counts']['n_criteria']} criteria → {RESULTS_PATH}"
     )
@@ -262,11 +273,11 @@ def run(
     if experiment:
         exp_path = write_experiment_copy(experiment, results)
         idx_path = update_index(experiment, meta)
-        print(f"aggregate: tagged as {experiment} → {exp_path}")
-        print(f"aggregate: updated dashboard index → {idx_path}")
-        _sync_dashboard()
+        mon.note(f"aggregate: tagged as {experiment} → {exp_path}")
+        mon.note(f"aggregate: updated dashboard index → {idx_path}")
+        _sync_dashboard(mon)
     else:
-        print("aggregate: no --experiment slug provided; only canonical results.json written.")
+        mon.note("aggregate: no --experiment slug provided; only canonical results.json written.")
 
     _merge_manifest({
         "schema_version": SCHEMA_VERSION,
@@ -279,7 +290,7 @@ def run(
         "config": meta["config"],
         "validation": meta["validation"],
     })
-    print(f"aggregate: merged run summary → {RUN_MANIFEST_PATH}")
+    mon.note(f"aggregate: merged run summary → {RUN_MANIFEST_PATH}")
 
 
 if __name__ == "__main__":

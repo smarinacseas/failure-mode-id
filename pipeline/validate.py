@@ -25,6 +25,7 @@ from config import (
     VALIDATE_SEED,
 )
 from pipeline._io import read_jsonl
+from pipeline.monitor import RunMonitor, stage_ctx
 
 
 def _build_pool() -> list[dict]:
@@ -60,7 +61,7 @@ def _build_pool() -> list[dict]:
     return pool
 
 
-def sample() -> None:
+def sample(mon: "RunMonitor | None" = None) -> None:
     pool = _build_pool()
     if not pool:
         raise RuntimeError("No graded rows found. Run `grade` first.")
@@ -71,11 +72,9 @@ def sample() -> None:
     JUDGE_VALIDATION_PATH.write_text(
         json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    print(
-        f"validate sample: wrote {n} rows → {JUDGE_VALIDATION_PATH}\n"
-        f"  fill the `human` field on each row with PASS or FAIL, then run "
-        f"`uv run python main.py validate --mode score`."
-    )
+    msg = (f"validate sample: wrote {n} rows → {JUDGE_VALIDATION_PATH}; "
+           f"fill the `human` field (PASS/FAIL), then run `validate --mode score`.")
+    mon.note(msg) if mon is not None else print(msg)
 
 
 def _merge_manifest(update: dict) -> None:
@@ -146,13 +145,18 @@ def score() -> None:
     print(f"  merged judge_agreement → {RUN_MANIFEST_PATH}")
 
 
-def run(mode: str = "sample") -> None:
-    if mode == "sample":
-        sample()
-    elif mode == "score":
-        score()
-    else:
+def run(mode: str = "sample", monitor: RunMonitor | None = None) -> None:
+    if mode not in {"sample", "score"}:
         raise ValueError(f"validate mode must be 'sample' or 'score', got {mode!r}")
+    with stage_ctx(monitor, "validate", 1) as mon:
+        mon.start_stage("validate", total=1)
+        mon.item_start()
+        if mode == "sample":
+            sample(mon)
+        else:
+            score()
+        mon.item_done()
+        mon.end_stage()
 
 
 if __name__ == "__main__":
