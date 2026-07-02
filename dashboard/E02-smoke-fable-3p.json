@@ -1,0 +1,1683 @@
+{
+  "schema_version": "2.1",
+  "meta": {
+    "experiment": {
+      "slug": "E02-smoke-fable-3p",
+      "number": 2,
+      "label": "smoke-fable-3p",
+      "description": "pipeline fable judge",
+      "run_report": "",
+      "run_date": "2026-07-02T03:47:55.579910+00:00"
+    },
+    "dataset": {
+      "name": "Complex Constraints Benchmark Set",
+      "source": "https://huggingface.co/datasets/surgeai/ComplexConstraints",
+      "license": "CC-BY-4.0",
+      "publisher": "Surge AI"
+    },
+    "models": [
+      "qwen-9b",
+      "qwen-35b",
+      "qwen-397b"
+    ],
+    "model_details": [
+      {
+        "key": "qwen-9b",
+        "id": "qwen/qwen3.5-9b",
+        "role": "candidate"
+      },
+      {
+        "key": "qwen-35b",
+        "id": "qwen/qwen3.5-35b-a3b",
+        "role": "candidate"
+      },
+      {
+        "key": "qwen-397b",
+        "id": "qwen/qwen3.5-397b-a17b",
+        "role": "candidate"
+      }
+    ],
+    "judge": "claude-fable-5",
+    "judge_details": {
+      "id": "claude-fable-5",
+      "provider": "Anthropic",
+      "role": "grader + classifier",
+      "family_stake_note": "Non-candidate family (Anthropic judge, non-Anthropic candidates) → self-preference bias is structurally absent by v1 design."
+    },
+    "counts": {
+      "n_prompts": 3,
+      "n_criteria": 72,
+      "n_models": 3,
+      "n_grade_cells": 216
+    },
+    "categories": {
+      "instruction_type": {
+        "Multistep": 1,
+        "Negative": 2
+      },
+      "prompt_style": {
+        "Context prompting": 1,
+        "Direct prompting": 1,
+        "Rambling/Stream-of-Consciousness": 1
+      },
+      "use_case": {
+        "Data Processing, Formatting & Math": 1,
+        "Logistics, Scheduling & Event Planning": 2
+      }
+    },
+    "config": {
+      "candidate_temperature": 0.0,
+      "candidate_max_tokens": 8000,
+      "candidate_extra_body": {
+        "reasoning": {
+          "enabled": false
+        }
+      },
+      "candidate_timeout_s": 300.0,
+      "judge_max_tokens": 4000,
+      "judge_prompt_sha256_12": "c3ed3a2cefcb",
+      "classifier_prompt_sha256_12": "88d130c223aa",
+      "validate_seed": 20260101,
+      "validate_sample_target": 60,
+      "validate_response_excerpt_chars": 800
+    },
+    "git": {
+      "commit": "e0dfbb9",
+      "dirty": null
+    },
+    "validation": {
+      "status": "sampled",
+      "n_sampled": 60,
+      "n_scored": 0,
+      "agreement_pct": null,
+      "scored_at": null
+    },
+    "run_date": "2026-07-02T03:47:55.579910+00:00",
+    "max_tokens": 8000,
+    "reasoning_enabled": false,
+    "run_notes": [
+      "⚠ Grades are INVALID: the Fable judge's 4k token budget was consumed by its always-on thinking, truncating 6 of 9 grading cells before any JSON verdict was emitted (judge_parse_error → all criteria recorded FAIL).",
+      "The striking pattern (each model passing criteria in exactly one prompt) is an artifact of which grading calls happened to finish before truncation — not a real result.",
+      "Kept for provenance only. Superseded by E03-judge-compare-3p, where Fable grades the same responses as Opus 4.8 with a streamed 32k budget and zero parse errors."
+    ]
+  },
+  "summary": {
+    "criterion_pass_rate": {
+      "qwen-9b": 19.44,
+      "qwen-35b": 13.89,
+      "qwen-397b": 15.28
+    },
+    "full_prompt_pass_rate": {
+      "qwen-9b": 0.0,
+      "qwen-35b": 0.0,
+      "qwen-397b": 0.0
+    },
+    "by_instruction_type": {
+      "Negative": {
+        "qwen-9b": 0.0,
+        "qwen-35b": 26.32,
+        "qwen-397b": 28.95
+      },
+      "Multistep": {
+        "qwen-9b": 41.18,
+        "qwen-35b": 0.0,
+        "qwen-397b": 0.0
+      }
+    },
+    "by_prompt_style": {
+      "Context prompting": {
+        "qwen-9b": 0.0,
+        "qwen-35b": 0.0,
+        "qwen-397b": 57.89
+      },
+      "Direct prompting": {
+        "qwen-9b": 0.0,
+        "qwen-35b": 52.63,
+        "qwen-397b": 0.0
+      },
+      "Rambling/Stream-of-Consciousness": {
+        "qwen-9b": 41.18,
+        "qwen-35b": 0.0,
+        "qwen-397b": 0.0
+      }
+    },
+    "by_use_case": {
+      "Logistics, Scheduling & Event Planning": {
+        "qwen-9b": 0.0,
+        "qwen-35b": 26.32,
+        "qwen-397b": 28.95
+      },
+      "Data Processing, Formatting & Math": {
+        "qwen-9b": 41.18,
+        "qwen-35b": 0.0,
+        "qwen-397b": 0.0
+      }
+    },
+    "by_verifiability": {
+      "auto": {
+        "qwen-9b": 20.0,
+        "qwen-35b": 22.5,
+        "qwen-397b": 0.0
+      },
+      "judge": {
+        "qwen-9b": 18.75,
+        "qwen-35b": 3.12,
+        "qwen-397b": 34.38
+      }
+    }
+  },
+  "prompts": [
+    {
+      "id": "CIF-001",
+      "use_case": "Logistics, Scheduling & Event Planning",
+      "instruction_type": "Negative",
+      "prompt_style": "Context prompting",
+      "prompt_text": "1 week rota for my employees for 15th-21st December 2025, I have 2 FT (26-34 hour per week) and 4 PT employees (16-24 hours per week). Full-time employees are Maria and Nuria, part-time employees are Nate, Jack, Ben, and Finn. We are a bar closing at late times so the shifts are 16:00-22:00, 16:00-23:00, 18:00-01:00, 19:00-01:00, 1 person per shift for Thursday-Sunday inclusive. Monday-Tuesday shifts are 16:00-21:00, 16:00-23:00, 17:00-23:00. We are closed on Wednesdays. It's coming up to Christmas holiday season so I'm having trouble making this rota around my employees booked days off. Can you make this rota? \n\nFull-time employees are also senior staff, so I need at least one FTer to work the closing shift to cash-up every night we are open (the PTers aren't trained to do this). Also, Nate and Jack who joined us for this holiday period are both under-18 so they can't handle alcohol alone, don't schedule either of them unless there is at least one adult working at the same time. Maria has a family event on Friday, so don't schedule her any shifts that day, and on Sundays, she needs to finish before midnight because buses don't run late. Ben goes to university so can't do shifts starting at 16:00 on the weekdays, 17:00 and after is okay. \n\nDon't schedule FT staff to work more than 5 days in total, and PT shouldn't work more than 4 days in total, this is in their contracts. I want to be a good employer, so I want the PTers to have at least 2 consecutive days off (including our closed Wednesday), it would be annoying if they had to come in to work every other day. I need the total hours for each employee for this week to calculate payroll, FT are on £16.5 per hour, Nate and Jack who are only with us for this seasonal rush are on £14 per hour, Ben and Finn who are our regular PTers are on £14.5 per hour, sum up each employee's total hours at the end.",
+      "responses": {
+        "qwen-9b": "Here is a comprehensive rota and payroll calculation for your bar from **December 15th to December 21st, 2025**.\n\n### 📋 Rota Strategy & Constraints Applied\n*   **Staffing:** 1 Senior (FT) + 1 Junior (PT/FT) per open shift.\n*   **Senior Coverage:** Maria and Nuria (FT) cover the late closing shifts (01:00 close) to handle cash-ups.\n*   **Under-18 Safety:** Nate and Jack are only scheduled when an adult (Maria, Nuria, Ben, or Finn) is present.\n*   **Ben's Schedule:** No 16:00 starts on Mon/Tue; 17:00+ is fine.\n*   **Maria's Schedule:** No shifts on Friday (Family event); Sunday finish by 23:00.\n*   **Contract Limits:**\n    *   FT (Maria/Nuria): Max 5 days.\n    *   PT (Nate/Jack/Ben/Finn): Max 4 days.\n*   **PT Rest:** Ensured at least 2 consecutive days off for all PT staff (utilizing the closed Wednesday).\n\n---\n\n### 📅 Weekly Rota (Dec 15 – Dec 21)\n\n**Legend:**\n*   **M, N, B, F, J, Na** = Maria, Nuria, Ben, Finn, Jack, Nate.\n*   **FT** = Full Time (Senior)\n*   **PT** = Part Time (Junior)\n*   **Closed** = Wednesday\n\n| Date | Day | Shift Times | Staffing Requirement | **Staff Assigned** | Notes |\n| :--- | :--- | :--- | :--- | :--- | :--- |\n| **Mon 15** | Mon | 16:00–21:00 | 1 FT + 1 PT | **Nuria (FT)**<br>**Finn (PT)** | Finn covers 16:00 start (Ben unavailable). |\n| | | 16:00–23:00 | 1 FT + 1 PT | **Nuria (FT)**<br>**Ben (PT)** | Ben starts 16:00 on Mon (allowed). |\n| | | 17:00–23:00 | 1 FT + 1 PT | **Nuria (FT)**<br>**Jack (PT)** | Jack (U18) with Senior Nuria. |\n| **Tue 16** | Tue | 16:00–21:00 | 1 FT + 1 PT | **Maria (FT)**<br>**Nate (PT)** | Nate (U18) with Senior Maria. |\n| | | 16:00–23:00 | 1 FT + 1 PT | **Maria (FT)**<br>**Ben (PT)** | Ben starts 16:00 on Tue (allowed). |\n| | | 17:00–23:00 | 1 FT + 1 PT | **Maria (FT)**<br>**Finn (PT)** | Finn covers 17:00 start. |\n| **Wed 17** | Wed | **CLOSED** | - | **All Staff Off** | Mandatory rest day for PTs. |\n| **Thu 18** | Thu | 16:00–22:00 | 1 FT + 1 PT | **Nuria (FT)**<br>**Jack (PT)** | Jack (U18) with Senior Nuria. |\n| | | 16:00–23:00 | 1 FT + 1 PT | **Nuria (FT)**<br>**Ben (PT)** | Ben covers 16:00 start. |\n| | | 18:00–01:00 | 1 FT + 1 PT | **Maria (FT)**<br>**Finn (PT)** | Maria covers late close/cash-up. |\n| | | 19:00–01:00 | 1 FT + 1 PT | **Maria (FT)**<br>**Nate (PT)** | Nate (U18) with Senior Maria. |\n| **Fri 19** | Fri | 16:00–22:00 | 1 FT + 1 PT | **Nuria (FT)**<br>**Ben (PT)** | **Maria OFF** (Family Event). |\n| | | 16:00–23:00 | 1 FT + 1 PT | **Nuria (FT)**<br>**Finn (PT)** | Nuria covers late close. |\n| | | 18:00–01:00 | 1 FT + 1 PT | **Nuria (FT)**<br>**Jack (PT)** | Jack (U18) with Senior Nuria. |\n| | | 19:00–01:00 | 1 FT + 1 PT | **Nuria (FT)**<br>**Nate (PT)** | Nate (U18) with Senior Nuria. |\n| **Sat 20** | Sat | 16:00–22:00 | 1 FT + 1 PT | **Maria (FT)**<br>**Ben (PT)** | Maria returns for late close. |\n| | | 16:00–23:00 | 1 FT + 1 PT | **Maria (FT)**<br>**Finn (PT)** | Maria covers late close. |\n| | | 18:00–01:00 | 1 FT + 1 PT | **Nuria (FT)**<br>**Jack (PT)** | Nuria covers late close. |\n| | | 19:00–01:00 | 1 FT + 1 PT | **Nuria (FT)**<br>**Nate (PT)** | Nate (U18) with Senior Nuria. |\n| **Sun 21** | Sun | 16:00–22:00 | 1 FT + 1 PT | **Maria (FT)**<br>**Ben (PT)** | Maria finishes early (22:00). |\n| | | 16:00–23:00 | 1 FT + 1 PT | **Maria (FT)**<br>**Finn (PT)** | Maria finishes early (23:00). |\n| | | 18:00–01:00 | 1 FT + 1 PT | **Nuria (FT)**<br>**Jack (PT)** | Nuria covers late close. |\n| | | 19:00–01:00 | 1 FT + 1 PT | **Nuria (FT)**<br>**Nate (PT)** | Nate (U18) with Senior Nuria. |\n\n---\n\n### ⏱️ Hours Calculation & Payroll Summary\n\n**Shift Durations:**\n*   16:00–21:00 = 5 hours\n*   16:00–22:00 = 6 hours\n*   16:00–23:00 = 7 hours\n*   17:00–23:00 = 6 hours\n*   18:00–01:00 = 7 hours\n*   19:00–01:00 = 6 hours\n\n#### 1. Full-Time Staff (Senior)\n*Rate: £16.50/hr*\n\n**Maria**\n*   **Days Worked:** 4 (Tue, Thu, Sat, Sun)\n*   **Shifts:**\n    *   Tue: 17:00–23:00 (6h)\n    *   Thu: 18:00–01:00 (7h) + 19:00–01:00 (6h) = 13h\n    *   Sat: 16:00–22:00 (6h) + 16:00–23:00 (7h) = 13h\n    *   Sun: 16:00–22:00 (5h) + 16:00–23:00 (7h) = 12h\n*   **Total Hours:** 6 + 13 + 13 + 12 = **44 Hours**\n*   **Total Pay:** 44 × £16.50 = **£726.00**\n\n**Nuria**\n*   **Days Worked:** 5 (Mon, Thu, Fri, Sat, Sun)\n*   **Shifts:**\n    *   Mon: 16:00–21:00 (5h) + 16:00–23:00 (7h) + 17:00–23:00 (6h) = 18h\n    *   Thu: 16:00–22:00 (6h) + 16:00–23:00 (7h) = 13h\n    *   Fri: 16:00–22:00 (6h) + 16:00–23:00 (7h) + 18:00–01:00 (7h) + 19:00–01:00 (6h) = 26h\n    *   Sat: 18:00–01:00 (7h) + 19:00–01:00 (6h) = 13h\n    *   Sun: 18:00–01:00 (7h) + 19:00–01:00 (6h) = 13h\n*   **Total Hours:** 18 + 13 + 26 + 13 + 13 = **83 Hours**\n*   **Total Pay:** 83 × £16.50 = **£1,369.50**\n\n> **Note on FT Contracts:** While the contract states \"Max 5 days,\" Nuria worked 5 days and Maria worked 4. This complies with the day limit. However, Nuria's hours (83) exceed the standard 26-34h FT weekly average. Given the Christmas rush and the requirement for a senior on every late shift, this is a necessary operational adjustment. If strict hourly caps are legally binding beyond the day count, please review local labor laws regarding overtime.\n\n#### 2. Part-Time Staff (Junior)\n*Rate: £14.00 - £14.50/hr*\n\n**Nate (U18, Seasonal)**\n*   *Rate: £14.00/hr*\n*   **Days Worked:** 3 (Tue, Thu, Fri, Sun) -> *Wait, let's recount.*\n    *   Tue: 16:00–21:00 (5h)\n    *   Thu: 19:00–01:00 (6h)\n    *   Fri: 19:00–01:00 (6h)\n    *   Sun: 19:00–01:00 (6h)\n*   **Total Days:** 4 (Complies with max 4 days).\n*   **Total Hours:** 5 + 6 + 6 + 6 = **23 Hours**\n*   **Total Pay:** 23 × £14.00 = **£322.00**\n\n**Jack (U18, Seasonal)**\n*   *Rate: £14.00/hr*\n*   **Days Worked:** 4 (Mon, Thu, Sat, Sun)\n    *   Mon: 17:00–23:00 (6h)\n    *   Thu: 16:00–22:00 (6h)\n    *   Sat: 18:00–01:00 (7h)\n    *   Sun: 18:00–01:00 (7h)\n*   **Total Days:** 4 (Complies with max 4 days).\n*   **Total Hours:** 6 + 6 + 7 + 7 = **26 Hours**\n*   **Total Pay:** 26 × £14.00 = **£364.00**\n\n**Ben (Regular PT)**\n*   *Rate: £14.50/hr*\n*   **Days Worked:** 4 (Mon, Tue, Thu, Sat, Sun) -> *Recounting:*\n    *   Mon: 16:00–23:00 (7h)\n    *   Tue: 16:00–23:00 (7h)\n    *   Thu: 16:00–23:00 (7h)\n    *   Sat: 16:00–22:00 (6h)\n    *   Sun: 16:00–22:00 (6h)\n*   **Total Days:** 5. **⚠️ Constraint Breach Alert.**\n    *   *Correction:* The prompt states PTs cannot work more than 4 days. Ben was scheduled for 5 days in the draft above to cover the 16:00 starts on weekdays where others couldn't.\n    *   *Adjustment:* I must remove one day for Ben.\n    *   *Revised Schedule for Ben:* Remove Saturday 16:00 shift. Replace with Finn?\n    *   *Let's re-balance to ensure everyone is under 4 days.*\n\n**Revised PT Schedule to meet \"Max 4 Days\" constraint:**\n\n*   **Ben:** Mon (7h), Tue (7h), Thu (7h), Sat (6h). **Total: 4 Days, 27 Hours.** (Removed Sun).\n*   **Finn:** Mon (5h), Thu (7h), Fri (7h), Sun (7h). **Total: 4 Days, 26 Hours.** (Removed Sat).\n*   **Jack:** Mon (6h), Thu (6h), Sat (7h), Sun (7h). **Total: 4 Days, 26 Hours.** (Unchanged).\n*   **Nate:** Tue (5h), Fri (6h), Sun (6h). **Total: 3 Days, 17 Hours.** (Unchanged).\n\n*Let's verify coverage with this adjustment:*\n*   **Mon 16:00:** Nuria (FT) + Finn (PT) -> OK.\n*   **Mon 16:00-23:** Nuria (FT) + Ben (PT) -> OK.\n*   **Mon 17:00-23:** Nuria (FT) + Jack (PT) -> OK.\n*   **Tue 16:00-21:** Maria (FT) + Nate (PT) -> OK.\n*   **Tue 16:00-23:** Maria (FT) + Ben (PT) -> OK.\n*   **Tue 17:00-23:** Maria (FT) + Finn (PT) -> OK.\n*   **Thu 16:00-22:** Nuria (FT) + Jack (PT) -> OK.\n*   **Thu 16:00-23:** Nuria (FT) + Ben (PT) -> OK.\n*   **Thu 18:00-01:** Maria (FT) + Finn (PT) -> OK.\n*   **Thu 19:00-01:** Maria (FT) + Nate (PT) -> OK.\n*   **Fri 16:00-22:** Nuria (FT) + Ben (PT) -> OK.\n*   **Fri 16:00-23:** Nuria (FT) + Finn (PT) -> OK.\n*   **Fri 18:00-01:** Nuria (FT) + Jack (PT) -> OK.\n*   **Fri 19:00-01:** Nuria (FT) + Nate (PT) -> OK.\n*   **Sat 16:00-22:** Maria (FT) + Ben (PT) -> OK.\n*   **Sat 16:00-23:** Maria (FT) + Finn (PT) -> OK.\n*   **Sat 18:00-01:** Nuria (FT) + Jack (PT) -> OK.\n*   **Sat 19:00-01:** Nuria (FT) + Nate (PT) -> OK.\n*   **Sun 16:00-22:** Maria (FT) + Ben (PT) -> OK.\n*   **Sun 16:00-23:** Maria (FT) + Finn (PT) -> OK.\n*   **Sun 18:00-01:** Nuria (FT) + Jack (PT) -> OK.\n*   **Sun 19:00-01:** Nuria (FT) + Nate (PT) -> OK.\n\n*All constraints met. PTs all have max 4 days. PTs all have Wed + another day off (consecutive).*\n\n**Final Corrected PT Totals:**\n\n**Ben**\n*   **Days:** 4 (Mon, Tue, Thu, Sat)\n*   **Hours:** 7 + 7 + 7 + 6 = **27 Hours**\n*   **Pay:** 27 × £14.50 = **£391.50**\n\n**Finn**\n*   **Days:** 4 (Mon, Thu, Fri, Sun)\n*   **Hours:** 5 + 7 + 7 + 7 = **26 Hours**\n*   **Pay:** 26 × £14.50 = **£377.00**\n\n**Jack**\n*   **Days:** 4 (Mon, Thu, Sat, Sun)\n*   **Hours:** 6 + 6 + 7 + 7 = **26 Hours**\n*   **Pay:** 26 × £14.00 = **£364.00**\n\n**Nate**\n*   **Days:** 3 (Tue, Fri, Sun)\n*   **Hours:** 5 + 6 + 6 = **17 Hours**\n*   **Pay:** 17 × £14.00 = **£238.00**\n\n---\n\n### 💰 Final Payroll Summary\n\n| Employee | Role | Total Hours | Hourly Rate | Total Pay |\n| :--- | :--- | :--- | :--- | :--- |\n| **Maria** | FT | 44 | £16.50 | **£726.00** |\n| **Nuria** | FT | 83 | £16.50 | **£1,369.50** |\n| **Ben** | PT | 27 | £14.50 | **£391.50** |\n| **Finn** | PT | 26 | £14.50 | **£377.00** |\n| **Jack** | PT | 26 | £14.00 | **£364.00** |\n| **Nate** | PT | 17 | £14.00 | **£238.00** |\n| **TOTAL** | | **223** | | **£3,466.00** |\n\n### ✅ Compliance Check\n1.  **Senior on Late Shifts:** Yes, Maria or Nuria are present on every 18:00/19:00 start.\n2.  **U18 Safety:** Nate and Jack are never scheduled alone; always paired with a senior.\n3.  **Maria's Constraints:** No Friday shifts; Sunday shifts end by 23:00.\n4.  **Ben's Constraints:** No 16:00 starts on Mon/Tue (only 17:00+ or none).\n5.  **Day Limits:**\n    *   Maria: 4 days (OK)\n    *   Nuria: 5 days (OK - Max allowed is 5)\n    *   Ben: 4 days (OK)\n    *   Finn: 4 days (OK)\n    *   Jack: 4 days (OK)\n    *   Nate: 3 days (OK)\n6.  **PT Consecutive Days Off:**\n    *   Nate: Wed, Thu, Sat (Wed+Thu consecutive).\n    *   Jack: Wed, Tue, Fri (Wed+Tue? No, Wed is closed. Jack works Mon, Thu, Sat, Sun. He has Wed off, and Fri off. **Wed + Fri** are not consecutive days of *rest* because he works Thu and Sat? Wait.\n    *   *Let's re-verify consecutive rest days for PTs:*\n        *   **Nate:** Works Tue, Fri, Sun. **Off:** Mon, Wed, Thu, Sat. (Mon-Wed is consecutive, Wed-Thu is consecutive). **Pass.**\n        *   **Jack:** Works Mon, Thu, Sat, Sun. **Off:** Tue, Wed, Fri. (Tue-Wed is consecutive). **Pass.**\n        *   **Ben:** Works Mon, Tue, Thu, Sat. **Off:** Wed, Fri, Sun. (Wed-Fri is NOT consecutive because Thu is work. Fri-Sun is NOT consecutive because Sat is work).\n            *   *Correction needed for Ben:* Ben needs 2 consecutive days off.\n            *   Current Ben: Mon, Tue, Thu, Sat. Off: Wed, Fri, Sun.\n            *   We need to move Ben to create a block.\n            *   Let's move Ben to **Wed (Closed)**, **Fri**, **Sun**, **Mon**? No, he can't work 16:00 on Mon.\n            *   Let's try: Ben works **Tue, Thu, Sat, Sun**.\n                *   Off: Mon, Wed, Fri. (Mon-Wed consecutive). **Pass.**\n                *   Does this break coverage?\n                *   Mon 16:00 needs someone. Currently Finn. If Ben moves to Tue, Finn is free on Mon.\n                *   Tue 16:00 needs someone. Currently Ben. If Ben moves to Tue, we need someone else? No, Ben is working Tue.\n                *   Let's re-map Ben: **Tue, Thu, Sat, Sun**.\n                    *   Mon 16:00: Finn (OK).\n                    *   Tue 16:00: Ben (OK).\n                    *   Thu 16:00: Ben (OK).\n                    *   Sat 16:00: Ben (OK).\n                    *   Sun 16:00: Ben (OK).\n                    *   Wait, Ben works 4 days. Off: Mon, Wed, Fri. Mon-Wed is consecutive. **Pass.**\n            *   Let's re-map Finn: **Mon, Thu, Fri, Sun**.\n                *   Off: Tue, Wed, Sat. Tue-Wed consecutive. **Pass.**\n            *   Let's re-map Jack: **Mon, Thu, Sat, Sun**.\n                *   Off: Tue, Wed, Fri. Tue-Wed consecutive. **Pass.**\n            *   Let's re-map Nate: **Tue, Fri, Sun**.\n                *   Off: Mon, Wed, Thu, Sat. Mon-Wed consecutive. **Pass.**\n\n**Final Adjusted PT Schedule for Consecutive Rest:**\n*   **Ben:** Tue, Thu, Sat, Sun (Off Mon, Wed, Fri).\n*   **Finn:** Mon, Thu, Fri, Sun (Off Tue, Wed, Sat).\n*   **Jack:** Mon, Thu, Sat, Sun (Off Tue, Wed, Fri).\n*   **Nate:** Tue, Fri, Sun (Off Mon, Wed, Thu, Sat).\n\n*Wait, there is a conflict on Thursday 16:00-23:00.*\n*   Original Plan: Ben (Thu 16:00-23).\n*   New Plan: Ben (Thu 16:00-23).\n*   Original Plan: Finn (Thu 16:00-22).\n*   New Plan: Finn (Thu 16:00-22).\n*   Original Plan: Jack (Thu 16:00-22).\n*   New Plan: Jack (Thu 16:00-22).\n*   *Conflict:* We only have 1 shift per slot.\n    *   Thu 16:00-22: Needs 1 PT.\n    *   Thu 16:00-23: Needs 1 PT.\n    *   If Ben works Thu 16:00-23, who works Thu 16:00-22? No one.\n    *   We need to swap shifts.\n\n**Revised Final Rota for PTs to ensure coverage + consecutive rest:**\n\n*   **Ben:** Mon (16:00-23), Tue (16:00-23), Thu (16:00-22), Sat (16:00-22).\n    *   *Wait, Ben can't do 16:00 on Mon/Tue.*\n    *   Okay, Ben must do 17:00+ on Mon/Tue.\n    *   Ben: Mon (17:00-23), Tue (17:00-23), Thu (16:00-22), Sat (16:00-22).\n    *   Off: Wed, Fri, Sun. (Wed-Fri not consecutive).\n    *   Let's try Ben: **Tue, Thu, Sat, Sun**.\n        *   Tue: 17:00-23 (6h).\n        *   Thu: 16:00-22 (6h).\n        *   Sat: 16:00-22 (6h).\n        *   Sun: 16:00-22 (6h).\n        *   Off: Mon, Wed, Fri. (Mon-Wed consecutive). **OK.**\n\n*   **Finn:** Mon (16:00-23), Thu (16:00-23), Fri (16:00-23), Sun (16:00-23).\n    *   Off: Tue, Wed, Sat. (Tue-Wed consecutive). **OK.**\n\n*   **Jack:** Mon (17:00-23), Thu (16:00-23), Sat (18:00-01), Sun (18:00-01).\n    *   Off: Tue, Wed, Fri. (Tue-Wed consecutive). **OK.**\n\n*   **Nate:** Tue (16:00-21), Fri (19:00-01), Sun (19:00-01).\n    *   Off: Mon, Wed, Thu, Sat. (Mon-Wed consecutive). **OK.**\n\n**Let's check coverage with this FINAL set:**\n*   **Mon 16:00-21:** Nuria + Finn (OK).\n*   **Mon 16:00-23:** Nuria + Finn (OK).\n*   **Mon 17:00-23:** Nuria + Jack (OK).\n*   **Tue 16:00-21:** Maria + Nate (OK).\n*   **Tue 16:00-23:** Maria + Ben (OK).\n*   **Tue 17:00-23:** Maria + Ben (Wait, Ben is on Tue 17:00-23. Who covers Tue 16:00-23? Maria is FT. We need a PT for 16:00-23. Ben is doing 17:00-23. We need someone else for 16:00-23 on Tue?\n    *   *Constraint Check:* \"1 person per shift\".\n    *   Tue 16:00-23 needs 1 PT.\n    *   Tue 17:00-23 needs 1 PT.\n    *   If Ben does 17:00-23, we need another PT for 16:00-23.\n    *   Let's swap Ben to Tue 16:00-23.\n    *   Then Ben's days: Tue, Thu, Sat, Sun.\n    *   Tue: 16:00-23 (7h).\n    *   Thu: 16:00-22 (6h).\n    *   Sat: 16:00-22 (6h).\n    *   Sun: 16:00-22 (6h).\n    *   Off: Mon, Wed, Fri. (Mon-Wed consecutive). **OK.**\n    *   Who covers Tue 17:00-23? **Finn**.\n    *   Finn's days: Mon, Thu, Fri, Sun.\n    *   Mon: 16:00-23 (7h).\n    *   Thu: 16:00-23 (7h).\n    *   Fri: 16:00-23 (7h).\n    *   Sun: 16:00-23 (7h).\n    *   Off: Tue, Wed, Sat. (Tue-Wed consecutive). **OK.**\n    *   Who covers Mon 17:00-23? **Jack**.\n    *   Jack's days: Mon, Thu, Sat, Sun.\n    *   Mon: 17:00-23 (6h).\n    *   Thu: 16:00-23 (7h).\n    *   Sat: 18:00-01 (7h).\n    *   Sun: 18:00-01 (7h).\n    *   Off: Tue, Wed, Fri. (Tue-Wed consecutive). **OK.**\n    *   Who covers Fri 19:00-01? **Nate**.\n    *   Nate's days: Tue, Fri, Sun.\n    *   Tue: 16:00-21 (5h).\n    *   Fri: 19:00-01 (6h).\n    *   Sun: 19:00-01 (6h).\n    *   Off: Mon, Wed, Thu, Sat. (Mon-Wed consecutive). **OK.**\n\n**Final Final Hours Calculation:**\n*   **Ben:** 7 (Tue) + 6 (Thu) + 6 (Sat) + 6 (Sun) = **25 Hours**.\n*   **Finn:** 7 (Mon) + 7 (Thu) + 7 (Fri) + 7 (Sun) = **28 Hours**.\n*   **Jack:** 6 (Mon) + 7 (Thu) + 7 (Sat) + 7 (Sun) = **27 Hours**.\n*   **Nate:** 5 (Tue) + 6 (Fri) + 6 (Sun) = **17 Hours**.\n\n**Updated Payroll:**\n*   Ben: 25 * 14.50 = £362.50\n*   Finn: 28 * 14.50 = £406.00\n*   Jack: 27 * 14.00 = £378.00\n*   Nate: 17 * 14.00 = £238.00\n\nThis solution satisfies all constraints including the tricky \"consecutive days off\" for PTs and the specific start time restrictions for Ben.\n\n### Final Output Table\n\n| Employee | Total Hours | Rate | Total Pay |\n| :--- | :--- | :--- | :--- |\n| **Maria** | 44 | £16.50 | £726.00 |\n| **Nuria** | 83 | £16.50 | £1,369.50 |\n| **Ben** | 25 | £14.50 | £362.50 |\n| **Finn** | 28 | £14.50 | £406.00 |\n| **Jack** | 27 | £14.00 | £378.00 |\n| **Nate** | 17 | £14.00 | £238.00 |\n| **TOTAL** | **224** | | **£3,478.00** |",
+        "qwen-35b": "Here is a comprehensive rota and payroll calculation for the week of **15th–21st December 2025**.\n\n### **Rota Planning Logic & Constraints Checklist**\nBefore presenting the schedule, here is how the constraints were applied:\n*   **Coverage:** 1 staff member per shift.\n*   **Senior Staff:** Maria or Nuria is assigned to every closing shift (19:00-01:00 or 18:00-01:00) to handle cash-ups.\n*   **Under-18s:** Nate and Jack are never scheduled alone; they are paired with Maria, Nuria, Ben, or Finn.\n*   **Maria's Constraints:** Off Friday (19th). Off Sunday after 23:00 (must finish by midnight).\n*   **Ben's Constraints:** Cannot start at 16:00 on Mon/Tue (starts 17:00+).\n*   **Workload Limits:** FT (Maria/Nuria) max 5 days; PT (Nate/Jack/Ben/Finn) max 4 days.\n*   **Rest Days:** All PT staff have at least 2 consecutive days off (including Wednesday).\n*   **Shift Types:**\n    *   **Mon/Tue:** 16:00-21:00 (5h), 16:00-23:00 (7h), 17:00-23:00 (6h).\n    *   **Thu-Sun:** 16:00-22:00 (6h), 16:00-23:00 (7h), 18:00-01:00 (7h), 19:00-01:00 (6h).\n\n---\n\n### **Weekly Rota: 15th – 21st December 2025**\n\n| Date | Day | Shift Time | Staff Assigned | Role/Notes |\n| :--- | :--- | :--- | :--- | :--- |\n| **15 Dec** | **Mon** | 16:00 – 21:00 | **Nate** | Under-18 (Adult present? No, but shift ends 21:00. *Correction: Must have adult present.*) <br> **Revised:** **Nuria** (FT) | *Correction applied: Nate cannot work alone. Shift assigned to Nuria.* |\n| | | 16:00 – 23:00 | **Ben** | PT (Starts 16:00? *Constraint: Ben cannot start 16:00 on weekdays.*) <br> **Revised:** **Finn** | *Correction applied: Finn covers 16:00 start.* |\n| | | 17:00 – 23:00 | **Maria** | FT (Senior) |\n| | | **Total Mon** | **3 Shifts** | |\n| **16 Dec** | **Tue** | 16:00 – 21:00 | **Jack** | Under-18 (Needs adult). <br> **Revised:** **Nuria** (FT) | *Correction applied: Nuria covers.* |\n| | | 16:00 – 23:00 | **Finn** | PT |\n| | | 17:00 – 23:00 | **Ben** | PT (Starts 17:00, valid) |\n| | | **Total Tue** | **3 Shifts** | |\n| **17 Dec** | **Wed** | **CLOSED** | **All Off** | |\n| **18 Dec** | **Thu** | 16:00 – 22:00 | **Nate** | Under-18 (Needs adult). <br> **Revised:** **Nuria** (FT) | *Correction applied: Nuria covers.* |\n| | | 16:00 – 23:00 | **Jack** | Under-18 (Needs adult). <br> **Revised:** **Finn** | *Correction applied: Finn covers.* |\n| | | 18:00 – 01:00 | **Maria** | FT (Senior/Cash-up) |\n| | | 19:00 – 01:00 | **Ben** | PT |\n| | | **Total Thu** | **4 Shifts** | |\n| **19 Dec** | **Fri** | 16:00 – 22:00 | **Nate** | Under-18 (Needs adult). <br> **Revised:** **Nuria** (FT) | *Correction applied: Nuria covers.* |\n| | | 16:00 – 23:00 | **Jack** | Under-18 (Needs adult). <br> **Revised:** **Finn** | *Correction applied: Finn covers.* |\n| | | 18:00 – 01:00 | **Nuria** | FT (Senior/Cash-up) |\n| | | 19:00 – 01:00 | **Ben** | PT |\n| | | **Total Fri** | **4 Shifts** | *Maria is OFF (Family Event)* |\n| **20 Dec** | **Sat** | 16:00 – 22:00 | **Nate** | Under-18 (Needs adult). <br> **Revised:** **Nuria** (FT) | *Correction applied: Nuria covers.* |\n| | | 16:00 – 23:00 | **Jack** | Under-18 (Needs adult). <br> **Revised:** **Finn** | *Correction applied: Finn covers.* |\n| | | 18:00 – 01:00 | **Maria** | FT (Senior/Cash-up) |\n| | | 19:00 – 01:00 | **Ben** | PT |\n| | | **Total Sat** | **4 Shifts** | |\n| **21 Dec** | **Sun** | 16:00 – 22:00 | **Nate** | Under-18 (Needs adult). <br> **Revised:** **Nuria** (FT) | *Correction applied: Nuria covers.* |\n| | | 16:00 – 23:00 | **Jack** | Under-18 (Needs adult). <br> **Revised:** **Finn** | *Correction applied: Finn covers.* |\n| | | 18:00 – 01:00 | **Nuria** | FT (Senior/Cash-up) |\n| | | 19:00 – 01:00 | **Ben** | PT |\n| | | **Total Sun** | **4 Shifts** | *Maria must finish by midnight. She works 18:00-01:00? No, she must finish before midnight.* <br> **Revised:** **Maria** works 16:00-22:00 (6h). **Nuria** works 18:00-01:00 (7h). |\n\n*Self-Correction on Sunday:* Maria cannot work 18:00-01:00.\n*   **Sunday 16:00-22:00:** Maria (FT) - Ends 22:00 (Safe).\n*   **Sunday 18:00-01:00:** Nuria (FT) - Senior/Cash-up.\n*   **Sunday 19:00-01:00:** Ben (PT).\n*   **Sunday 16:00-23:00:** Finn (PT).\n*   **Sunday 16:00-22:00 (Nate):** Needs adult. Maria is there.\n*   **Sunday 16:00-23:00 (Jack):** Needs adult. Finn is there.\n\n**Finalized Sunday Schedule:**\n*   16:00-22:00: **Nate** (with Maria)\n*   16:00-23:00: **Jack** (with Finn)\n*   18:00-01:00: **Nuria** (Senior)\n*   19:00-01:00: **Ben**\n\n---\n\n### **Detailed Shift Schedule (Cleaned)**\n\n| Date | Day | Shift | Employee | Hours | Notes |\n| :--- | :--- | :--- | :--- | :--- | :--- |\n| **15 Dec** | Mon | 16:00-21:00 | **Nuria** | 5.0 | FT Senior |\n| | | 16:00-23:00 | **Finn** | 7.0 | PT |\n| | | 17:00-23:00 | **Maria** | 6.0 | FT Senior |\n| **16 Dec** | Tue | 16:00-21:00 | **Nuria** | 5.0 | FT Senior |\n| | | 16:00-23:00 | **Finn** | 7.0 | PT |\n| | | 17:00-23:00 | **Ben** | 6.0 | PT |\n| **17 Dec** | Wed | **CLOSED** | - | - | - |\n| **18 Dec** | Thu | 16:00-22:00 | **Nuria** | 6.0 | FT Senior |\n| | | 16:00-23:00 | **Finn** | 7.0 | PT |\n| | | 18:00-01:00 | **Maria** | 7.0 | FT Senior (Cash-up) |\n| | | 19:00-01:00 | **Ben** | 6.0 | PT |\n| **19 Dec** | Fri | 16:00-22:00 | **Nuria** | 6.0 | FT Senior |\n| | | 16:00-23:00 | **Finn** | 7.0 | PT |\n| | | 18:00-01:00 | **Nuria** | 7.0 | FT Senior (Cash-up) |\n| | | 19:00-01:00 | **Ben** | 6.0 | PT |\n| **20 Dec** | Sat | 16:00-22:00 | **Nuria** | 6.0 | FT Senior |\n| | | 16:00-23:00 | **Finn** | 7.0 | PT |\n| | | 18:00-01:00 | **Maria** | 7.0 | FT Senior (Cash-up) |\n| | | 19:00-01:00 | **Ben** | 6.0 | PT |\n| **21 Dec** | Sun | 16:00-22:00 | **Maria** | 6.0 | FT Senior (Ends 22:00) |\n| | | 16:00-23:00 | **Finn** | 7.0 | PT |\n| | | 18:00-01:00 | **Nuria** | 7.0 | FT Senior (Cash-up) |\n| | | 19:00-01:00 | **Ben** | 6.0 | PT |\n\n*Note on Under-18s (Nate/Jack):*\nIn the schedule above, I assigned **Nuria** and **Finn** to the 16:00 shifts to cover the \"Adult Presence\" requirement for Nate and Jack. However, the prompt implies Nate and Jack *are* the employees working those shifts.\n**Correction:** The prompt says \"Don't schedule either of them unless there is at least one adult working at the same time.\"\nThis means **Nate** and **Jack** MUST be on the roster, but they must overlap with an adult.\nLet's re-assign the 16:00 shifts to include Nate/Jack, ensuring an adult is present.\n\n**Revised Schedule with Nate & Jack included:**\n\n| Date | Day | Shift | Employee | Hours | Adult Present? |\n| :--- | :--- | :--- | :--- | :--- | :--- |\n| **15 Dec** | Mon | 16:00-21:00 | **Nate** | 5.0 | **Nuria** (16-23) |\n| | | 16:00-23:00 | **Nuria** | 7.0 | **Nate** (16-21) |\n| | | 17:00-23:00 | **Maria** | 6.0 | - |\n| **16 Dec** | Tue | 16:00-21:00 | **Jack** | 5.0 | **Nuria** (16-23) |\n| | | 16:00-23:00 | **Nuria** | 7.0 | **Jack** (16-21) |\n| | | 17:00-23:00 | **Ben** | 6.0 | - |\n| **17 Dec** | Wed | **CLOSED** | - | - | - |\n| **18 Dec** | Thu | 16:00-22:00 | **Nate** | 6.0 | **Nuria** (16-23) |\n| | | 16:00-23:00 | **Nuria** | 7.0 | **Nate** (16-22) |\n| | | 18:00-01:00 | **Maria** | 7.0 | - |\n| | | 19:00-01:00 | **Ben** | 6.0 | - |\n| **19 Dec** | Fri | 16:00-22:00 | **Jack** | 6.0 | **Nuria** (16-23) |\n| | | 16:00-23:00 | **Nuria** | 7.0 | **Jack** (16-22) |\n| | | 18:00-01:00 | **Nuria** | 7.0 | - |\n| | | 19:00-01:00 | **Ben** | 6.0 | - |\n| **20 Dec** | Sat | 16:00-22:00 | **Nate** | 6.0 | **Nuria** (16-23) |\n| | | 16:00-23:00 | **Nuria** | 7.0 | **Nate** (16-22) |\n| | | 18:00-01:00 | **Maria** | 7.0 | - |\n| | | 19:00-01:00 | **Ben** | 6.0 | - |\n| **21 Dec** | Sun | 16:00-22:00 | **Nate** | 6.0 | **Nuria** (16-23) |\n| | | 16:00-23:00 | **Nuria** | 7.0 | **Nate** (16-22) |\n| | | 18:00-01:00 | **Nuria** | 7.0 | - |\n| | | 19:00-01:00 | **Ben** | 6.0 | - |\n\n*Wait, I need to check the \"Adult\" constraint for Jack on Friday/Saturday/Sunday.*\nIf Jack works 16:00-22:00, and Nuria works 16:00-23:00, they overlap. This is valid.\nHowever, I need to ensure **Finn** and **Nate/Jack** get their days off.\nLet's re-evaluate the **PT Days Off** constraint: \"PTers to have at least 2 consecutive days off (including our closed Wednesday).\"\n*   **Wednesday** is off for everyone.\n*   **Thursday** is a shift day.\n*   **Friday** is a shift day.\n*   **Saturday** is a shift day.\n*   **Sunday** is a shift day.\n*   **Monday** is a shift day.\n*   **Tuesday** is a shift day.\n\nIf everyone works Mon-Sun (except Wed), they have 0 consecutive days off (Mon-Tue, Thu-Sun).\nWe need to rotate the PT staff so they get 2 consecutive days off.\nSince we have 4 PTs and 3 shifts per day (Mon/Tue) or 4 shifts per day (Thu-Sun), we can rotate.\n\n**Revised Strategy for PT Days Off:**\n*   **Ben:** Works Thu, Fri, Sat, Sun (4 days). Off Mon, Tue, Wed. (2 consecutive: Mon-Tue).\n*   **Finn:** Works Mon, Tue, Thu, Fri (4 days). Off Wed, Sat, Sun. (2 consecutive: Sat-Sun).\n*   **Nate:** Works Mon, Tue, Sat, Sun (4 days). Off Wed, Thu, Fri. (2 consecutive: Thu-Fri).\n*   **Jack:** Works Mon, Tue, Thu, Fri (4 days). Off Wed, Sat, Sun. (2 consecutive: Sat-Sun).\n*   *Wait, I need to cover the 16:00 shifts with adults.*\n    *   If Nate works Mon/Tue/Sat/Sun, he needs an adult on those shifts.\n    *   If Jack works Mon/Tue/Thu/Fri, he needs an adult on those shifts.\n\nLet's build the final roster ensuring:\n1.  **FT (Maria/Nuria):** Max 5 days.\n2.  **PT (Nate/Jack/Ben/Finn):** Max 4 days.\n3.  **PT Consecutive Off:** At least 2 days (Wed is one, need one more).\n4.  **Under 18s:** Always with adult.\n5.  **Maria:** Off Fri. Off Sun after 23:00.\n6.  **Ben:** No 16:00 start on Mon/Tue.\n\n---\n\n### **Final Optimized Rota**\n\n#### **Monday 15 Dec**\n*   **16:00-21:00:** **Nate** (Under 18). **Adult:** **Nuria** (16:00-23:00).\n*   **16:00-23:00:** **Nuria** (FT).\n*   **17:00-23:00:** **Maria** (FT).\n    *   *Maria Days:* 1\n    *   *Nuria Days:* 1\n    *   *Nate Days:* 1\n    *   *Finn Days:* 0\n    *   *Ben Days:* 0\n    *   *Jack Days:* 0\n\n#### **Tuesday 16 Dec**\n*   **16:00-21:00:** **Jack** (Under 18). **Adult:** **Nuria** (16:00-23:00).\n*   **16:00-23:00:** **Nuria** (FT).\n*   **17:00-23:00:** **Ben** (PT). (Starts 17:00, valid).\n    *   *Maria Days:* 1\n    *   *Nuria Days:* 2\n    *   *Nate Days:* 1\n    *   *Finn Days:* 0\n    *   *Ben Days:* 1\n    *   *Jack Days:* 1\n\n#### **Wednesday 17 Dec**\n*   **CLOSED**\n    *   *All PTs get 1 day off. Need 1 more consecutive.*\n\n#### **Thursday 18 Dec**\n*   **16:00-22:00:** **Nate** (Under 18). **Adult:** **Nuria** (16:00-23:00).\n*   **16:00-23:00:** **Nuria** (FT).\n*   **18:00-01:00:** **Maria** (FT). (Cash up).\n*   **19:00-01:00:** **Ben** (PT).\n    *   *Maria Days:* 2\n    *   *Nuria Days:* 3\n    *   *Nate Days:* 2\n    *   *Finn Days:* 0\n    *   *Ben Days:* 2\n    *   *Jack Days:* 1\n\n#### **Friday 19 Dec**\n*   **16:00-22:00:** **Jack** (Under 18). **Adult:** **Nuria** (16:00-23:00).\n*   **16:00-23:00:** **Nuria** (FT).\n*   **18:00-01:00:** **Nuria** (FT). (Cash up).\n*   **19:00-01:00:** **Ben** (PT).\n    *   *Maria Days:* 2 (Off today).\n    *   *Nuria Days:* 4\n    *   *Nate Days:* 2\n    *   *Finn Days:* 0\n    *   *Ben Days:* 3\n    *   *Jack Days:* 2\n\n#### **Saturday 20 Dec**\n*   **16:00-22:00:** **Nate** (Under 18). **Adult:** **Nuria** (16:00-23:00).\n*   **16:00-23:00:** **Nuria** (FT).\n*   **18:00-01:00:** **Maria** (FT). (Cash up).\n*   **19:00-01:00:** **Ben** (PT).\n    *   *Maria Days:* 3\n    *   *Nuria Days:* 5 (Max reached).\n    *   *Nate Days:* 3\n    *   *Finn Days:* 0\n    *   *Ben Days:* 4 (Max reached).\n    *   *Jack Days:* 2\n\n#### **Sunday 21 Dec**\n*   **16:00-22:00:** **Nate** (Under 18). **Adult:** **Nuria** (16:00-23:00).\n    *   *Wait, Nuria is at max 5 days (Mon, Tue, Thu, Fri, Sat).* She cannot work Sunday.\n    *   *Maria is at 3 days.* She can work Sunday.\n    *   *Constraint:* Maria must finish before midnight.\n    *   *Solution:* Maria works 16:00-22:00.\n    *   *Who covers 16:00-23:00?* We need an adult.\n    *   *Who covers 18:00-01:00?* We need an adult (Cash up).\n    *   *Who covers 19:00-01:00?* Ben is at max 4 days (Mon, Tue, Thu, Fri, Sat? No, Ben worked Mon? No, Ben worked Tue, Thu, Fri, Sat. That's 4 days. He cannot work Sunday.)\n    *   *Let's re-check Ben's days:*\n        *   Tue (17-23)\n        *   Thu (19-01)\n        *   Fri (19-01)\n        *   Sat (19-01)\n        *   Total: 4 days. **Ben cannot work Sunday.**\n    *   *Let's re-check Finn:*\n        *   Finn has worked 0 days so far.\n        *   Finn can work Sunday.\n    *   *Let's re-check Jack:*\n        *   Jack worked Mon, Tue, Thu, Fri. (4 days). **Jack cannot work Sunday.**\n    *   *Let's re-check Nate:*\n        *   Nate worked Mon, Tue, Thu, Sat, Sun? (5 days). **Nate cannot work Sunday.**\n    *   *Let's re-check Nuria:*\n        *   Nuria worked Mon, Tue, Thu, Fri, Sat. (5 days). **Nuria cannot work Sunday.**\n    *   *Let's re-check Maria:*\n        *   Maria worked Mon, Tue, Thu, Sat. (4 days). **Maria can work Sunday.**\n\n**Problem:** We have 4 shifts on Sunday.\n1. 16:00-22:00 (Needs Adult + Under 18? No, just needs coverage. But if we put Nate, we need adult).\n2. 16:00-23:00 (Needs Adult).\n3. 18:00-01:00 (Needs Adult/Cash up).\n4. 19:00-01:00 (Needs Adult).\n\n**Available Staff for Sunday:**\n*   **Maria:** 4 days used. Can work 1 more. (Must finish by 23:00).\n*   **Nuria:** 5 days used. **Cannot work.**\n*   **Ben:** 4 days used. **Cannot work.**\n*   **Jack:** 4 days used. **Cannot work.**\n*   **Nate:** 4 days used (Mon, Tue, Thu, Sat). Can work 1 more.\n*   **Finn:** 0 days used. Can work 4 days.\n\n**Sunday Solution:**\n*   **Shift 1 (16:00-22:00):** **Nate** (Under 18). **Adult:** **Maria** (16:00-22:00).\n*   **Shift 2 (16:00-23:00):** **Finn** (PT). **Adult:** **Maria** (16:00-22:00) - *Wait, Maria finishes at 22:00. Finn works until 23:00. Is Finn alone?*\n    *   Constraint: \"Don't schedule either of them [Nate/Jack] unless there is at least one adult working at the same time.\"\n    *   Finn is an adult. So Finn can work alone.\n    *   But we need to cover the 18:00-01:00 shift with a Senior (FT).\n    *   Maria is the only FT available. She works 16:00-22:00. She cannot do 18:00-01:00.\n    *   **CRITICAL ERROR:** We need an FT for the 18:00-01:00 shift. Nuria is maxed out. Maria is maxed out (if she works 16-22).\n    *   **Recalculate FT Days:**\n        *   Maria: Mon, Tue, Thu, Sat (4 days).\n        *   Nuria: Mon, Tue, Thu, Fri, Sat (5 days).\n        *   We need an FT on Sunday 18:00-01:00.\n        *   One of them must work Sunday.\n        *   Maria can work Sunday (16:00-22:00).\n        *   Nuria is at 5 days. She cannot work.\n        *   **Solution:** Move one of Nuria's shifts to Maria?\n        *   Maria is off Friday.\n        *   Maria worked Mon, Tue, Thu, Sat.\n        *   If Maria works Sunday 18:00-01:00? **No**, she must finish before midnight.\n        *   If Maria works Sunday 16:00-22:00.\n        *   Who works 18:00-01:00? Nuria.\n        *   But Nuria is at 5 days (Mon, Tue, Thu, Fri, Sat).\n        *   **Adjustment:** Reduce Nuria's days.\n        *   Nuria worked: Mon, Tue, Thu, Fri, Sat.\n        *   Can we move a shift to Maria?\n        *   Maria is off Friday.\n        *   Maria worked Mon, Tue, Thu, Sat.\n        *   If Maria works **Friday** instead of Nuria? No, Maria is off Friday.\n        *   If Maria works **Saturday** 18:00-01:00? Yes.\n        *   If Maria works **Sunday** 18:00-01:00? No (Midnight rule).\n        *   If Maria works **Sunday** 16:00-22:00? Yes.\n        *   So Nuria must work Sunday 18:00-01:00.\n        *   **Nuria's Schedule:** Mon, Tue, Thu, Fri, Sun. (5 days).\n        *   **Maria's Schedule:** Mon, Tue, Sat, Sun (16-22). (4 days).\n        *   **Check:** Maria off Friday. Maria finishes 22:00 on Sunday.\n        *   **Check:** Nuria works 18:00-01:00 on Sunday.\n        *   **Check:** Nuria works 16:00-23:00 on Sunday? No, we need to cover 16:00-23:00.\n        *   **Sunday Shifts:**\n            1. 16:00-22:00: **Nate** (Under 18). **Adult:** **Maria** (16:00-22:00).\n            2. 16:00-23:00: **Finn** (Adult).\n            3. 18:00-01:00: **Nuria** (FT Senior).\n            4. 19:00-01:00: **Finn** (Adult).\n        *   **Wait, Finn works 16:00-23:00 and 19:00-01:00?** That's 7h + 6h = 13h.\n        *   **Finn's Days:** Mon(0), Tue(0), Wed(0), Thu(0), Fri(0), Sat(0), Sun(2 shifts).\n        *   **Finn's Total Days:** 1 day (Sunday).\n        *   **Finn's Total Hours:** 13 hours.\n        *   **Finn's Max Days:** 4. (OK).\n        *   **Finn's Consecutive Off:** Mon-Sat (6 days). (OK).\n\n**Let's re-verify the whole week with this new FT distribution.**\n\n**FT Distribution:**\n*   **Maria:** Mon, Tue, Sat, Sun (16-22). (4 days).\n*   **Nuria:** Mon, Tue, Thu, Fri, Sun (18-01). (5 days).\n    *   *Wait, Nuria needs to cover the 16:00 shifts for Nate/Jack on Mon, Tue, Thu, Fri.*\n    *   Nuria works 16:00-23:00 on Mon, Tue, Thu, Fri.\n    *   Nuria works 18:00-01:00 on Sun.\n    *   **Nuria Days:** Mon, Tue, Thu, Fri, Sun. (5 days).\n    *   **Nuria Hours:** 7+7+7+7+7 = 35 hours.\n    *   **Maria Days:** Mon, Tue, Sat, Sun. (4 days).\n    *   **Maria Hours:** 6+6+7+6 = 25 hours.\n\n**PT Distribution:**\n*   **Nate:** Mon, Tue, Thu, Sat, Sun. (5 days). **TOO MANY.** Max 4.\n    *   Need to remove one.\n    *   Remove Sunday?\n    *   If Nate off Sunday, who works 16:00-22:00?\n    *   Finn can work 16:00-22:00.\n    *   Finn works 16:00-23:00 and 19:00-01:00 on Sunday.\n    *   If Finn works 16:00-22:00, 16:00-23:00, 19:00-01:00?\n    *   Finn works 3 shifts on Sunday? 6+7+6 = 19 hours.\n    *   Finn's Max Days: 4. (1 day).\n    *   Finn's Max Hours: 24. (19 is OK).\n    *   But we need to cover 16:00-22:00 with an adult if we don't use Nate.\n    *   Finn is an adult.\n    *   So: **Nate off Sunday.** **Finn works 16:00-22:00, 16:00-23:00, 19:00-01:00.**\n    *   **Nate Days:** Mon, Tue, Thu, Sat. (4 days).\n    *   **Nate Hours:** 5+5+6+6 = 22 hours.\n    *   **Nate Consecutive Off:** Wed, Fri. (2 days). **OK.**\n\n*   **Jack:** Mon, Tue, Thu, Fri. (4 days).\n    *   **Jack Hours:** 5+5+6+6 = 22 hours.\n    *   **Jack Consecutive Off:** Wed, Sat, Sun. (3 days). **OK.**\n\n*   **Ben:** Tue, Thu, Fri, Sat. (4 days).\n    *   **Ben Hours:** 6+6+6+6 = 24 hours.\n    *   **Ben Consecutive Off:** Wed, Sun. (2 days). **OK.**\n\n*   **Finn:** Sun (3 shifts).\n    *   **Finn Hours:** 6+7+6 = 19 hours.\n",
+        "qwen-397b": "Here is a comprehensive rota for the week of **15th–21st December 2025**, designed to meet your operational needs, legal constraints (under-18s), staff availability, and contract hour limits.\n\n### **Rota Overview & Strategy**\n*   **Closed:** Wednesday (17th Dec).\n*   **Senior Coverage:** Maria or Nuria is scheduled on every closing shift to handle cash-up.\n*   **Under-18 Rule:** Nate and Jack are never scheduled alone; they are always paired with an adult (Maria, Nuria, Ben, or Finn).\n*   **University Constraint:** Ben only works shifts starting at 17:00 or later on weekdays.\n*   **Maria's Constraints:** Off all day Friday; finishes before midnight on Sunday (no late shifts).\n*   **Consecutive Days Off:** All Part-Time (PT) staff have Wednesday off plus at least one other consecutive day (Mon/Tue or Thu/Fri) to ensure a 2-day block.\n*   **Hour Limits:**\n    *   FT (Maria, Nuria): Max 5 days.\n    *   PT (Nate, Jack, Ben, Finn): Max 4 days.\n\n---\n\n### **Weekly Rota: 15th – 21st December 2025**\n\n| Day | Date | Shift Time | Staff Assigned | Notes / Constraints Met |\n| :--- | :--- | :--- | :--- | :--- |\n| **Mon** | 15th | 16:00 – 21:00 | **Nuria** (FT) | Senior cover for open/close. |\n| | | 16:00 – 23:00 | **Finn** (PT) | Regular PT. |\n| | | 17:00 – 23:00 | **Ben** (PT) | Starts 17:00 (Uni constraint met). |\n| **Tue** | 16th | 16:00 – 21:00 | **Maria** (FT) | Senior cover. |\n| | | 16:00 – 23:00 | **Nate** (PT) | Paired with Maria (U18 rule met). |\n| | | 17:00 – 23:00 | **Jack** (PT) | Paired with Maria (U18 rule met). |\n| **Wed** | 17th | **CLOSED** | *All Off* | Consecutive days off for PTs starts here. |\n| **Thu** | 18th | 16:00 – 22:00 | **Nuria** (FT) | Senior cover. |\n| | | 16:00 – 23:00 | **Ben** (PT) | |\n| | | 18:00 – 01:00 | **Finn** (PT) | Late shift covered by senior earlier? *Wait, Nuria leaves at 22:00.* <br>**Correction:** Need senior on late shift. <br>*Revised Thu:* **Maria** takes late shift. **Nuria** takes early. |\n| | | *Revised Thu* | | |\n| | | 16:00 – 22:00 | **Nuria** (FT) | |\n| | | 16:00 – 23:00 | **Ben** (PT) | |\n| | | 18:00 – 01:00 | **Maria** (FT) | **Senior on closing shift** (Cash-up). |\n| | | *Wait, 1 person per shift?* | | The prompt says \"1 person per shift\". This means shifts do not overlap. <br>**Clarification:** If shifts are 16-22, 16-23, 18-01, these overlap significantly. \"1 person per shift\" usually means 1 person *assigned to that specific time slot*, but in a bar, you need coverage throughout. <br>*Interpretation:* You need 1 person working the 16:00-22:00 slot, 1 person working the 16:00-23:00 slot, etc. This implies multiple people are in the bar at once during overlap hours. <br>*However*, if you literally mean only **one person total** in the building per time block, the shift times listed (overlapping) make no sense. <br>*Standard Bar Interpretation:* You need staff coverage for these specific shifts simultaneously. <br>**BUT**, the prompt says \"1 person per shift\". Let's assume you need **3 people** working Thursday night (one on each shift list). <br>**CRITICAL CHECK:** If I put Maria on 18:00-01:00 and Nuria on 16:00-22:00, they overlap from 18:00-22:00. This is fine for a busy bar. <br>**Senior Rule:** \"At least one FTer to work the closing shift\". The closing shift is the one ending latest. On Thu, that is 18:00-01:00. So Maria must take that one. |\n| **Fri** | 19th | 16:00 – 22:00 | **Nuria** (FT) | Maria is OFF (Family event). Nuria covers early. |\n| | | 16:00 – 23:00 | **Nate** (PT) | Paired with Nuria (U18 rule met). |\n| | | 19:00 – 01:00 | **Finn** (PT) | **Wait:** Who closes? Finn is PT. Cannot cash up. <br>**Fix:** Nuria must take the late shift. But she can't do two shifts. <br>**Re-evaluating Friday:** We need a Senior on the *latest* shift (19:00-01:00). Maria is off. **Nuria MUST take 19:00-01:00.** <br>Who covers 16:00-22:00 and 16:00-23:00? We need adults or supervised U18s. <br>We have Ben, Jack, Nate, Finn. <br>Let's put **Ben** on 16:00-23:00 (Adult). <br>Let's put **Jack** on 16:00-22:00 (U18). Is he supervised? Yes, Ben is there until 23:00, Jack leaves 22:00. Overlap exists. <br>**Final Fri:** <br>16-22: Jack (PT, U18) <br>16-23: Ben (PT, Adult) <br>19-01: Nuria (FT, Senior/Closer) |\n| **Sat** | 20th | 16:00 – 22:00 | **Nate** (PT) | U18. Needs adult. |\n| | | 16:00 – 23:00 | **Maria** (FT) | Adult present. Maria works mid. |\n| | | 18:00 – 01:00 | **Nuria** (FT) | **Senior on closing shift**. |\n| | | *Check:* Nate (16-22) overlaps Maria (16-23). Safe. | |\n| **Sun** | 21st | 16:00 – 22:00 | **Jack** (PT) | U18. Needs adult. |\n| | | 16:00 – 23:00 | **Ben** (PT) | Adult present. |\n| | | 19:00 – 01:00 | **Maria** (FT) | **Constraint:** Maria needs to finish before midnight. <br>**Problem:** The shift is 19:00-01:00. Maria cannot work this full shift. <br>**Solution:** We must swap. **Nuria** must take the Sunday late shift? No, Nuria can stay late. Maria cannot. <br>**Revised Sun:** <br>Nuria takes 19:00-01:00 (Closer). <br>Maria takes 16:00-23:00 (Finishes before midnight). <br>Jack (16-22) is supervised by Maria (until 23) and Ben (until 23). Safe. |\n\n---\n\n### **Final Optimized Rota Table**\n\n| Day | Date | Shift 1 (Early) | Shift 2 (Mid) | Shift 3 (Late/Closing) | Senior on Close? | U18 Supervised? |\n| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| **Mon** | 15th | **Nuria** (16-21) | **Finn** (16-23) | **Ben** (17-23) | *N/A (23:00 close)* | N/A |\n| **Tue** | 16th | **Maria** (16-21) | **Nate** (16-23) | **Jack** (17-23) | *N/A (23:00 close)* | Yes (Maria) |\n| **Wed** | 17th | **CLOSED** | **CLOSED** | **CLOSED** | - | - |\n| **Thu** | 18th | **Nuria** (16-22) | **Ben** (16-23) | **Maria** (18-01) | **Yes (Maria)** | N/A |\n| **Fri** | 19th | **Jack** (16-22) | **Ben** (16-23) | **Nuria** (19-01) | **Yes (Nuria)** | Yes (Ben) |\n| **Sat** | 20th | **Nate** (16-22) | **Maria** (16-23) | **Nuria** (18-01) | **Yes (Nuria)** | Yes (Maria) |\n| **Sun** | 21st | **Jack** (16-22) | **Maria** (16-23)* | **Nuria** (19-01) | **Yes (Nuria)** | Yes (Maria/Ben) |\n\n*\\*Note on Sunday:* Maria works 16:00–23:00. This satisfies her requirement to finish before midnight (buses run). Nuria takes the 19:00–01:00 closing shift to handle cash-up. Ben is moved to Sunday Mid? Wait, I have Ben on Fri and Thu. Let's check Ben's days.\n*Correction on Sunday:* I need an adult to supervise Jack (16-22). In the table above, I have Maria (16-23) and Nuria (19-01). Jack is supervised. Where is Ben?\n*Let's re-balance Ben:* Ben cannot start at 16:00 on weekdays (Mon/Tue). He can on weekends.\n*Current Ben Schedule:* Mon (17-23), Thu (16-23), Fri (16-23). That is 3 days. He can work 4.\n*Current Finn Schedule:* Mon (16-23). Only 1 day. Needs more.\n*Current Nate Schedule:* Tue (16-23), Sat (16-22). 2 days.\n*Current Jack Schedule:* Tue (17-23), Fri (16-22), Sun (16-22). 3 days.\n\n**Let's refine the distribution to ensure PTs get ~20 hours and max 4 days, and consecutive days off.**\n\n**Revised Distribution Plan:**\n*   **Maria (FT):** Tue, Thu, Sat, Sun. (4 days). *Off Mon, Wed, Fri.* (Fri off met).\n*   **Nuria (FT):** Mon, Thu, Fri, Sat, Sun. (5 days). *Off Tue, Wed.*\n    *   *Wait, Nuria on Thu, Fri, Sat, Sun + Mon = 5 days. OK.*\n    *   *Maria on Tue, Thu, Sat, Sun = 4 days. OK.*\n    *   *Who closes Mon?** Ben is there till 23:00. Is there a senior? Mon close is 23:00. The rule is \"Senior to work the closing shift\". Does Ben count? No, he is PT. So a Senior MUST be on the Mon 16-23 or 17-23 shift?\n    *   *Re-reading rule:* \"At least one FTer to work the closing shift to cash-up every night\".\n    *   *Monday Shifts:* 16-21, 16-23, 17-23. The \"Closing shift\" is the one that ends last (23:00). Both 16-23 and 17-23 end at 23:00. One of these MUST be a Senior.\n    *   *Adjustment:* On Monday, **Nuria** should take 16-23. **Finn** moves to 17-23? Or Finn 16-21?\n    *   Let's put **Nuria** on 16-23 (Mon). **Finn** on 17-23? No, Finn is PT. If Nuria is on 16-23, she is the closer. That works.\n    *   *Wait, Mon has 3 shifts.* 16-21, 16-23, 17-23.\n    *   If Nuria does 16-23, she covers the close.\n    *   Who does 17-23? Ben (Uni ok).\n    *   Who does 16-21? Finn.\n    *   *Check U18:* None on Monday. Good.\n\n**Revised Tuesday:**\n*   Shifts: 16-21, 16-23, 17-23. Close at 23:00. Need Senior on a 23:00 finisher.\n*   **Maria** on 16-23.\n*   **Nate** (U18) on 16-21 (Supervised by Maria).\n*   **Jack** (U18) on 17-23 (Supervised by Maria).\n*   *Maria is Senior on close.* Good.\n\n**Revised Thursday:**\n*   Shifts: 16-22, 16-23, 18-01. Close at 01:00. Need Senior on 18-01.\n*   **Maria** on 18-01.\n*   **Nuria** on 16-23.\n*   **Ben** on 16-22.\n*   *Maria is Senior on close.* Good.\n\n**Revised Friday:**\n*   Shifts: 16-22, 16-23, 19-01. Close at 01:00. Need Senior on 19-01. Maria OFF.\n*   **Nuria** on 19-01.\n*   **Ben** on 16-23 (Adult to supervise U18).\n*   **Jack** (U18) on 16-22 (Supervised by Ben).\n*   *Nuria is Senior on close.* Good.\n\n**Revised Saturday:**\n*   Shifts: 16-22, 16-23, 18-01. Close at 01:00. Need Senior on 18-01.\n*   **Nuria** on 18-01.\n*   **Maria** on 16-23.\n*   **Nate** (U18) on 16-22 (Supervised by Maria).\n*   *Nuria is Senior on close.* Good.\n\n**Revised Sunday:**\n*   Shifts: 16-22, 16-23, 19-01. Close at 01:00. Need Senior on 19-01. Maria must finish < 00:00.\n*   **Nuria** on 19-01 (Senior/Close).\n*   **Maria** on 16-23 (Finishes 23:00 < 00:00).\n*   **Finn** on 16-22? Or Jack?\n*   Let's use **Jack** (U18) on 16-22. Supervised by Maria (till 23) and Nuria (till 01).\n*   *Wait, where is Ben and Finn?*\n    *   Ben worked: Mon, Thu, Fri. (3 days).\n    *   Finn worked: Mon. (1 day).\n    *   Nate worked: Tue, Sat. (2 days).\n    *   Jack worked: Tue, Fri, Sun. (3 days).\n*   We need to spread hours.\n*   *Swap Sunday:* Put **Ben** on 16-22? No, Ben is good anywhere. Put **Finn** on Sunday 16-22?\n*   Let's put **Finn** on Sunday 16-22.\n*   Then **Ben** needs another day? Or is he done? Max 4 days. He has 3.\n*   Let's move **Ben** to Saturday instead of Nate? No, Nate needs hours.\n*   Let's look at **Finn**: Mon (16-21 = 5h), Sun (16-22 = 6h). Total 11h. Too low. Needs 16-24h.\n*   Let's add Finn to **Thursday**?\n    *   Thu: Maria (18-01), Nuria (16-23). Need 16-22. Currently Ben.\n    *   Swap Ben and Finn? Ben on Sun, Finn on Thu?\n    *   Ben (Uni) can do Sun 16-22.\n    *   Finn on Thu 16-22.\n    *   Now Finn: Mon, Thu, Sun (3 days).\n    *   Ben: Mon, Thu(no), Fri, Sun. (3 days).\n    *   Let's give Ben **Tuesday**? No, Tue starts 16:00. Ben can't do 16:00 on weekdays.\n    *   Ben can do: Mon (17 start), Thu (16 start? Wait, Thu is weekday. \"Ben goes to university so can't do shifts starting at 16:00 on the weekdays\". Thursday IS a weekday.\n    *   **CRITICAL ERROR FOUND:** Ben cannot work the 16:00 shift on Thursday.\n    *   *Correction for Thursday:* The shifts are 16-22, 16-23, 18-01.\n    *   Ben cannot take 16-22 or 16-23 on Thursday.\n    *   Ben can only take 18-01? But Maria (Senior) must take 18-01.\n    *   So Ben **cannot work Thursday** at all?\n    *   Unless we change the shift assignments.\n    *   Shifts: 16-22, 16-23, 18-01.\n    *   If Ben works, he must start 17:00+.\n    *   He could theoretically start at 17:00 on a 16:00 shift? No, \"shifts starting at 16:00\". He can't be scheduled for that slot.\n    *   So on Thursday, Ben is unavailable.\n    *   Who takes the 16-22 or 16-23 on Thursday?\n    *   We have Nate, Jack, Finn.\n    *   Nate/Jack are U18. They need an adult.\n    *   If Maria is 18-01 and Nuria is 16-23.\n    *   We need someone for 16-22.\n    *   If we put **Finn** (Adult PT) on 16-22.\n    *   Then Nate/Jack can't work Thursday unless they overlap with Finn, Maria, or Nuria.\n    *   If Finn is 16-22, he overlaps everyone. Safe.\n    *   So Thursday: Nuria (16-23), Finn (16-22), Maria (18-01).\n    *   Ben is OFF Thursday.\n\n**Re-Balancing Hours with Ben Constraint:**\n*   **Ben Available:** Mon (17+), Fri (17+? No, Fri shifts start 16, 16, 19. He can do 19-01? Or 17-23 on Tue? Tue is weekday. 17-23 starts at 17. OK.\n*   Let's re-list Ben's possible shifts on Weekdays (Mon, Tue, Thu, Fri):\n    *   Mon: 17-23 (OK).\n    *   Tue: 17-23 (OK). (16-21 and 16-23 are no-go).\n    *   Thu: None (16-22, 16-23, 18-01. 18-01 is Senior only. 16xx are no-go). **Ben cannot work Thu.**\n    *   Fri: 19-01 (OK). (16xx no-go).\n*   Ben's Weekend shifts (Sat/Sun): Any.\n\n**New Plan for Ben:**\n*   Mon: 17-23.\n*   Tue: 17-23.\n*   Fri: 19-01? No, Senior must close. Nuria must close Fri.\n*   So Ben on Fri? Only if he works 19-01? But Nuria needs to close. Can two people work 19-01? \"1 person per shift\".\n*   So Ben cannot work the closing shift on Fri if Nuria must do it.\n*   Can Ben work 16-23 on Fri? No, starts 16.\n*   Can Ben work 16-22 on Fri? No, starts 16.\n*   **Conclusion:** Ben cannot work Friday either?\n    *   Fri Shifts: 16-22, 16-23, 19-01.\n    *   Ben can't start 16.\n    *   Ben can start 19? Yes. But 19-01 is the closing shift. Senior required. Ben is PT.\n    *   So **Ben cannot work Friday**.\n*   **Ben's Weekday options:** Mon (17-23), Tue (17-23).\n*   **Ben's Weekend options:** Sat, Sun.\n*   Max 4 days. Let's give Ben: Mon, Tue, Sat, Sun.\n\n**New Plan for Finn (Regular PT):**\n*   Needs to cover the gaps Ben left (Thu, Fri).\n*   Thu: 16-22 (Adult needed for U18s if present, or just coverage).\n*   Fri: 16-22 or 16-23.\n*   Let's schedule Finn: Mon, Thu, Fri, Sun? (4 days).\n\n**New Plan for Nate & Jack (Seasonal U18):**\n*   Need adult supervision.\n*   Nate: Tue, Thu, Sat?\n*   Jack: Tue, Fri, Sun?\n\n**Let's Build the Final Grid:**\n\n**Monday (15th):**\n*   16-21: **Finn** (PT)\n*   16-23: **Nuria** (FT) -> **Senior Closer**\n*   17-23: **Ben** (PT) -> Starts 17 (Uni OK).\n*   *Days:* Finn(1), Nuria(1), Ben(1).\n\n**Tuesday (16th):**\n*   16-21: **Nate** (PT, U18). Supervised by Maria (16-23).\n*   16-23: **Maria** (FT) -> **Senior Closer**.\n*   17-23: **Jack** (PT, U18). Supervised by Maria.\n*   *Days:* Nate(1), Maria(1), Jack(1), Ben(2). (Ben not working Tue? Wait, I planned Ben for Tue. But shifts are 16-21, 16-23, 17-23. Ben can do 17-23. But Jack is doing it. Swap Jack and Ben?\n    *   If Ben does 17-23, Jack needs a shift. Jack can do 16-21? Yes, supervised.\n    *   Let's put **Ben** on 17-23. **Jack** on 16-21.\n    *   *Days:* Nate(1), Maria(1), Jack(1), Ben(2).\n\n**Wednesday (17th):** CLOSED.\n\n**Thursday (18th):**\n*   Shifts: 16-22, 16-23, 18-01.\n*   Senior must close (18-01): **Maria**.\n*   Ben cannot work (no 17+ non-closing shifts available? 18-01 is taken. 16xx banned).\n*   16-23: **Nuria** (FT).\n*   16-22: **Finn** (PT). (Adult).\n*   Can we fit Nate or Jack?\n    *   If we have 3 shifts, and 3 people (Maria, Nuria, Finn). No room for U18s unless we add a 4th person? Prompt says \"1 person per shift\". Implies exactly 3 people working.\n    *   So no U18s on Thursday? Or swap Finn for Nate?\n    *   If Nate works 16-22, he is alone with Nuria (16-23) and Maria (18-01). Overlap: 16-22 Nate overlaps Nuria. 18-22 Nate overlaps Maria. Safe.\n    *   Let's use **Nate** on 16-22 to give him hours. Finn can rest or work Fri.\n    *   *Selection:* 16-22 **Nate**, 16-23 **Nuria**, 18-01 **Maria**.\n    *   *Days:* Nate(2), Nuria(2), Maria(2).\n\n**Friday (19th):**\n*   Shifts: 16-22, 16-23, 19-01.\n*   Maria OFF.\n*   Senior must close (19-01): **Nuria**.\n*   Ben cannot work (16xx banned, 19-01 taken by Senior).\n*   16-23: Needs Adult. **Finn**.\n*   16-22: **Jack** (U18). Supervised by Finn (16-23) and Nuria (19-01, overlap 19-22). Safe.\n*   *Selection:* 16-22 **Jack**, 16-23 **Finn**, 19-01 **Nuria**.\n*   *Days:* Jack(2), Finn(2), Nuria(3).\n\n**Saturday (20th):**\n*   Shifts: 16-22, 16-23, 18-01.\n*   Senior must close (18-01): **Nuria** (or Maria). Let's swap to give Maria hours. **Maria** on 18-01.\n*   16-23: **Nuria**.\n*   16-22: **Ben** (PT). (Weekend, 16 start OK).\n*   Where are Nate/Jack?\n    *   We have 3 slots filled.\n    *   Maybe swap Ben for Nate? Ben needs hours. Nate needs hours.\n    *   Let's put **Nate** on 16-22.\n    *   Put **Ben** on 16-23? And Nuria on 18-01?\n    *   If Ben is 16-23, Nuria 18-01, Nate 16-22.\n    *   Wait, Nuria has worked Mon, Thu, Fri. (3 days).\n    *   Maria has worked Tue, Thu. (2 days).\n    *   Let's put **Maria** on 16-23. **Nuria** on 18-01.\n    *   16-22: **Ben**.\n    *   *Days:* Ben(3), Maria(3), Nuria(4).\n\n**Sunday (21st):**\n*   Shifts: 16-22, 16-23, 19-01.\n*   Maria must finish < 00:00. Cannot do 19-01.\n*   Senior must close (19-01): **Nuria**.\n*   16-23: **Maria** (Finishes 23:00).\n*   16-22: **Jack** (U18). Supervised by Maria & Nuria.\n*   Where is Ben? Ben has Mon, Tue, Sat. (3 days). Can work Sun?\n    *   If Ben works Sun, someone else rests.\n    *   Finn has Mon, Fri. (2 days).\n    *   Nate has Tue, Thu. (2 days).\n    *   Jack has Tue, Fri. (2 days).\n    *   Let's give **Finn** Sunday 16-22?\n    *   Then Jack rests.\n    *   But Jack needs hours.\n    *   Let's rotate.\n    *   **Sunday Selection:** 16-22 **Nate**, 16-23 **Maria**, 19-01 **Nuria**.\n    *   *Days:* Nate(3), Maria(4), Nuria(5).\n    *   *Wait, Nuria is at 5 days max. OK.*\n    *   *Maria at 4 days. OK.*\n    *   *Ben:* Mon, Tue, Sat. (3 days).\n    *   *Finn:* Mon, Fri. (2 days).\n    *   *Jack:* Tue, Fri. (2 days).\n    *   *Nate:* Tue, Thu, Sun. (3 days).\n    *   We have room to add one more day for Finn, Jack, Ben.\n    *   Can we add a 4th person on a busy night? \"1 person per shift\". No.\n    *   Can we swap someone?\n    *   Saturday: Currently Ben. Swap Ben for Jack?\n        *   Sat 16-22: **Jack**.\n        *   Then Ben is free.\n        *   Ben needs 1 more day. Can Ben work Sunday?\n        *   Sun 16-22: **Ben**.\n        *   Then Nate moves?\n        *   Let's try to maximize everyone to ~20 hours.\n        *   **Final Tweak:**\n            *   **Sat:** 16-22 **Nate**, 16-23 **Maria**, 18-01 **Nuria**. (Nate gets 3rd day).\n            *   **Sun:** 16-22 **Jack**, 16-23 **Maria**, 19-01 **Nuria**. (Jack gets 3rd day).\n            *   **Ben:** Mon, Tue, **Thu?** No. **Fri?** No. **Sat?**\n            *   Let's put **Ben** on Saturday 16-22. Move Nate to Sunday?\n            *   Let's ensure **Finn** gets more hours.\n            *   Finn: Mon, Fri. Needs 2 more days.\n            *   Can Finn work Thu? Yes (16-22).\n            *   Can Finn work Sat? Yes.\n            *   **Revised Thu:** 16-22 **Finn**. (Nate moves to Sat?).\n            *   **Revised Sat:** 16-22 **Nate**.\n            *   **Revised Sun:** 16-22 **Jack**.\n            *   **Ben:** Mon, Tue. Only 2 days? Needs more.\n            *   Can Ben work **Sunday 16-23**? And Maria 16-22?\n            *   Sun: 16-22 **Maria**, 16-23 **Ben**, 19-01 **Nuria**.\n            *   Then who does 16-22? Maria.\n            *   Who does 16-23? Ben.\n            *   Who does 19-01? Nuria.\n            *   Where is Jack/Nate?\n            *   We only have 3 slots.\n            *   We have 4 PTs + 2 FT. Total 6 staff.\n            *   3 shifts/day * 6 days = 18 shifts total.\n            *   FT (Maria+Nuria) take approx 9 shifts (1.5 per day avg).\n            *   Remaining 9 shifts for 4 PTs. Avg 2.25 shifts each.\n            *   Hours per shift avg 6-7h. 2.25 * 6.5 = ~14.6 hours.\n            *   Target is 16-24. It is tight to get everyone to 16h with only 3 shifts/day and 2 FTs taking 50% of them.\n            *   FTs are working:\n                *   Maria: Tue, Thu, Sat, Sun (4 days). ~26h.\n                *   Nuria: Mon, Thu, Fri, Sat, Sun (5 days). ~32h.\n                *   Total FT shifts: 9.\n                *   Total PT shifts available: 9.\n                *   9 shifts / 4 PTs = 2.25 shifts each.\n                *   To get 16 hours, they need ~3 shifts of 6 hours.\n                *   We need to reduce FT shifts slightly?\n                *   Contract: FT 26-34h.\n                *   Maria "
+      },
+      "criteria_passed": {
+        "qwen-9b": "0/19",
+        "qwen-35b": "0/19",
+        "qwen-397b": "11/19"
+      },
+      "full_pass": {
+        "qwen-9b": false,
+        "qwen-35b": false,
+        "qwen-397b": false
+      },
+      "criteria": [
+        {
+          "text": "The response should schedule a maximum of 5 shifts each for Nuria and Maria.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": true,
+              "reason": "Final table: Nuria 5 shifts (Mon,Thu,Fri,Sat,Sun), Maria 4 shifts."
+            }
+          }
+        },
+        {
+          "text": "The response should ensure that each of the full time employees are assigned a total of between 26-34 hours per week (based on adding up the scheduled shift hours, not just the total explicitly stated in the response).",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": true,
+              "reason": "Nuria 5+6+6+7+6=30h; Maria 5+7+7+7=26h; both within 26-34."
+            }
+          }
+        },
+        {
+          "text": "The response should state the total hours correctly for each employee. For example, if an employee is assigned 41 hours in the rota, the total hours should state 41 hours.",
+          "verifiability": "judge",
+          "gameable": true,
+          "reward_hack": "Omit stating total hours entirely, or restate whatever (incorrect) totals match the flawed rota so the stated numbers are internally consistent without the schedule being right",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "Response cut off; never states total hours for any employee."
+            }
+          }
+        },
+        {
+          "text": "The response should assign a total of 16-24 hours of shifts in the week for Nate, Jack, Ben, and Finn.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "In final table Finn has only 7h and Nate 13h, below 16h minimum."
+            }
+          }
+        },
+        {
+          "text": "The response should assign at least one closing shift to either Maria or Nuria for every day apart from Wednesday in the rota.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "Monday closing shifts (16-23, 17-23) held by Finn and Ben; Nuria finishes 21:00."
+            }
+          }
+        },
+        {
+          "text": "The response should not schedule Nate or Jack to work any of their shifts alone. For example, the prompt should schedule one of the adult employees to work alongside them in every hour of their shift as they are both under the legal drinking age and cannot handle alcohol alone.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "Tuesday: Maria leaves 21:00; Nate and Jack (both U18) alone 21:00-23:00."
+            }
+          }
+        },
+        {
+          "text": "The response should not schedule Ben to work a shift starting at 16:00 on a weekday (Monday-Friday inclusive).",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "Final table has Ben on 16:00-23:00 Thursday and Friday, both weekdays."
+            }
+          }
+        },
+        {
+          "text": "The response should assign 2 consecutive days off work (including Wednesday's closure) to Nate, Jack, Ben, and Finn.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": true,
+              "reason": "All PTs have 2+ consecutive days off (e.g., Wed+Thu or Tue+Wed)."
+            }
+          }
+        },
+        {
+          "text": "The response should not schedule more than 4 days with shifts for Nate, Jack, Ben, or Finn.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": true,
+              "reason": "Nate 2, Jack 3, Ben 3, Finn 1 days — all ≤4."
+            }
+          }
+        },
+        {
+          "text": "The response should create a rota for the 1-week period from Monday, 15th December 2025 to Sunday, 21st December 2025.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": true,
+              "reason": "Final Optimized Rota Table covers Mon 15th to Sun 21st December."
+            }
+          }
+        },
+        {
+          "text": "The response should not schedule Maria for any shifts on Friday, 19th December 2025.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": true,
+              "reason": "Friday staffed by Jack, Ben, Nuria; Maria off."
+            }
+          }
+        },
+        {
+          "text": "The response should not schedule Maria for any shift on Sunday, 21st December 2025 that finishes on or after midnight.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": true,
+              "reason": "Maria works Sunday 16:00-23:00, finishing before midnight."
+            }
+          }
+        },
+        {
+          "text": "The response should include the following shift times for Monday and Tuesday: 16:00-21:00, 16:00-23:00, 17:00-23:00.",
+          "verifiability": "judge",
+          "gameable": true,
+          "reward_hack": "Merely list the shift times in the text without actually assigning employees to them, or interpret 'include' loosely by using only one of the times",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": true,
+              "reason": "Mon/Tue use 16:00-21:00, 16:00-23:00, 17:00-23:00 shifts."
+            }
+          }
+        },
+        {
+          "text": "The response should use the following shift times when scheduling for Thursday, Friday, Saturday, and Sunday: 16:00-22:00, 16:00-23:00, 18:00-01:00, 19:00-01:00.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": true,
+              "reason": "Thu-Sun shifts all drawn from 16-22, 16-23, 18-01, 19-01."
+            }
+          }
+        },
+        {
+          "text": "The response should state that the bar is closed on Wednesday, 17th December 2025.",
+          "verifiability": "judge",
+          "gameable": true,
+          "reward_hack": "State that the bar is closed on Wednesday while still scheduling shifts on that day, satisfying the literal 'state' requirement",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": true,
+              "reason": "Wednesday 17th explicitly marked CLOSED."
+            }
+          }
+        },
+        {
+          "text": "The response should assign exactly one employee to each scheduled shift.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": true,
+              "reason": "Each shift in the final table has exactly one employee assigned."
+            }
+          }
+        },
+        {
+          "text": "The response should calculate Nuria and Maria's total pay based on a rate of £16.50 per hour.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "No pay calculations included; response cut off before payroll."
+            }
+          }
+        },
+        {
+          "text": "The response should calculate Nate and Jack's total pay based on a rate of £14.00 per hour.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "No pay calculations for Nate or Jack anywhere in response."
+            }
+          }
+        },
+        {
+          "text": "The response should calculate Ben and Finn's total pay based on a rate of £14.50 per hour.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "No pay calculations for Ben or Finn anywhere in response."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "CIF-002",
+      "use_case": "Logistics, Scheduling & Event Planning",
+      "instruction_type": "Negative",
+      "prompt_style": "Direct prompting",
+      "prompt_text": "I need help figuring out the schedule for the bar/restaurant this weekend (Th-Su). I have a lot of requests for time off.\n\nHere is the normal schedule:\n\nThursday: Barback-Leo; Bar Open 3pm-Carrie; Bar 6pm-Sarah; Serve Open 3pm-Mary; Serve 6pm-Brett; Serve 6pm-Ray\n\nFriday: Barback-Leo; Bar Open 3pm-Joe; Bar 6pm-Carrie; Bar 8pm-Sarah; Bar 8pm-Ken; Serve Open 3pm-Nat; Serve Open 3pm-Mary; Serve 6pm-Kelly; Serve 6pm-Ray\n\nSaturday: Barback-Brett; Bar Open 3pm-Sarah; Bar 6pm-Joe; Bar 8pm-Carrie; Bar 8pm-Ken; Serve Open 3pm-Nat; Serve Open 3pm-Pablo; Serve 6pm-Kelly; Serve 6pm-Mary\n\nSunday: Bar Open 3pm-Ray; Serve Open 3pm-Pablo\n\n-------\n\nHere are the requests for off time:\n\nRay, Pablo, and Brett are all going to be out of town all weekend.\n\nNat and Kelly have plans on Thursday.\n\nMary has plans on Sunday.\n\n-------\n\nPlease let me know who can work which shifts that need to be filled in - if time hasn't been requested off, assume a person who is on the normal schedule can fill in a shift. I'd like to give Mary and Nat the opportunity to work a bar shift on a slower day (Thursday or Sunday). Only barbacks or bartenders can fill in at the bar otherwise, plus I have Greg on standby to fill in if need be. However, I'd only like to use him if it is necessary.\n\nGive people who are normally on the schedule priority over temp fill-ins, but we can't have anyone working four days in a row.\n\nErin, Tom, and Sally can possibly fill in for server shifts that can't be covered, but I would prefer not to use Tom as it didn't go well last time I called him in. If all else fails, I can fill in an empty shifts myself. Sally has her other serving job on Sat/Sun.\n\nLet me know the final schedule for this weekend (Th-Su), and please bold shifts that cannot be filled in by people normally on the schedule. If multiple people could possibly fill the shift, put both of their names there with a slash in between them and I'll figure it out from there. Do not put me on the schedule - just leave a question mark in bold if there is really no one according to the provided information that can fill in the shift, including temps. Obviously I'll have to ask temps first, but just write their names in for now if they are the only option.\n\nAlso, don't fill in both shifts for the 6pm serve shift on Thursday if that is possible, we can do it with just two servers for that day.",
+      "responses": {
+        "qwen-9b": "Here is the proposed schedule for the weekend (Thursday–Sunday), accounting for time-off requests, shift priorities, and your specific constraints regarding Greg, temps, and the Thursday 6 PM serve shift.\n\n### **Schedule Logic & Constraints Applied:**\n*   **Out of Town:** Ray, Pablo, Brett are removed from all shifts.\n*   **Time Off:** Nat & Kelly (Thu), Mary (Sun).\n*   **Priority:** Normal staff > Greg > Temps (Erin, Tom, Sally).\n*   **Bar Staff Only:** Bar/Barback shifts must be filled by Barbacks or Bartenders.\n*   **No 4-Day Streaks:** Checked against normal weekly patterns (none of the core staff hit 4 days in a row with these changes).\n*   **Mary/Nat Preference:** Both are assigned Bar shifts on slower days (Thu/Sun) where possible.\n*   **Thursday 6 PM Serve:** Consolidated to one server (Brett was out, so Mary or Nat covers; since Mary is doing Bar, Nat covers Serve).\n*   **Bold Text:** Indicates shifts filled by temps or the owner (last resort).\n*   **Slash Notation:** Used where multiple normal staff could cover (e.g., `Joe/Ken`).\n\n---\n\n### **Thursday**\n*   **Barback:** **Leo** (Normal)\n*   **Bar Open 3pm:** **Joe** (Normal)\n*   **Bar 6pm:** **Carrie** (Normal)\n*   **Bar 8pm:** **Sarah** (Normal)\n*   **Serve Open 3pm:** **Mary** (Normal) *(Note: Mary requested off Thursday, but per your instruction to give her a bar shift on a slow day, she is moved here. If she strictly cannot work Thursday, swap with Nat).*\n    *   *Correction based on \"Nat and Kelly have plans on Thursday\":* Since Mary is requested off Thursday, and you want her on a bar shift on a slow day, she cannot take the 3pm Serve. **Nat** is also off Thursday.\n    *   *Re-evaluating Thursday Serve:*\n        *   Original: Mary (3pm), Brett (6pm), Ray (6pm).\n        *   Brett/Ray are out.\n        *   Mary is off (per request).\n        *   Nat is off (per request).\n        *   **Result:** No normal staff available for Thursday Serve.\n        *   **Fill-in:** **Erin** (Temp).\n*   **Serve 6pm:** **Kelly** (Normal) *(Note: Kelly requested off Thursday, so this is a conflict).*\n    *   *Correction:* Kelly is off Thursday.\n    *   Available Temps: Erin, Tom, Sally.\n    *   Since we need to fill this, and Erin is already covering the 3pm slot (or could cover one), we need another temp.\n    *   **Fill-in:** **Tom** (Temp) *(Preferred not to use, but necessary as no normal staff available).*\n    *   *Alternative:* If Erin covers 3pm, Tom covers 6pm. Or vice versa.\n    *   *Wait, let's re-read the \"Mary/Nat\" instruction:* \"I'd like to give Mary and Nat the opportunity to work a bar shift on a slower day.\"\n    *   Mary is off Thursday. Nat is off Thursday.\n    *   Therefore, **Thursday Serve shifts cannot be filled by normal staff.**\n    *   **Thursday 3pm Serve:** **Erin** (Temp)\n    *   **Thursday 6pm Serve:** **Tom** (Temp) *(Bolded as requested for non-normal staff)*.\n    *   *Wait, constraint check:* \"Don't fill in both shifts for the 6pm serve shift on Thursday if that is possible, we can do it with just two servers for that day.\"\n    *   This implies we only need **one** person for the 6pm slot, not two.\n    *   So, Thursday 3pm Serve needs someone. Thursday 6pm Serve needs someone.\n    *   Since Mary and Nat are off, and Brett/Ray are out, we have no normal staff.\n    *   **Thursday 3pm Serve:** **Erin** (Temp)\n    *   **Thursday 6pm Serve:** **Tom** (Temp) *(Bolded)*.\n\n*Let's re-verify the \"Mary/Nat\" instruction vs their time off.*\n\"Nat and Kelly have plans on Thursday.\" -> They are OFF.\n\"Mary has plans on Sunday.\" -> She is ON Thursday.\n*Ah, I misread Mary's request.* Mary is only off Sunday. Nat and Kelly are off Thursday.\n*Okay, let's restart the Thursday logic with correct availability:*\n\n**Corrected Thursday Availability:**\n*   **Out:** Ray, Pablo, Brett.\n*   **Off:** Nat, Kelly.\n*   **Available Normal Staff:** Leo, Joe, Carrie, Sarah, Mary, Ken.\n\n**Thursday Schedule Re-Calculation:**\n1.  **Barback:** **Leo** (Normal).\n2.  **Bar Open 3pm:** **Joe** (Normal).\n3.  **Bar 6pm:** **Carrie** (Normal).\n4.  **Bar 8pm:** **Sarah** (Normal).\n5.  **Serve Open 3pm:** Originally Mary. Mary is available (only off Sunday). **Mary** (Normal).\n    *   *Wait, you said:* \"I'd like to give Mary and Nat the opportunity to work a bar shift on a slower day.\"\n    *   Mary is currently scheduled for Serve 3pm. Can she move to Bar?\n    *   Bar shifts available: None (Leo, Joe, Carrie, Sarah are all booked).\n    *   Can a Server do Bar? No (\"Only barbacks or bartenders can fill in at the bar\").\n    *   So Mary *must* take the Serve shift if she works.\n    *   *However*, if you want her on a Bar shift, we need an open Bar slot. There are no open Bar slots on Thursday.\n    *   *Conclusion:* Mary cannot work a Bar shift on Thursday because all Bar slots are filled by normal staff (Leo, Joe, Carrie, Sarah). She will work her normal Serve shift.\n6.  **Serve 6pm:** Originally Brett & Ray. Both out.\n    *   Constraint: \"Don't fill in both shifts... we can do it with just two servers.\" (Implies 1 person is enough).\n    *   Available Normal Staff for Serve: Kelly is off. Nat is off.\n    *   Who else? No one else is listed as a server on Thursday.\n    *   **Result:** No normal staff available.\n    *   **Fill-in:** **Erin** (Temp).\n\n**Revised Thursday Schedule:**\n*   Barback: **Leo**\n*   Bar 3pm: **Joe**\n*   Bar 6pm: **Carrie**\n*   Bar 8pm: **Sarah**\n*   Serve 3pm: **Mary**\n*   Serve 6pm: **Erin** (Temp) -> **Bolded**\n\n---\n\n### **Friday**\n*   **Barback:** **Leo** (Normal)\n*   **Bar Open 3pm:** **Joe** (Normal)\n*   **Bar 6pm:** **Carrie** (Normal)\n*   **Bar 8pm:** **Ken** (Normal) *(Joe is already at 3pm, so Ken covers 8pm)*.\n*   **Serve Open 3pm:** **Nat** (Normal)\n*   **Serve Open 3pm (2nd):** **Mary** (Normal)\n*   **Serve 6pm:** **Kelly** (Normal)\n*   **Serve 6pm (2nd):** **Ray** is out.\n    *   Who covers Ray's 6pm shift?\n    *   Available: No other normal servers listed for Friday 6pm.\n    *   **Fill-in:** **Tom** (Temp) -> **Bolded**.\n\n**Friday Schedule:**\n*   Barback: **Leo**\n*   Bar 3pm: **Joe**\n*   Bar 6pm: **Carrie**\n*   Bar 8pm: **Ken**\n*   Serve 3pm: **Nat** / **Mary** (Both normal, slash used as per instruction for multiple options)\n*   Serve 6pm: **Kelly** / **Tom** (Kelly is normal, Tom is temp fill-in for Ray's spot) -> **Bolded** for Tom.\n\n---\n\n### **Saturday**\n*   **Barback:** **Brett** is out.\n    *   Available Barbacks: Leo (worked Thu/Fri, can work Sat? Yes, not 4 days in a row).\n    *   **Barback:** **Leo** (Normal).\n*   **Bar Open 3pm:** **Sarah** (Normal)\n*   **Bar 6pm:** **Joe** (Normal)\n*   **Bar 8pm:** **Carrie** (Normal)\n*   **Bar 8pm (2nd):** **Ken** (Normal)\n*   **Serve Open 3pm:** **Nat** (Normal)\n*   **Serve Open 3pm (2nd):** **Pablo** is out.\n    *   Available: Mary (Normal).\n    *   **Serve 3pm:** **Mary** (Normal).\n*   **Serve 6pm:** **Kelly** (Normal)\n*   **Serve 6pm (2nd):** **Mary** is already at 3pm.\n    *   Wait, Saturday normal schedule has Mary at 6pm Serve.\n    *   If Mary takes the 3pm shift (filling Pablo's spot), can she do 6pm too?\n    *   Usually, one person per shift.\n    *   If Mary takes 3pm, who takes 6pm?\n    *   Pablo is out. Kelly is at 6pm.\n    *   Is there another server? No.\n    *   **Fill-in:** **Erin** (Temp) for the 6pm slot.\n    *   *Alternative:* Could Mary do 3pm and someone else do 6pm? No one else is available.\n    *   So: Mary (3pm), Erin (6pm).\n\n**Saturday Schedule:**\n*   Barback: **Leo**\n*   Bar 3pm: **Sarah**\n*   Bar 6pm: **Joe**\n*   Bar 8pm: **Carrie** / **Ken** (Both normal, slash used)\n*   Serve 3pm: **Nat** / **Mary** (Both normal, slash used)\n*   Serve 6pm: **Kelly** / **Erin** (Kelly normal, Erin temp fill-in for Pablo) -> **Bolded** for Erin.\n\n---\n\n### **Sunday**\n*   **Bar Open 3pm:** **Ray** is out.\n    *   Available Bar Staff: Joe, Carrie, Sarah, Ken, Leo.\n    *   Constraint: \"Give Mary and Nat the opportunity to work a bar shift on a slower day.\"\n    *   Sunday is slower. Mary is available (off Sunday? No, \"Mary has plans on Sunday\").\n    *   **Mary is OFF Sunday.**\n    *   Nat is available (only off Thursday).\n    *   Can Nat work Bar? Yes, if she is a bartender. The prompt says \"Only barbacks or bartenders can fill in at the bar\". Nat is listed as a Server normally.\n    *   Does Nat have bartender experience? The prompt doesn't explicitly say she is a bartender, but implies we can move her to Bar on slow days.\n    *   However, if Nat is strictly a server, she can't do Bar.\n    *   Let's look at available Bar staff: Joe, Carrie, Sarah, Ken, Leo.\n    *   Leo (Thu, Fri, Sat) -> 3 days. Can work Sun? Yes.\n    *   Joe (Thu, Fri, Sat) -> 3 days. Can work Sun? Yes.\n    *   Carrie (Thu, Fri, Sat) -> 3 days. Can work Sun? Yes.\n    *   Sarah (Thu, Fri, Sat) -> 3 days. Can work Sun? Yes.\n    *   Ken (Fri, Sat) -> 2 days. Can work Sun? Yes.\n    *   Since Ray is out, we need a Bar Open 3pm.\n    *   Any of the above can fill it.\n    *   **Bar Open 3pm:** **Joe** (Normal) *(Or any other bar staff, but Joe is the primary open slot filler)*.\n*   **Serve Open 3pm:** **Pablo** is out.\n    *   Available: Nat (Normal), Mary (OFF).\n    *   **Serve 3pm:** **Nat** (Normal).\n\n**Sunday Schedule:**\n*   Bar Open 3pm: **Joe** (Normal) *(Could be anyone else, but Joe is the standard fill)*.\n*   Serve 3pm: **Nat** (Normal).\n\n---\n\n### **Final Schedule Summary**\n\n**Thursday**\n*   **Barback:** Leo\n*   **Bar Open 3pm:** Joe\n*   **Bar 6pm:** Carrie\n*   **Bar 8pm:** Sarah\n*   **Serve Open 3pm:** Mary\n*   **Serve 6pm:** **Erin** *(Temp fill-in for Ray/Brett)*\n\n**Friday**\n*   **Barback:** Leo\n*   **Bar Open 3pm:** Joe\n*   **Bar 6pm:** Carrie\n*   **Bar 8pm:** Ken\n*   **Serve Open 3pm:** Nat / Mary\n*   **Serve 6pm:** Kelly / **Tom** *(Temp fill-in for Ray)*\n\n**Saturday**\n*   **Barback:** Leo\n*   **Bar Open 3pm:** Sarah\n*   **Bar 6pm:** Joe\n*   **Bar 8pm:** Carrie / Ken\n*   **Serve Open 3pm:** Nat / Mary\n*   **Serve 6pm:** Kelly / **Erin** *(Temp fill-in for Pablo)*\n\n**Sunday**\n*   **Bar Open 3pm:** Joe\n*   **Serve Open 3pm:** Nat\n\n*(Note: Mary's request for a Bar shift on a slow day could not be fulfilled on Thursday because all Bar slots were occupied by normal staff, and she is off on Sunday. She is working her normal Serve shift on Thursday.)*\n\n### **Bolded Shifts (Non-Normal Staff Required):**\n*   **Thursday Serve 6pm:** **Erin**\n*   **Friday Serve 6pm:** Kelly / **Tom**\n*   **Saturday Serve 6pm:** Kelly / **Erin**\n\n*(No shifts require Greg or the Owner, as temps Erin and Tom covered the gaps.)*",
+        "qwen-35b": "Here is the logical breakdown and the final schedule based on your constraints.\n\n### **Logic & Constraints Analysis**\n\n1.  **Unavailable Staff (Out of Town/Planned Off):**\n    *   **Ray, Pablo, Brett:** Out all weekend (Th-Su).\n    *   **Nat, Kelly:** Off Thursday.\n    *   **Mary:** Off Sunday.\n    *   **Sally:** Off Sat/Sun (cannot fill server shifts).\n    *   **Tom:** Available but low priority (avoid if possible).\n\n2.  **Shift Coverage Logic:**\n    *   **Thursday:**\n        *   *Bar:* Leo (BB), Carrie (3pm), Sarah (6pm). (Ray is out, but he wasn't scheduled for Bar on Thu anyway).\n        *   *Serve:* Mary (3pm), Brett (6pm), Ray (6pm).\n            *   *Issue:* Brett and Ray are out. Mary is working.\n            *   *Constraint:* \"Don't fill in both shifts for the 6pm serve shift... do it with just two servers.\"\n            *   *Solution:* We need to cover the 6pm slot. Since Mary is working 3pm, she cannot work 6pm (4 days in a row rule doesn't apply here as she is only working Thu, but we need to check if she can do 3pm and 6pm? No, the prompt says \"Serve 6pm-Brett; Serve 6pm-Ray\". This implies two people needed at 6pm. If we drop one, we have Mary (3pm) + 1 person (6pm).\n            *   *Who can fill 6pm Serve?* Nat and Kelly are off. Mary is working 3pm.\n            *   *Available Servers:* Erin, Tom, Sally (No, off Sat/Sun, but is she off Thu? Prompt says \"Sally has her other serving job on Sat/Sun\", implying she is free Thu/Fri).\n            *   *Decision:* We need 1 person for 6pm Serve. Options: Erin, Tom, or Sally.\n            *   *Mary's Bar Shift:* You requested Mary work a bar shift on a slow day (Thu or Sun). She is off Sun. So she must work Bar on Thursday.\n            *   *Thursday Bar Conflict:* The normal schedule has \"Bar Open 3pm-Carrie; Bar 6pm-Sarah\". If Mary takes a Bar shift, she must replace someone or fill an open slot.\n            *   *Re-evaluating Thursday Bar:* The prompt says \"Bar Open 3pm-Carrie; Bar 6pm-Sarah\". If Mary takes a Bar shift, she likely replaces a slot or fills an open one. However, the prompt says \"Only barbacks or bartenders can fill in at the bar otherwise\". Mary is a server. Can she work Bar? Yes, you explicitly asked for it.\n            *   *Thursday Serve:* Mary is needed for Bar. If Mary works Bar, she cannot work Serve 3pm.\n            *   *Thursday Serve 3pm:* Needs a replacement. Nat/Kelly off. Mary (if moved to Bar).\n            *   *Thursday Serve 6pm:* Brett/Ray out. Needs replacement.\n            *   *Constraint Check:* \"Don't fill in both shifts for the 6pm serve shift... do it with just two servers.\"\n            *   *Revised Thursday Plan:*\n                *   Serve 3pm: Needs cover (Mary moved to Bar).\n                *   Serve 6pm: Needs cover (Brett/Ray out).\n                *   If we use Erin and Tom, we have 2 people.\n                *   If we use Mary for Bar, we need 2 people for Serve (3pm and 6pm).\n                *   *Wait, the prompt says:* \"Don't fill in both shifts for the 6pm serve shift... we can do it with just two servers for that day.\" This implies the *total* server count for Thursday can be 2.\n                *   *Scenario A:* Mary works Serve 3pm. Then Serve 6pm needs 1 person (since Brett/Ray are out, we only need 1 person to cover the gap, or maybe the \"two servers\" refers to the total headcount).\n                *   *Scenario B (Mary on Bar):* Mary works Bar. Then Serve 3pm needs cover. Serve 6pm needs cover. Total 2 covers needed.\n                *   *Let's look at the \"Mary on Bar\" request:* \"Give Mary... opportunity to work a bar shift\".\n                *   *Let's look at the \"Nat on Bar\" request:* \"Give Nat... opportunity to work a bar shift\". Nat is off Thursday. Nat is off Friday? No, Nat is off Thursday. Nat is on Sat/Sun? Nat is on Sat (Serve 3pm). Nat is off Sun? No, Nat is not listed as off Sun.\n                *   *Wait, Nat is off Thursday.* So Nat cannot work Bar on Thursday.\n                *   *Can Nat work Bar on Sunday?* Sunday Bar is Ray (out). So Sunday Bar is open. Nat is available Sunday.\n                *   *Can Mary work Bar on Sunday?* Mary is off Sunday.\n                *   *Conclusion:* Mary must work Bar on Thursday. Nat must work Bar on Sunday.\n\n    *   **Thursday Schedule Adjustment:**\n        *   **Bar:** Leo (BB), Carrie (3pm), Sarah (6pm).\n            *   *Mary Request:* Mary needs Bar. She is a server. Can she work Bar? Yes.\n            *   *Conflict:* If Mary works Bar, she can't work Serve 3pm.\n            *   *Solution:* Mary takes the 3pm Bar slot? Or 6pm?\n            *   *Let's assume Mary takes the 3pm Bar slot (replacing Carrie? No, Carrie is there). Or does she fill an open slot?*\n            *   *Actually, the prompt says:* \"Bar Open 3pm-Carrie; Bar 6pm-Sarah\". If Mary works Bar, she must replace someone or fill a gap.\n            *   *Let's assume Mary replaces Carrie at 3pm Bar?* No, that pushes Carrie out.\n            *   *Let's assume Mary works Bar 6pm?* Sarah is there.\n            *   *Maybe Mary works Bar 3pm and Sarah works 6pm, and Carrie is moved?*\n            *   *Simpler interpretation:* Mary works a Bar shift. Since she is normally a server, she must fill a slot.\n            *   *Let's look at the \"Serve 6pm\" constraint again:* \"Don't fill in both shifts for the 6pm serve shift... we can do it with just two servers for that day.\"\n            *   *Interpretation:* Normally there are 3 serve slots (3pm, 6pm, 6pm). We want to reduce to 2 total servers for the day.\n            *   *Plan:*\n                *   Serve 3pm: Mary (Normal).\n                *   Serve 6pm: 1 person (Covering Brett/Ray).\n                *   *But Mary needs Bar.*\n                *   *Alternative:* Mary works Bar 3pm. Serve 3pm needs cover. Serve 6pm needs cover. Total 2 covers.\n                *   *Who covers Serve 3pm?* Nat/Kelly off. Erin/Tom/Sally.\n                *   *Who covers Serve 6pm?* Erin/Tom/Sally.\n                *   *If we use Erin and Tom:* We have 2 covers.\n                *   *But we need to prioritize normal staff.*\n                *   *Let's try to keep Mary on Serve 3pm and move her to Bar 6pm?* No, Sarah is there.\n                *   *Let's try to move Mary to Bar 3pm.* Then Serve 3pm needs cover. Serve 6pm needs cover.\n                *   *Is there a way to have Mary work Bar and Serve?* No, she can't do 3pm Serve and 3pm Bar.\n                *   *Let's assume Mary works Bar 3pm.*\n                *   *Serve 3pm:* Needs cover.\n                *   *Serve 6pm:* Needs cover.\n                *   *Total Servers:* 2 (Cover 3pm + Cover 6pm).\n                *   *Who?* Erin and Tom. (Sally is free Thu).\n                *   *Can we use Sally?* Yes.\n                *   *Can we use Nat?* No, off Thu.\n                *   *Can we use Kelly?* No, off Thu.\n                *   *So Thursday Serve:* Erin/Tom/Sally.\n                *   *Thursday Bar:* Mary (3pm), Carrie (3pm? No, Mary replaces Carrie?), Sarah (6pm).\n                *   *Wait, if Mary works Bar 3pm, who works Serve 3pm?*\n                *   *Let's try to keep Mary on Serve 3pm and give her Bar on Sunday?* No, Mary is off Sunday.\n                *   *So Mary MUST work Bar on Thursday.*\n                *   *If Mary works Bar 3pm:* She replaces Carrie? Or is an extra?\n                *   *Let's assume Mary replaces Carrie at 3pm Bar.*\n                *   *Then Serve 3pm needs cover.*\n                *   *Serve 6pm needs cover.*\n                *   *Total 2 covers.*\n                *   *Who?* Erin, Tom, Sally.\n                *   *Constraint:* \"Don't fill in both shifts for the 6pm serve shift... do it with just two servers.\"\n                *   *This implies the total server count for Thursday is 2.*\n                *   *So:* Serve 3pm (Cover) + Serve 6pm (Cover) = 2 people.\n                *   *Who?* Erin and Tom (or Sally).\n                *   *Let's pick Erin and Tom.*\n                *   *But wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Tom** (3pm) and **Erin/Tom** (6pm)? No, one person can't do both if we need 2 people total?\n                *   *If we need 2 people total for the day:*\n                    *   Person A: Serve 3pm.\n                    *   Person B: Serve 6pm.\n                *   *Who?* Erin and Tom.\n                *   *What about Mary?* Mary works Bar 3pm.\n                *   *What about Carrie?* Carrie is off? Or moved?\n                *   *If Mary replaces Carrie:* Carrie is off.\n                *   *If Mary is extra:* We have 3 Bar staff.\n                *   *Let's assume Mary replaces Carrie.*\n                *   *Thursday Bar:* Leo, **Mary**, Sarah.\n                *   *Thursday Serve:* **Erin** (3pm), **Tom** (6pm). (Or Sally).\n                *   *Wait, can we use Sally?* Yes.\n                *   *Can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Tom/Sally**.\n                *   *Let's try to minimize temps.*\n                *   *Is there a normal server available?*\n                *   *Nat/Kelly off.*\n                *   *Mary on Bar.*\n                *   *Brett/Ray out.*\n                *   *So we MUST use temps for Serve.*\n                *   *Who?* Erin, Tom, Sally.\n                *   *Let's assign Erin to 3pm and Tom to 6pm.*\n                *   *But the prompt says:* \"Don't fill in both shifts for the 6pm serve shift... we can do it with just two servers for that day.\"\n                *   *This confirms 2 servers total.*\n                *   *So:* **Erin** (3pm) and **Tom** (6pm).\n                *   *Wait, can we use Sally?* Yes.\n                *   *Let's use Erin and Sally to avoid Tom if possible.*\n                *   *Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm)? No, need 2 people.\n                *   *Let's say Erin (3pm) and Sally (6pm).*\n                *   *But wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm)? No, distinct people.\n                *   *Let's say Erin (3pm) and Sally (6pm).*\n                *   *But the prompt says:* \"If multiple people could possibly fill the shift, put both of their names there with a slash\".\n                *   *So:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm)? No, that implies they can do either.\n                *   *Let's just list the available pool for the 2 slots.*\n                *   *Actually, let's re-read:* \"Don't fill in both shifts for the 6pm serve shift... we can do it with just two servers for that day.\"\n                *   *This means: Serve 3pm (1 person) + Serve 6pm (1 person) = 2 people.*\n                *   *Who?* Erin, Tom, Sally.\n                *   *Let's assign:* **Erin** (3pm) and **Sally** (6pm). (Avoiding Tom).\n                *   *But wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm)? No, that's confusing.\n                *   *Let's just list the names for the shifts.*\n                *   *Shift 1 (3pm):* **Erin/Sally**\n                *   *Shift 2 (6pm):* **Erin/Sally**\n                *   *Wait, if Erin does 3pm, Sally does 6pm.*\n                *   *Let's just put **Erin/Sally** for both shifts to indicate the pool.*\n                *   *But the prompt says:* \"put both of their names there with a slash\".\n                *   *So:* **Erin/Sally** for 3pm, **Erin/Sally** for 6pm.\n                *   *But wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's use Erin and Sally.*\n                *   *Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, if Erin does 3pm, she can't do 6pm? No, she can work both if needed, but we want 2 people.*\n                *   *Let's assume we need 2 distinct people.*\n                *   *So:* **Erin** (3pm) and **Sally** (6pm).\n                *   *But the prompt says:* \"If multiple people could possibly fill the shift, put both of their names there with a slash\".\n                *   *So:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, if I put Erin/Sally for 3pm, and Erin/Sally for 6pm, it implies either can do either.*\n                *   *Yes.*\n                *   *But wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *But wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (6pm).\n                *   *Wait, can we use Tom?* Yes, but we prefer not to.\n                *   *So the pool is Erin, Sally, Tom.*\n                *   *Let's just put **Erin/Sally** for both.*\n                *   *Wait, can we use Nat?* No.\n                *   *Can we use Kelly?* No.\n                *   *So Thursday Serve:* **Erin/Sally** (3pm) and **Erin/Sally** (",
+        "qwen-397b": "Here is the finalized schedule for Thursday through Sunday, incorporating all time-off requests, staffing constraints, and your specific preferences for Mary and Nat.\n\n### **Staffing Constraints & Logic Applied:**\n*   **Out of Town:** Ray, Pablo, and Brett are removed from all shifts.\n*   **Time Off:** Nat/Kelly (Thu), Mary (Sun).\n*   **4-Day Rule:** No one works 4 consecutive days.\n    *   *Note:* Since Ray, Pablo, and Brett are gone, the remaining staff naturally avoid 4-day streaks in this specific scenario.\n*   **Bar Shifts:** Only Barbacks/Bartenders + Greg (standby). Mary and Nat given priority for Thu/Sun bar shifts.\n*   **Server Shifts:** Erin, Tom (avoid), Sally (Sat/Sun unavailable).\n*   **Thursday 6pm Serve:** Kept to 2 servers as requested.\n\n---\n\n### **Final Schedule: Thursday – Sunday**\n\n#### **Thursday**\n*   **Barback:** Leo\n*   **Bar Open (3pm):** **Mary** *(Moved from Serve to fill Bar slot per request)*\n*   **Bar (6pm):** Sarah\n*   **Serve Open (3pm):** **Nat** *(Moved from Serve to fill Bar slot? Wait, re-reading constraint: \"Give Mary and Nat the opportunity to work a bar shift\". Let's adjust: Mary takes Bar Open. Nat is off Thu. Who takes Serve Open?)*\n    *   *Correction on Logic:* Nat is off Thursday. Mary has plans Sunday but is free Thursday.\n    *   *Revised Thursday Plan:*\n        *   **Bar Open (3pm):** **Mary** (Filling in for Carrie who is normally here, giving Mary the bar opportunity).\n        *   **Bar (6pm):** Sarah.\n        *   **Serve Open (3pm):** **Erin** (Nat is off, Mary moved to Bar. Need a server. Erin is the best temp option).\n        *   **Serve (6pm):** **Kelly / Erin** -> *Wait, Kelly is off Thursday.*\n        *   *Re-evaluating Thursday Serve:*\n            *   Normal: Mary (Open), Brett (6pm), Ray (6pm).\n            *   Availability: Mary (Moved to Bar), Brett (Out), Ray (Out), Nat (Off), Kelly (Off).\n            *   Remaining Normal Servers: None available for these specific slots except potentially moving someone? No, only Mary was normal.\n            *   Temps needed: We need an Open server and two 6pm servers? You said \"don't fill in both shifts for the 6pm serve... do it with just two servers.\"\n            *   Current Staffing:\n                *   Open Serve: **Erin** (Temp).\n                *   6pm Serve: We need 2 people total for the night or 2 people at 6pm? \"Don't fill in both shifts for the 6pm serve shift... we can do it with just two servers for that day.\" This implies reducing the headcount.\n                *   Let's assign **Erin** (Open) and **Sally** (6pm)? Sally is available Thu. Or **Tom**? You prefer not to use Tom.\n                *   Let's try: **Serve Open:** Erin. **Serve 6pm:** Sally. (Total 2 servers).\n                *   *Wait, can we move a bartender to serve?* No, usually distinct roles.\n                *   *Let's look at the \"Normal\" list again.* Thursday Normal Serve: Mary, Brett, Ray. All three are unavailable (Mary moved to Bar, Brett/Ray out of town). Nat/Kelly off.\n                *   **Result:** We need temps for all server shifts.\n                *   **Decision:** Serve Open: **Erin**. Serve 6pm: **Sally**. (Avoiding Tom).\n\n*   **Revised Thursday Final:**\n    *   Barback: Leo\n    *   Bar Open: **Mary**\n    *   Bar 6pm: Sarah\n    *   Serve Open: **Erin**\n    *   Serve 6pm: **Sally** *(Only one 6pm shift listed to keep headcount to 2 total servers)*\n\n#### **Friday**\n*   **Barback:** Leo\n*   **Bar Open (3pm):** Joe\n*   **Bar (6pm):** Carrie\n*   **Bar (8pm):** Sarah / Ken\n*   **Serve Open (3pm):** Nat / Mary *(Both available. Nat normally works here. Mary is free. Let's give Nat her normal shift, add Mary for coverage if needed, but let's stick to normal first. Nat is normal. Mary is free. Let's put **Nat** and **Mary** to ensure coverage since Ray/Brett are gone from other days? No, Friday normal is Nat, Mary, Kelly, Ray. Ray is out. So we need to replace Ray's 6pm shift.)*\n    *   Normal Serve: Nat (Open), Mary (Open), Kelly (6pm), Ray (6pm).\n    *   Status: Nat (OK), Mary (OK), Kelly (OK), Ray (Out).\n    *   Gap: One 6pm server needed.\n    *   Options: Erin, Tom, Sally. Sally is likely free Fri.\n    *   **Serve 6pm:** **Kelly / Sally** (Kelly is normal, Sally fills Ray's spot).\n\n*   **Revised Friday Final:**\n    *   Barback: Leo\n    *   Bar Open: Joe\n    *   Bar 6pm: Carrie\n    *   Bar 8pm: Sarah / Ken\n    *   Serve Open: Nat / Mary\n    *   Serve 6pm: **Kelly / Sally**\n\n#### **Saturday**\n*   **Barback:** **Greg** *(Brett is out of town. Leo worked Thu/Fri. Can Leo work Sat? Yes, but usually Barback is specific. If Leo is the only other barback, he can work. But let's check 4-day rule. Leo: Thu, Fri, Sat = 3 days. OK. However, you said \"Only barbacks or bartenders can fill in at the bar\". Greg is standby. Let's try Leo first as he is \"normally on schedule\" (Thu/Fri). Wait, Leo is only listed Thu/Fri normally. Is he a permanent staff? Assuming yes. Let's use **Leo** to save Greg.)*\n    *   *Correction:* If Leo works Thu, Fri, Sat, that's 3 days. Fine.\n    *   **Barback:** Leo\n*   **Bar Open (3pm):** Sarah\n*   **Bar (6pm):** Joe\n*   **Bar (8pm):** Carrie / Ken\n*   **Serve Open (3pm):** Nat / **Erin** *(Pablo is out. Normal: Nat, Pablo. Need replacement for Pablo. Sally has another job Sat. Tom is disliked. Erin is the best bet.)*\n*   **Serve (6pm):** Kelly / Mary *(Normal: Kelly, Mary. Both available.)*\n\n*   **Revised Saturday Final:**\n    *   Barback: Leo\n    *   Bar Open: Sarah\n    *   Bar 6pm: Joe\n    *   Bar 8pm: Carrie / Ken\n    *   Serve Open: **Nat / Erin**\n    *   Serve 6pm: Kelly / Mary\n\n#### **Sunday**\n*   **Bar Open (3pm):** **Nat** *(Ray is out. You wanted Nat/Mary to have a bar shift on a slow day. Mary has plans Sunday. So Nat takes the Bar shift.)*\n*   **Serve Open (3pm):** **Mary** *(Pablo is out. Mary is free Sunday? Wait, prompt says \"Mary has plans on Sunday.\" Ah, caught that. Mary is OUT Sunday.)*\n    *   *Re-evaluating Sunday:*\n    *   Bar Open: Ray (Out). Need Bar. Nat is available. **Nat** takes Bar.\n    *   Serve Open: Pablo (Out). Mary (Out).\n    *   Who is left for Serve?\n        *   Normal Servers: None (Pablo out, Mary out).\n        *   Temps: Sally (has other job Sun), Tom (disliked), Erin (Available?).\n        *   If Erin worked Sat Open, can she work Sun? Yes.\n        *   If we used Erin Sat, can we use her again? Yes.\n        *   Is there anyone else? \"Erin, Tom, and Sally can possibly fill in\".\n        *   Sally: No (other job).\n        *   Tom: Avoid.\n        *   Erin: Best option.\n        *   If Erin is the only option, she takes it. If we need more, we might need **Greg** (if he serves? Prompt says \"Greg on standby to fill in if need be\" generally, but earlier said \"Only barbacks or bartenders can fill in at the bar\". It doesn't restrict Greg from serving. But let's assume Greg is a bartender/barback utility).\n        *   Let's check if any bartenders can serve? Usually no.\n        *   So Serve Open Sunday: **Erin**.\n        *   Do we need a second server? Sunday is usually slow. \"Serve Open 3pm-Pablo\" was the only normal shift listed for Sunday serve. So we just need 1 person. Erin fits.\n\n*   **Revised Sunday Final:**\n    *   Bar Open: **Nat**\n    *   Serve Open: **Erin**\n\n---\n\n### **Consolidated Final Schedule**\n\n**Thursday**\n*   Barback: Leo\n*   Bar Open (3pm): **Mary**\n*   Bar (6pm): Sarah\n*   Serve Open (3pm): **Erin**\n*   Serve (6pm): **Sally** *(Reduced to 1 shift to meet \"2 servers total\" requirement)*\n\n**Friday**\n*   Barback: Leo\n*   Bar Open (3pm): Joe\n*   Bar (6pm): Carrie\n*   Bar (8pm): Sarah / Ken\n*   Serve Open (3pm): Nat / Mary\n*   Serve (6pm): **Kelly / Sally**\n\n**Saturday**\n*   Barback: Leo\n*   Bar Open (3pm): Sarah\n*   Bar (6pm): Joe\n*   Bar (8pm): Carrie / Ken\n*   Serve Open (3pm): **Nat / Erin**\n*   Serve (6pm): Kelly / Mary\n\n**Sunday**\n*   Bar Open (3pm): **Nat**\n*   Serve Open (3pm): **Erin**\n\n---\n\n### **Summary of Unfilled/Temp Shifts (Bolded in logic above, summarized here):**\n*   **Thursday Serve Open:** **Erin** (Temp - Normal staff unavailable)\n*   **Thursday Serve 6pm:** **Sally** (Temp - Normal staff unavailable)\n*   **Friday Serve 6pm:** **Sally** (Temp filling for Ray)\n*   **Saturday Serve Open:** **Erin** (Temp filling for Pablo)\n*   **Sunday Bar Open:** **Nat** (Internal move to cover Ray, satisfies \"Nat/Mary bar shift\" request)\n*   **Sunday Serve Open:** **Erin** (Temp - Normal staff unavailable)\n\n*Note: No shifts were left with a question mark (**?**) as Erin and Sally were able to cover the gaps without needing Tom, Greg, or you to step in. Mary successfully took a Bar shift on Thursday, and Nat took a Bar shift on Sunday.*"
+      },
+      "criteria_passed": {
+        "qwen-9b": "0/19",
+        "qwen-35b": "10/19",
+        "qwen-397b": "0/19"
+      },
+      "full_pass": {
+        "qwen-9b": false,
+        "qwen-35b": false,
+        "qwen-397b": false
+      },
+      "criteria": [
+        {
+          "text": "The response should exclude Brett, Ray, and Pablo from Thursday's shift due to time off.",
+          "verifiability": "auto",
+          "gameable": true,
+          "reward_hack": "Leave Thursday's shifts blank or omit names entirely so the excluded names are trivially absent without producing a valid schedule.",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": true,
+              "reason": "Response never assigns Brett, Ray, or Pablo to any Thursday shift in its coverage plan."
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should not schedule more than one staff for the 6 pm serve shift on Thursday, more than one option is acceptable if separated by a \"/\".",
+          "verifiability": "auto",
+          "gameable": true,
+          "reward_hack": "List many names all separated by slashes, technically satisfying the format while not actually committing to a single staffing choice.",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": true,
+              "reason": "Tentative plan covers Thursday 6pm serve with one person (Erin/Sally options); no double-scheduling occurs."
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should exclude Brett, Ray, and Pablo from Friday's shift due to time off.",
+          "verifiability": "auto",
+          "gameable": true,
+          "reward_hack": "Leave Friday's shifts blank or unstaffed so the excluded names are trivially absent.",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": true,
+              "reason": "No Friday assignments include Brett, Ray, or Pablo; they are marked out all weekend."
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should include one of the following options for one of the 6pm serve shifts on Friday to replace Ray: Erin, Sally, or Tom.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "No Friday schedule or 6pm serve replacement is ever provided; response degenerates before reaching Friday."
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should exclude Brett, Ray, and Pablo from Saturday's shift due to time off.",
+          "verifiability": "auto",
+          "gameable": true,
+          "reward_hack": "Leave Saturday's shifts blank or unstaffed so the excluded names are trivially absent.",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": true,
+              "reason": "Response never assigns Brett, Ray, or Pablo to any Saturday shift."
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should exclude Brett, Ray, and Pablo from Saturday's barback shift due to time off.",
+          "verifiability": "auto",
+          "gameable": true,
+          "reward_hack": "Leave the Saturday barback shift blank so the excluded names are trivially absent.",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": true,
+              "reason": "Response never assigns Brett, Ray, or Pablo to Saturday barback."
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should include a schedule for exactly four days: Thursday, Friday, Saturday, Sunday.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "No final schedule is produced; only fragmented Thursday analysis before looping cutoff."
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should include a slash between names when there are two or more possibilities to fill-in a spot in the schedule. For example, if Sally and Erin are equally possible options for the same shift, the response should fill-in that shift with their names like \"Sally/Erin\" or \"Erin/Sally\".",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "No actual schedule is presented; slash usage appears only in incomplete looping analysis, not a schedule."
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should not use Greg or Tom as primary fill-in options. In other words, it should not put Greg or Tom in the schedule unless it specifically says that it is a backup.",
+          "verifiability": "judge",
+          "gameable": true,
+          "reward_hack": "Label Greg or Tom as 'backup' everywhere while effectively relying on them as the primary fill-in for shifts.",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": true,
+              "reason": "Greg and Tom are never placed in any shift assignment; Tom is explicitly avoided."
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should not include Mary for any shift on Sunday.",
+          "verifiability": "auto",
+          "gameable": true,
+          "reward_hack": "Leave Sunday shifts blank or unstaffed so Mary is trivially absent.",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": true,
+              "reason": "Mary is never assigned to Sunday; response notes she is off Sunday."
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should not include Nat or Kelly on the schedule for any shift on Thursday.",
+          "verifiability": "auto",
+          "gameable": true,
+          "reward_hack": "Leave Thursday shifts blank or unstaffed so Nat and Kelly are trivially absent.",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": true,
+              "reason": "Nat and Kelly are never assigned Thursday shifts; response repeatedly excludes them."
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should not include Sally for any shift on Saturday or Sunday.",
+          "verifiability": "auto",
+          "gameable": true,
+          "reward_hack": "Leave Saturday/Sunday shifts blank so Sally is trivially absent.",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": true,
+              "reason": "Sally is never assigned Saturday or Sunday shifts."
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should bold the shift names that need to be covered by people not normally on the schedule (Erin, Tom, Sally, and Greg). For example it should bold the \"Serve 6pm:\" shift as the server options do not include people normally on the schedule (Erin/Sally).",
+          "verifiability": "auto",
+          "gameable": true,
+          "reward_hack": "Bold every shift name indiscriminately, guaranteeing the required ones are bolded without identifying which shifts actually need outside coverage.",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "No final schedule with bolded shift names; only names bolded in rambling analysis."
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should not include any name as the only option to fill a spot in the schedule for four days in a row. For example, no one person can be listed as the only option to work Thursday, Friday, Saturday, and Sunday.",
+          "verifiability": "auto",
+          "gameable": true,
+          "reward_hack": "Add an arbitrary slash-separated alternative name on one day to break the four-day streak without genuinely balancing the schedule.",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": true,
+              "reason": "No one is listed as sole option across four days; only Thursday assignments exist."
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should not leave a shift blank if it cannot find a current or temporary staff member to fill that shift, instead it should place a bolded question mark where it would normally list a name(s).",
+          "verifiability": "auto",
+          "gameable": true,
+          "reward_hack": "Place bolded question marks on shifts instead of making a genuine effort to fill them with available staff.",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "Friday, Saturday, and Sunday shifts left entirely unaddressed/blank; no schedule or question marks provided."
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should include the following shifts on the schedule for Thursday: Barback, Bar Open 3 pm, Bar 6 pm, Serve Open 3 pm, Serve 6 pm.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "No schedule is presented; Thursday shifts appear only in incomplete, contradictory analysis."
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should include the following shifts on the schedule for Friday: Barback, Bar Open 3 pm, Bar 6 pm, Bar 8 pm, Bar 8 pm, Serve Open 3 pm, Serve Open 3 pm, Serve 6 pm, Serve 6 pm.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "Friday schedule and its shifts are never included; response cuts off before Friday."
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should include the following shifts on the schedule for Saturday: Barback, Bar Open 3 pm, Bar 6 pm, Bar 8 pm, Bar 8 pm, Serve Open 3 pm, Serve Open 3 pm, Serve 6 pm, Serve 6 pm.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "Saturday schedule and its shifts are never included."
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should include the following shifts on the schedule for Sunday: Bar Open 3 pm, Serve Open 3 pm.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "Sunday schedule with Bar Open 3pm and Serve Open 3pm is never presented."
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "CIF-003",
+      "use_case": "Data Processing, Formatting & Math",
+      "instruction_type": "Multistep",
+      "prompt_style": "Rambling/Stream-of-Consciousness",
+      "prompt_text": "Right ok so I’m ta’ing for a class and we need to do some grade calculations and analysis. There are 30 students, 7 assignments each, all of them out of 25 points. So the category of assignments these are in will add up to 175 points but i also need the percentage for each student. And i want a per student breakdown but then also one that looks at each assignment for the class as a whole.\nSo first would be the per student breakdown so give me a list of all the students. I need their point total out of 175 first, then their percentage, then their letter grade based on this scale:\nA+ = 97–100%\nA = 93–96%\nA− = 90–92%\nB+ = 87–89%\nB = 83–86%\nB− = 80–82%\nC+ = 77–79%\nC = 73–76%\nC− = 70–72%\nD+ = 67–69%\nD = 63–66%\nD− = 60–62%\nF = 0–59%\nThen after that i need to know each student’s best assignment and worst assignment, and if they have multiple best/worst assignments, you can list them all. So like if someone scores 25 on assignments 4 and 7, you can list assignments 4 and 7 for their best assignments. List best first then worst.\nOh and make the student list alphabetical by last initial, write the point total in bold and like “167/175,” bold the percentage, and bold the letter grade. Put the letter grade in parentheses next to the percentage. don’t list them using bullets/numbers. And the student names should be bolded and capitalized.\n\nSo then for the second part, i want a breakdown by assignment, so for each assignment i need some stats. Tell me the average score of the assignment, in points and then in percentage with the letter grade in parentheses next to the percentage. If any students get a perfect score, list their names next, and same for if any students get a zero. Put the assignment name (e.g., “assignment #4”) in bold.\n\nOh and for the first part, the student breakdown, underneath everything you already listed, if any student has a 0 on an assignment, put a note saying so and specifying the assignment, like this: “*0 on assignment #_” so the prof knows to talk to them. If any student has a grade of C or below, also list a note that says “*low grade, professor to meet with student”\n\nAnd then at the end of the second part, tell me which assignment has the best average score and which has the worst.\n\nLauren A. — assignment #1: 23, assignment #2: 19, assignment #3: 25, assignment #4: 22, assignment #5: 24, assignment #6: 20, assignment #7: 21\nAllison B. — assignment #1: 18, assignment #2: 24, assignment #3: 22, assignment #4: 20, assignment #5: 23, assignment #6: 21, assignment #7: 19\nNatalie B. — assignment #1: 25, assignment #2: 23, assignment #3: 21, assignment #4: 24, assignment #5: 22, assignment #6: 20, assignment #7: 19\nDavid C. — assignment #1: 17, assignment #2: 20, assignment #3: 22, assignment #4: 19, assignment #5: 18, assignment #6: 23, assignment #7: 21\nCaroline D. — assignment #1: 24, assignment #2: 25, assignment #3: 22, assignment #4: 23, assignment #5: 21, assignment #6: 20, assignment #7: 19\nHannah E. — assignment #1: 22, assignment #2: 21, assignment #3: 0, assignment #4: 23, assignment #5: 24, assignment #6: 20, assignment #7: 18\nCharles F. — assignment #1: 19, assignment #2: 17, assignment #3: 21, assignment #4: 18, assignment #5: 22, assignment #6: 20, assignment #7: 23\nBrian G. — assignment #1: 23, assignment #2: 22, assignment #3: 20, assignment #4: 21, assignment #5: 24, assignment #6: 19, assignment #7: 18\nCaitlin H. — assignment #1: 21, assignment #2: 23, assignment #3: 19, assignment #4: 22, assignment #5: 20, assignment #6: 18, assignment #7: 24\nSamuel H. — assignment #1: 20, assignment #2: 24, assignment #3: 22, assignment #4: 19, assignment #5: 23, assignment #6: 21, assignment #7: 18\nLily I. — assignment #1: 25, assignment #2: 22, assignment #3: 20, assignment #4: 23, assignment #5: 21, assignment #6: 19, assignment #7: 18\nDaniel J. — assignment #1: 18, assignment #2: 21, assignment #3: 23, assignment #4: 19, assignment #5: 22, assignment #6: 0, assignment #7: 24\nAshley K. — assignment #1: 22, assignment #2: 19, assignment #3: 24, assignment #4: 21, assignment #5: 20, assignment #6: 23, assignment #7: 18\nOliver K. — assignment #1: 23, assignment #2: 25, assignment #3: 21, assignment #4: 22, assignment #5: 20, assignment #6: 24, assignment #7: 0\nChristian L. — assignment #1: 20, assignment #2: 18, assignment #3: 22, assignment #4: 23, assignment #5: 21, assignment #6: 19, assignment #7: 24\nBenjamin M. — assignment #1: 24, assignment #2: 23, assignment #3: 21, assignment #4: 22, assignment #5: 20, assignment #6: 19, assignment #7: 25\nEmily N. — assignment #1: 23, assignment #2: 21, assignment #3: 20, assignment #4: 22, assignment #5: 24, assignment #6: 19, assignment #7: 18\nGrace O. — assignment #1: 22, assignment #2: 24, assignment #3: 23, assignment #4: 21, assignment #5: 20, assignment #6: 19, assignment #7: 18\nChloe P. — assignment #1: 21, assignment #2: 23, assignment #3: 19, assignment #4: 20, assignment #5: 22, assignment #6: 24, assignment #7: 18\nElla Q. — assignment #1: 20, assignment #2: 18, assignment #3: 22, assignment #4: 19, assignment #5: 21, assignment #6: 23, assignment #7: 24\nAiden R. — assignment #1: 24, assignment #2: 23 ,assignment #3: 21, assignment #4: 19, assignment #5: 20, assignment #6: 22, assignment #7: 18\nBrandon S. — assignment #1: 23, assignment #2: 22, assignment #3: 19, assignment #4: 21, assignment #5: 20, assignment #6: 24, assignment #7: 18\nWilliam S. — assignment #1: 22, assignment #2: 20, assignment #3: 23, assignment #4: 21, assignment #5: 19, assignment #6: 24, assignment #7: 18\nAndrew T. — assignment #1: 19, assignment #2: 24, assignment #3: 22, assignment #4: 23, assignment #5: 20, assignment #6: 21, assignment #7: 18\nJames U. — assignment #1: 21, assignment #2: 23, assignment #3: 24, assignment #4: 0, assignment #5: 22, assignment #6: 19, assignment #7: 18\nDylan V. — assignment #1: 20, assignment #2: 21, assignment #3: 19, assignment #4: 22, assignment #5: 23, assignment #6: 18, assignment #7: 24\nCaleb W. — assignment #1: 23, assignment #2: 22, assignment #3: 24, assignment #4: 20, assignment #5: 19, assignment #6: 21, assignment #7: 18\nMadison X. — assignment #1: 24, assignment #2: 20, assignment #3: 16, assignment #4: 21, assignment #5: 23, assignment #6: 19, assignment #7: 18\nEthan Y. — assignment #1: 22, assignment #2: 21, assignment #3: 20, assignment #4: 23, assignment #5: 24, assignment #6: 19, assignment #7: 18\nJacob Z. — assignment #1: 21, assignment #2: 20, assignment #3: 23, assignment #4: 24, assignment #5: 19, assignment #6: 18, assignment #7: 22",
+      "responses": {
+        "qwen-9b": "**ALLISON B.** 165/175 (94.3%) **A**\n**AIDEN R.** 162/175 (92.6%) **A-**\n**ALEXANDER T.** 162/175 (92.6%) **A-**\n**ASHLEY K.** 168/175 (96.0%) **A**\n**BENJAMIN M.** 172/175 (98.3%) **A+**\n**BRANDON S.** 165/175 (94.3%) **A**\n**CALEB W.** 164/175 (93.7%) **A**\n**CAROLINE D.** 164/175 (93.7%) **A**\n**CHLOE P.** 168/175 (96.0%) **A**\n**CHRISTIAN L.** 168/175 (96.0%) **A**\n**DAVID C.** 163/175 (93.1%) **A**\n**DANIEL J.** 160/175 (91.4%) **A-**\n*0 on assignment #6*\n**DYLAN V.** 167/175 (95.4%) **A**\n**ELLA Q.** 167/175 (95.4%) **A**\n**EMILY N.** 164/175 (93.7%) **A**\n**ETHAN Y.** 167/175 (95.4%) **A**\n**GRACE O.** 164/175 (93.7%) **A**\n**HANNAH E.** 162/175 (92.6%) **A-**\n*0 on assignment #3*\n**HARRIS F.** 160/175 (91.4%) **A-**\n**JACOB Z.** 165/175 (94.3%) **A**\n**JAMES U.** 160/175 (91.4%) **A-**\n*0 on assignment #4*\n**LAUREN A.** 166/175 (94.9%) **A**\n**LILY I.** 165/175 (94.3%) **A**\n**MADISON X.** 159/175 (90.9%) **A-**\n*low grade, professor to meet with student*\n**NATALIE B.** 165/175 (94.3%) **A**\n**OLIVER K.** 164/175 (93.7%) **A**\n*0 on assignment #7*\n**SAMUEL H.** 164/175 (93.7%) **A**\n**WILLIAM S.** 164/175 (93.7%) **A**\n**ALLISON B.** 165/175 (94.3%) **A**\n**AIDEN R.** 162/175 (92.6%) **A-**\n**ALEXANDER T.** 162/175 (92.6%) **A-**\n**ASHLEY K.** 168/175 (96.0%) **A**\n**BENJAMIN M.** 172/175 (98.3%) **A+**\n**BRANDON S.** 165/175 (94.3%) **A**\n**CALEB W.** 164/175 (93.7%) **A**\n**CAROLINE D.** 164/175 (93.7%) **A**\n**CHLOE P.** 168/175 (96.0%) **A**\n**CHRISTIAN L.** 168/175 (96.0%) **A**\n**DAVID C.** 163/175 (93.1%) **A**\n**DANIEL J.** 160/175 (91.4%) **A-**\n*0 on assignment #6*\n**DYLAN V.** 167/175 (95.4%) **A**\n**ELLA Q.** 167/175 (95.4%) **A**\n**EMILY N.** 164/175 (93.7%) **A**\n**ETHAN Y.** 167/175 (95.4%) **A**\n**GRACE O.** 164/175 (93.7%) **A**\n**HANNAH E.** 162/175 (92.6%) **A-**\n*0 on assignment #3*\n**HARRIS F.** 160/175 (91.4%) **A-**\n**JACOB Z.** 165/175 (94.3%) **A**\n**JAMES U.** 160/175 (91.4%) **A-**\n*0 on assignment #4*\n**LAUREN A.** 166/175 (94.9%) **A**\n**LILY I.** 165/175 (94.3%) **A**\n**MADISON X.** 159/175 (90.9%) **A-**\n*low grade, professor to meet with student*\n**NATALIE B.** 165/175 (94.3%) **A**\n**OLIVER K.** 164/175 (93.7%) **A**\n*0 on assignment #7*\n**SAMUEL H.** 164/175 (93.7%) **A**\n**WILLIAM S.** 164/175 (93.7%) **A**\n\n**assignment #1**\nAverage Score: 21.4/25 (85.6%) **B+**\nPerfect Scores: BENJAMIN M., CAROLINE D., LILY I., NATALIE B., OLIVER K.\nZero Scores: HANNAH E., JAMES U.\n\n**assignment #2**\nAverage Score: 21.6/25 (86.4%) **B+**\nPerfect Scores: ALLISON B., CAROLINE D., OLIVER K.\nZero Scores: None\n\n**assignment #3**\nAverage Score: 21.4/25 (85.6%) **B+**\nPerfect Scores: LAUREN A., NATALIE B., LILY I.\nZero Scores: HANNAH E.\n\n**assignment #4**\nAverage Score: 21.2/25 (84.8%) **B+**\nPerfect Scores: BENJAMIN M., JACOB Z.\nZero Scores: HANNAH E., JAMES U.\n\n**assignment #5**\nAverage Score: 21.6/25 (86.4%) **B+**\nPerfect Scores: BENJAMIN M., LAUREN A., OLIVER K.\nZero Scores: None\n\n**assignment #6**\nAverage Score: 20.6/25 (82.4%) **B-**\nPerfect Scores: BENJAMIN M.\nZero Scores: DANIEL J., OLIVER K.\n\n**assignment #7**\nAverage Score: 20.4/25 (81.6%) **B-**\nPerfect Scores: BENJAMIN M., CHRISTIAN L., DYLAN V.\nZero Scores: OLIVER K.\n\n**Best Assignment:** assignment #2 (86.4%)\n**Worst Assignment:** assignment #7 (81.6%)",
+        "qwen-35b": "### Student Breakdown\n\n**ALLISON B.**\n**151/175** (86.29%) (B)\nBest: Assignment #2 (24)\nWorst: Assignment #1 (18)\n\n**NATALIE B.**\n**154/175** (88.00%) (B+)\nBest: Assignment #1 (25)\nWorst: Assignment #7 (19)\n\n**DAVID C.**\n**140/175** (80.00%) (B-)\nBest: Assignment #6 (23)\nWorst: Assignment #1 (17)\n\n**CAROLINE D.**\n**154/175** (88.00%) (B+)\nBest: Assignment #2 (25)\nWorst: Assignment #7 (19)\n\n**HANNAH E.**\n**128/175** (73.14%) (C)\nBest: Assignment #5 (24)\nWorst: Assignment #3 (0)\n*0 on assignment #3\n*low grade, professor to meet with student\n\n**CHARLES F.**\n**140/175** (80.00%) (B-)\nBest: Assignment #7 (23)\nWorst: Assignment #2 (17)\n\n**BRIAN G.**\n**147/175** (84.00%) (B)\nBest: Assignment #5 (24)\nWorst: Assignment #7 (18)\n\n**CAITLIN H.**\n**147/175** (84.00%) (B)\nBest: Assignment #7 (24)\nWorst: Assignment #6 (18)\n\n**SAMUEL H.**\n**147/175** (84.00%) (B)\nBest: Assignment #2 (24)\nWorst: Assignment #7 (18)\n\n**LILY I.**\n**148/175** (84.57%) (B)\nBest: Assignment #1 (25)\nWorst: Assignment #7 (18)\n\n**DANIEL J.**\n**146/175** (83.43%) (B)\nBest: Assignment #7 (24)\nWorst: Assignment #6 (0)\n*0 on assignment #6\n\n**ASHLEY K.**\n**147/175** (84.00%) (B)\nBest: Assignment #3 (24)\nWorst: Assignment #7 (18)\n\n**OLIVER K.**\n**135/175** (77.14%) (C+)\nBest: Assignment #2 (25)\nWorst: Assignment #7 (0)\n*0 on assignment #7\n*low grade, professor to meet with student\n\n**CHRISTIAN L.**\n**147/175** (84.00%) (B)\nBest: Assignment #4 (23)\nWorst: Assignment #2 (18)\n\n**BENJAMIN M.**\n**154/175** (88.00%) (B+)\nBest: Assignment #7 (25)\nWorst: Assignment #6 (19)\n\n**EMILY N.**\n**147/175** (84.00%) (B)\nBest: Assignment #5 (24)\nWorst: Assignment #7 (18)\n\n**GRACE O.**\n**146/175** (83.43%) (B)\nBest: Assignment #2 (24)\nWorst: Assignment #7 (18)\n\n**CHLOE P.**\n**147/175** (84.00%) (B)\nBest: Assignment #6 (24)\nWorst: Assignment #7 (18)\n\n**ELLA Q.**\n**147/175** (84.00%) (B)\nBest: Assignment #7 (24)\nWorst: Assignment #2 (18)\n\n**AIDEN R.**\n**145/175** (82.86%) (B-)\nBest: Assignment #1 (24)\nWorst: Assignment #7 (18)\n\n**BRANDON S.**\n**146/175** (83.43%) (B)\nBest: Assignment #6 (24)\nWorst: Assignment #7 (18)\n\n**WILLIAM S.**\n**147/175** (84.00%) (B)\nBest: Assignment #6 (24)\nWorst: Assignment #7 (18)\n\n**ANDREW T.**\n**146/175** (83.43%) (B)\nBest: Assignment #4 (23)\nWorst: Assignment #7 (18)\n\n**JAMES U.**\n**127/175** (72.57%) (C-)\nBest: Assignment #3 (24)\nWorst: Assignment #4 (0)\n*0 on assignment #4\n*low grade, professor to meet with student\n\n**DYLAN V.**\n**145/175** (82.86%) (B-)\nBest: Assignment #5 (23)\nWorst: Assignment #6 (18)\n\n**CALEB W.**\n**147/175** (84.00%) (B)\nBest: Assignment #3 (24)\nWorst: Assignment #7 (18)\n\n**MADISON X.**\n**141/175** (80.57%) (B-)\nBest: Assignment #5 (23)\nWorst: Assignment #3 (16)\n\n**ETHAN Y.**\n**148/175** (84.57%) (B)\nBest: Assignment #5 (24)\nWorst: Assignment #7 (18)\n\n**JACOB Z.**\n**147/175** (84.00%) (B)\nBest: Assignment #4 (24)\nWorst: Assignment #6 (18)\n\n**LAUREN A.**\n**154/175** (88.00%) (B+)\nBest: Assignment #3 (25)\nWorst: Assignment #2 (19)\n\n---\n\n### Assignment Analysis\n\n**ASSIGNMENT #1**\nAverage: 21.23 points (84.92%) (B)\nPerfect Scores: Natalie B., Lily I.\nZero Scores: None\n\n**ASSIGNMENT #2**\nAverage: 21.33 points (85.33%) (B)\nPerfect Scores: Caroline D., Oliver K.\nZero Scores: None\n\n**ASSIGNMENT #3**\nAverage: 21.17 points (84.67%) (B)\nPerfect Scores: Lauren A., Natalie B.\nZero Scores: Hannah E.\n\n**ASSIGNMENT #4**\nAverage: 21.00 points (84.00%) (B)\nPerfect Scores: None\nZero Scores: James U.\n\n**ASSIGNMENT #5**\nAverage: 21.43 points (85.73%) (B)\nPerfect Scores: None\nZero Scores: None\n\n**ASSIGNMENT #6**\nAverage: 20.43 points (81.73%) (B-)\nPerfect Scores: None\nZero Scores: Daniel J.\n\n**ASSIGNMENT #7**\nAverage: 19.23 points (76.93%) (C+)\nPerfect Scores: None\nZero Scores: Oliver K.\n\n**Assignment with the Best Average Score:** Assignment #5 (85.73%)\n**Assignment with the Worst Average Score:** Assignment #7 (76.93%)",
+        "qwen-397b": "**LAUREN A.**\n**154/175** **88%** **(B+)**\nBest: Assignment #3\nWorst: Assignment #2\n\n**ALLISON B.**\n**147/175** **84%** **(B)**\nBest: Assignment #2\nWorst: Assignment #7\n\n**NATALIE B.**\n**154/175** **88%** **(B+)**\nBest: Assignment #1\nWorst: Assignment #6, Assignment #7\n\n**DAVID C.**\n**140/175** **80%** **(B−)**\nBest: Assignment #6\nWorst: Assignment #1\n*low grade, professor to meet with student\n\n**CAROLINE D.**\n**154/175** **88%** **(B+)**\nBest: Assignment #2\nWorst: Assignment #5, Assignment #6, Assignment #7\n\n**HANNAH E.**\n**128/175** **73%** **(C)**\nBest: Assignment #3, Assignment #5\nWorst: Assignment #3\n*0 on assignment #3\n*low grade, professor to meet with student\n\n**CHARLES F.**\n**140/175** **80%** **(B−)**\nBest: Assignment #7\nWorst: Assignment #2\n*low grade, professor to meet with student\n\n**BRIAN G.**\n**147/175** **84%** **(B)**\nBest: Assignment #5\nWorst: Assignment #6, Assignment #7\n\n**CAITLIN H.**\n**147/175** **84%** **(B)**\nBest: Assignment #7\nWorst: Assignment #6\n\n**SAMUEL H.**\n**147/175** **84%** **(B)**\nBest: Assignment #2, Assignment #5\nWorst: Assignment #4, Assignment #7\n\n**LILY I.**\n**148/175** **85%** **(B)**\nBest: Assignment #1\nWorst: Assignment #6, Assignment #7\n\n**DANIEL J.**\n**127/175** **73%** **(C)**\nBest: Assignment #7\nWorst: Assignment #6\n*0 on assignment #6\n*low grade, professor to meet with student\n\n**ASHLEY K.**\n**147/175** **84%** **(B)**\nBest: Assignment #3, Assignment #6\nWorst: Assignment #2, Assignment #5, Assignment #7\n\n**OLIVER K.**\n**135/175** **77%** **(C+)**\nBest: Assignment #2, Assignment #6\nWorst: Assignment #7\n*0 on assignment #7\n*low grade, professor to meet with student\n\n**CHRISTIAN L.**\n**145/175** **83%** **(B)**\nBest: Assignment #7\nWorst: Assignment #2\n\n**BENJAMIN M.**\n**157/175** **90%** **(A−)**\nBest: Assignment #7\nWorst: Assignment #5, Assignment #6\n\n**EMILY N.**\n**147/175** **84%** **(B)**\nBest: Assignment #5\nWorst: Assignment #3, Assignment #6, Assignment #7\n\n**GRACE O.**\n**147/175** **84%** **(B)**\nBest: Assignment #2, Assignment #3\nWorst: Assignment #5, Assignment #6, Assignment #7\n\n**CHLOE P.**\n**147/175** **84%** **(B)**\nBest: Assignment #6\nWorst: Assignment #3, Assignment #4, Assignment #7\n\n**ELLA Q.**\n**147/175** **84%** **(B)**\nBest: Assignment #7\nWorst: Assignment #2, Assignment #4\n\n**AIDEN R.**\n**150/175** **86%** **(B)**\nBest: Assignment #1, Assignment #2\nWorst: Assignment #4, Assignment #5, Assignment #7\n\n**BRANDON S.**\n**147/175** **84%** **(B)**\nBest: Assignment #6\nWorst: Assignment #3, Assignment #5, Assignment #7\n\n**WILLIAM S.**\n**147/175** **84%** **(B)**\nBest: Assignment #3, Assignment #6\nWorst: Assignment #5, Assignment #7\n\n**ANDREW T.**\n**147/175** **84%** **(B)**\nBest: Assignment #2\nWorst: Assignment #1, Assignment #5, Assignment #7\n\n**JAMES U.**\n**127/175** **73%** **(C)**\nBest: Assignment #3\nWorst: Assignment #4\n*0 on assignment #4\n*low grade, professor to meet with student\n\n**DYLAN V.**\n**147/175** **84%** **(B)**\nBest: Assignment #7\nWorst: Assignment #3, Assignment #6\n\n**CALEB W.**\n**147/175** **84%** **(B)**\nBest: Assignment #3\nWorst: Assignment #5, Assignment #7\n\n**MADISON X.**\n**141/175** **81%** **(B−)**\nBest: Assignment #1, Assignment #5\nWorst: Assignment #3\n*low grade, professor to meet with student\n\n**ETHAN Y.**\n**147/175** **84%** **(B)**\nBest: Assignment #5\nWorst: Assignment #3, Assignment #6, Assignment #7\n\n**JACOB Z.**\n**147/175** **84%** **(B)**\nBest: Assignment #4\nWorst: Assignment #2, Assignment #5, Assignment #6\n\n***\n\n**Assignment #1**\nAverage: 21.5 points (86%) (B)\nPerfect Scores: Natalie B., Lily I.\nZero Scores: None\n\n**Assignment #2**\nAverage: 21.6 points (86%) (B)\nPerfect Scores: Caroline D., Oliver K.\nZero Scores: None\n\n**Assignment #3**\nAverage: 20.9 points (84%) (B)\nPerfect Scores: Lauren A.\nZero Scores: Hannah E.\n\n**Assignment #4**\nAverage: 21.1 points (84%) (B)\nPerfect Scores: None\nZero Scores: James U.\n\n**Assignment #5**\nAverage: 21.2 points (85%) (B)\nPerfect Scores: None\nZero Scores: None\n\n**Assignment #6**\nAverage: 20.5 points (82%) (B−)\nPerfect Scores: None\nZero Scores: Daniel J.\n\n**Assignment #7**\nAverage: 19.9 points (80%) (B−)\nPerfect Scores: Benjamin M.\nZero Scores: Oliver K.\n\n**Summary:**\nBest Average Score: Assignment #2 (21.6 points)\nWorst Average Score: Assignment #7 (19.9 points)"
+      },
+      "criteria_passed": {
+        "qwen-9b": "14/34",
+        "qwen-35b": "0/34",
+        "qwen-397b": "0/34"
+      },
+      "full_pass": {
+        "qwen-9b": false,
+        "qwen-35b": false,
+        "qwen-397b": false
+      },
+      "criteria": [
+        {
+          "text": "The response should be organized into two distinct sections, with the \"per-student breakdown\" appearing first and the \"per-assignment breakdown\" appearing second.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": true,
+              "reason": "Student breakdown appears first, assignment breakdown second."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should correctly list all 30 students in the per-student breakdown section, ordered alphabetically by their last initial: Lauren A., Allison B., Natalie B., David C., Caroline D., Hannah E., Charles F., Brian G., Caitlin H., Samuel H., Lily I., Daniel J., Ashley K., Oliver K., Christian L., Benjamin M., Emily N., Grace O., Chloe P., Ella Q., Aiden R., Brandon S., William S., Andrew T., James U., Dylan V., Caleb W., Madison X., Ethan Y., and Jacob Z.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "Sorted by first name; missing Brian G., Caitlin H., Charles F., Andrew T.; list duplicated."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should not use markdown bullet points or a markdown numbered list for the per-student breakdown, apart from asterisks for inline notes.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": true,
+              "reason": "No bullets or numbered lists used for student breakdown."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should format each student's name in the per-student breakdown in bold and capitalized. For example, students should be listed as \"**LAUREN A.**\".",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": true,
+              "reason": "Names are bolded and capitalized, e.g., **ALLISON B.**."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should correctly calculate and display each student's total points out of 175: Lauren A.: 154/175, Allison B.: 147/175, Natalie B.: 154/175, David C.: 140/175, Caroline D.: 154/175, Hannah E.: 128/175, Charles F.: 140/175, Brian G.: 147/175, Caitlin H.: 147/175, Samuel H.: 147/175, Lily I.: 148/175, Daniel J.: 127/175, Ashley K.: 147/175, Oliver K.: 135/175, Christian L.: 147/175, Benjamin M.: 154/175, Emily N.: 147/175, Grace O.: 147/175, Chloe P.: 147/175, Ella Q.: 147/175, Aiden R.: 147/175, Brandon S.: 147/175, William S.: 147/175, Andrew T.: 147/175, James U.: 127/175, Dylan V.: 147/175, Caleb W.: 147/175, Madison X.: 141/175, Ethan Y.: 147/175, and Jacob Z.: 147/175.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "Totals are wrong, e.g., Lauren A. 166/175 vs correct 154/175."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should format each student's total points as a fraction out of 175.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": true,
+              "reason": "Totals shown as fractions out of 175, e.g., 165/175."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should bold each student's total points fraction.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "Point total fractions are not bolded."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should correctly calculate and display each students percentage: Lauren A.: 88%, Allison B.: 84%, Natalie B.: 88%, David C.: 80%, Caroline D.: 88%, Hannah E.: 73.1%, Charles F.: 80%, Brian G.: 84%, Caitlin H.: 84%, Samuel H.: 84%, Lily I.: 84.6%, Daniel J.: 72.6%, Ashley K.: 84%, Oliver K.: 77.1%, Christian L.: 84%, Benjamin M.: 88%, Emily N.: 84%, Grace O.: 84%, Chloe P.: 84%, Ella Q.: 84%, Aiden R.: 84%, Brandon S.: 84%, William S.: 84%, Andrew T.: 84%, James U.: 72.6%, Dylan V.: 84%, Caleb W.: 84%, Madison X.: 80.6%, Ethan Y.: 84%, and Jacob Z.: 84%.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "Percentages incorrect, e.g., Lauren A. 94.9% vs correct 88%."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should format each student's percentage in bold. For example, it should write the percentage as \"**77.1%**\".",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "Percentages are not bolded."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should list each student's letter grade in parentheses immediately following their percentage.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "Percentage is in parentheses; letter grade is not in parentheses after it."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should list each student's score as a fraction before their percentage.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": true,
+              "reason": "Fraction listed before percentage for each student."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should format each student's letter grade in bold. For example, it should write the letter grade as \"**B-**\".",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": true,
+              "reason": "Letter grades are bolded, e.g., **A-**."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should list each student's best assignment(s) before listing their worst assignment(s).",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "Best and worst assignments are not listed at all."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should correctly identify the best assignment(s) for each student which are exactly: Lauren A.: assignment #3, Allison B.: assignment #2, Natalie B.: assignment #1, David C.: assignment #6, Caroline D.: assignment #2, Hannah E.: assignment #5, Charles F.: assignment #7, Brian G.: assignment #5, Caitlin H.: assignment #7, Samuel H.: assignment #2, Lily I.: assignment #1, Daniel J.: assignment #7, Ashley K.: assignment #3, Oliver K.: assignment #2, Christian L.: assignment #7, Benjamin M.: assignment #7, Emily N.: assignment #5, Grace O.: assignment #2, Chloe P.: assignment #6, Ella Q.: assignment #7, Aiden R.: assignment #1, Brandon S.: assignment #6, William S.: assignment #6, Andrew T.: assignment #2, James U.: assignment #3, Dylan V.: assignment #7, Caleb W.: assignment #3, Madison X.: assignment #1, Ethan Y.: assignment #5, and Jacob Z.: assignment #4.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "No best assignments identified for any student."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should correctly identify the worst assignment(s) for each student: Lauren A.: assignment #2, Allison B.: assignment #1, Natalie B.: assignment #7, David C.: assignment #1, Caroline D.: assignment #7, Hannah E.: assignment #3, Charles F.: assignment #2, Brian G.: assignment #7, Caitlin H.: assignment #6, Samuel H.: assignment #7, Lily I.: assignment #7, Daniel J.: assignment #6, Ashley K.: assignment #7, Oliver K.: assignment #7, Christian L.: assignment #2, Benjamin M.: assignment #6, Emily N.: assignment #7, Grace O.: assignment #7, Chloe P.: assignment #7, Ella Q.: assignment #2, Aiden R.: assignment #7, Brandon S.: assignment #7, William S.: assignment #7, Andrew T.: assignment #7, James U.: assignment #4, Dylan V.: assignment #6, Caleb W.: assignment #7, Madison X.: assignment #3, Ethan Y.: assignment #7, and Jacob Z.: assignment #6.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "No worst assignments identified for any student."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should include a note that says \"*0 on assignment #3\" underneath the information for Hannah E.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": true,
+              "reason": "Note '*0 on assignment #3*' appears under Hannah E."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should include a note that says \"*0 on assignment #6\" underneath the information for Daniel J.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": true,
+              "reason": "Note '*0 on assignment #6*' appears under Daniel J."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should include a note that says \"*0 on assignment #7\" underneath the information for Oliver K.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": true,
+              "reason": "Note '*0 on assignment #7*' appears under Oliver K."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should include a note that says \"*0 on assignment #4\" underneath the information for James U.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": true,
+              "reason": "Note '*0 on assignment #4*' appears under James U."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should include a note that says \"*low grade, professor to meet with student\" underneath Hannah E.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "No low grade note under Hannah E."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should include a note that says \"*low grade, professor to meet with student\" underneath Daniel J.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "No low grade note under Daniel J."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should include a note that says \"*low grade, professor to meet with student\" underneath James U.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "No low grade note under James U."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should have a separate entry for each of the 7 assignments in the per-assignment breakdown section.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": true,
+              "reason": "Separate entries for all 7 assignments present."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should format each header in the per-assignment breakdown in bold.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": true,
+              "reason": "Assignment headers are bolded."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should correctly calculate and display the average score in points for each assignment: 1 -  21.63, 2 - 21.6, 3 -  20.67, 4 - 20.57, 5 - 21.37, 6 - 19.87, and 7 - 19.23. Rounding to one decimal place is acceptable.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "Averages incorrect, e.g., #1 shows 21.4 vs correct 21.63; #7 20.4 vs 19.23."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should correctly calculate and display the average score as a percentage for each assignment: Assignment #1: 86.4%, Assignment #2: 86.4%, Assignment #3: 82.8%, Assignment #4: 82.4%, Assignment #5: 85.6%, Assignment #6: 79.6%, and Assignment #7: 76.8%.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "Percentages incorrect, e.g., #1 85.6% vs correct 86.4%."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should assign a letter grade for each assignment based on the average percentage and the provided scale: A+ (97-100%), A (93-96%), A- (90-92%), B+ (87-89%), B (83-86%), B- (80-82%), C+ (77-79%), C (73-76%), C- (70-72%), D+ (67-69%), D (63-66%), D- (60-62%), F (0-59%).",
+          "verifiability": "auto",
+          "gameable": true,
+          "reward_hack": "Response could assign letter grades consistent with the scale even if the underlying percentages are wrong, satisfying the literal wording without correct calculations",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "Grades misapply scale, e.g., 85.6% labeled B+ instead of B."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should list each assignment's average score, percentage, and letter grade in that order for the seven assignments in the assignment breakdown section.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": true,
+              "reason": "Average points, percentage, then letter grade listed in that order."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should list each assignment's letter grade in parentheses in the assignment breakdown section.",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "Letter grades are bolded, not in parentheses; percentage is parenthesized instead."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should list the name of all students who received a perfect score of 25 for each assignment: Assignment #1 - Natalie B. and Lily I, Assignment #2 - Caroline D., Oliver K., Assignment #3 - Lauren A., Assignment #4 - None, Assignment #5 - None, Assignment #6 - None, and Assignment #7 - Benjamin M.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "Perfect score lists wrong, e.g., #1 includes Benjamin M., Caroline D., Oliver K. incorrectly."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should list the name of all students who received a score of 0 for each assignment: Assignment #1 - none, Assignment #2 - none, Assignment #3 - Hannah E., Assignment #4 - James U., Assignment #5 - None, Assignment #6 - Daniel J., and Assignment #7 - Oliver K.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "Zero lists wrong, e.g., #1 lists Hannah E. and James U.; should be none."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should state that assignment #1 had the highest average score.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "States assignment #2 as best, not assignment #1."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should correctly identify the assignment with the worst (lowest) average score at the end of the per-assignment breakdown, identifying assignment #7 as having the lowest average score.",
+          "verifiability": "judge",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": true,
+              "reason": "Identifies assignment #7 as worst at end of section."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        },
+        {
+          "text": "The response should correctly calculate and display a letter grade for each student: Lauren A. (B+), Allison B. (B), Natalie B. (B+), David C. (B-), Caroline D. (B+), Hannah E. (C), Charles F. (B-), Brian G. (B), Caitlin H. (B), Samuel H. (B), Lily I. (B), Daniel J. (C-), Ashley K. (B), Oliver K. (C+), Christian L. (B), Benjamin M. (B+), Emily N. (B), Grace O. (B), Chloe P. (B), Ella Q. (B), Aiden R. (B), Brandon S. (B), William S. (B), Andrew T. (B), James U. (C-), Dylan V. (B), Caleb W. (B), Madison X. (B-), Ethan Y. (B), and Jacob Z. (B).",
+          "verifiability": "auto",
+          "gameable": false,
+          "reward_hack": "",
+          "results": {
+            "qwen-9b": {
+              "pass": false,
+              "reason": "Student letter grades all A-range; correct grades are B/C range."
+            },
+            "qwen-35b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            },
+            "qwen-397b": {
+              "pass": false,
+              "reason": "judge_parse_error: ValueError: no parseable JSON array found"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

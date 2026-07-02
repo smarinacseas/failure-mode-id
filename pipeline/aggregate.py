@@ -22,7 +22,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from config import DATA_JSONL, RESULTS_PATH, ROOT
+from config import DATA_JSONL, JUDGE_MAX_TOKENS, RESULTS_PATH, ROOT
 from pipeline._experiment import (
     SCHEMA_VERSION,
     build_meta,
@@ -177,6 +177,52 @@ def _sync_dashboard(mon) -> None:
         mon.note(f"aggregate: dashboard sync skipped ({type(e).__name__}: {e})")
 
 
+def _build_run_notes(cfg: RunConfig, responses: dict, by_judge: dict, skipped: list[str]) -> list[str]:
+    """`meta.run_notes` — high-level issues/errors/factors for the dashboard's
+    expandable Run summary. Hand-written context first (runs/<slug>/NOTES.md,
+    one note per line, '#' lines skipped), then auto-derived anomalies, then
+    config factors worth knowing that aren't already dashboard rows."""
+    notes: list[str] = []
+
+    notes_md = cfg.run_dir / "NOTES.md"
+    if notes_md.exists():
+        for line in notes_md.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#"):
+                notes.append(line)
+
+    # Auto-derived issues.
+    empty = [f"{key}/{rid}" for key, by_id in responses.items()
+             for rid, text in by_id.items() if not (text or "").strip()]
+    if empty:
+        notes.append(f"⚠ Empty candidate response(s) stored for {', '.join(sorted(empty))} — "
+                     "their prompts are excluded from comparison; regenerate.")
+    if skipped:
+        notes.append(f"⚠ {len(skipped)} prompt(s) skipped as incomplete: "
+                     + "; ".join(skipped[:5]) + ("…" if len(skipped) > 5 else ""))
+    for judge, view in by_judge.items():
+        counts: dict[str, int] = {}
+        for p in view["prompts"]:
+            for c in p["criteria"]:
+                for r in c["results"].values():
+                    reason = str(r.get("reason", ""))
+                    for tag in ("judge_parse_error", "judge_truncated", "missing_in_judge_output"):
+                        if reason.startswith(tag):
+                            counts[tag] = counts.get(tag, 0) + 1
+        if counts:
+            detail = ", ".join(f"{n} × {tag}" for tag, n in sorted(counts.items()))
+            notes.append(f"⚠ Judge {judge}: {detail} — affected criteria count as FAIL.")
+
+    # Factors worth noting beyond the metadata rows already shown.
+    if len(cfg.judges) > 1:
+        notes.append("All judges graded the same candidate responses (single generation pass), "
+                     "so judge columns are directly comparable.")
+    notes.append("Judges reason with adaptive thinking over a streamed "
+                 f"{JUDGE_MAX_TOKENS}-token budget; candidate reasoning "
+                 f"{'enabled' if cfg.reasoning else 'disabled'} at temperature {cfg.temperature}.")
+    return notes
+
+
 def _merge_manifest(cfg: RunConfig, update: dict) -> None:
     existing: dict = {}
     if cfg.run_manifest_path.exists():
@@ -269,6 +315,7 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
     summary = default["summary"]
 
     meta = build_meta(cfg, run_report, run_date, prompts)
+    meta["run_notes"] = _build_run_notes(cfg, responses, by_judge, skipped)
     results = {
         "schema_version": SCHEMA_VERSION,
         "meta": meta,

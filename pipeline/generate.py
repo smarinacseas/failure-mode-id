@@ -25,7 +25,13 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str) -> str:
             extra_body=cfg.extra_body,
             timeout=cfg.timeout_s,
         )
-        return resp.choices[0].message.content or ""
+        text = resp.choices[0].message.content or ""
+        # OpenRouter occasionally serves an empty completion (transient,
+        # provider-dependent). Stored as-is it silently grades 0/N downstream,
+        # so surface it as a retriable failure instead of data.
+        if not text.strip():
+            raise RuntimeError(f"empty completion content from {model_id}")
+        return text
 
     return retry(_call, label=f"openrouter:{model_id}")
 

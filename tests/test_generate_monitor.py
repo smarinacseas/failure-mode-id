@@ -54,3 +54,33 @@ def test_generate_respects_cfg_limit(tmp_path, monkeypatch):
     with m:
         generate.run(cfg, monitor=m)
     assert [r["id"] for r in read_jsonl(cfg.responses_path("m1"))] == ["p1"]
+
+
+def test_generate_empty_completion_is_error_not_data(tmp_path, monkeypatch):
+    """A provider returning empty content must NOT be stored as a valid response
+    (it would silently grade 0/N downstream). It's an error: recorded, skipped,
+    resumable. Regression test for the E03 qwen-397b/CIF-002 empty cell."""
+    cfg = _setup(tmp_path, monkeypatch)
+
+    class _EmptyChoice:
+        message = type("M", (), {"content": "   "})()
+    class _EmptyRouter:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**_k):
+                    return type("R", (), {"choices": [_EmptyChoice()]})()
+
+    monkeypatch.setattr(generate, "router", _EmptyRouter)
+    # retry() must treat empty completions as retriable, then give up loudly.
+    monkeypatch.setattr(generate, "retry",
+                        lambda fn, label: fn())  # single attempt: surfacing the raise is what we test
+
+    m = RunMonitor(WorkPlan.for_step("generate", 2, 1), sinks=[RecordingSink()])
+    with m:
+        generate.run(cfg, monitor=m)
+
+    assert read_jsonl(cfg.responses_path("m1")) == []   # nothing written
+    snap = m.snapshot()
+    assert snap["errors"] == 2                          # both prompts recorded as errors
+    assert snap["stages"][0]["done"] == 2               # bar still completes

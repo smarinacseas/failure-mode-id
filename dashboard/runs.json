@@ -1,6 +1,22 @@
 {
   "runs": [
     {
+      "id": "E01-smoke-3p",
+      "label": "E01-smoke-3p — First end-to-end pipeline exercise",
+      "date": "2026-07-02",
+      "path": "./E01-smoke-3p.json",
+      "n_prompts": 3,
+      "n_models": 3
+    },
+    {
+      "id": "E02-smoke-fable-3p",
+      "label": "E02-smoke-fable-3p — pipeline fable judge",
+      "date": "2026-07-02",
+      "path": "./E02-smoke-fable-3p.json",
+      "n_prompts": 3,
+      "n_models": 3
+    },
+    {
       "id": "E03-judge-compare-3p",
       "label": "E03-judge-compare-3p — Judge comparison — Opus 4",
       "date": "2026-07-02",
@@ -9,5 +25,5 @@
       "n_models": 3
     }
   ],
-  "synced_at": "2026-07-02T05:12:58.492186+00:00"
+  "synced_at": "2026-07-02T17:21:03.573947+00:00"
 }

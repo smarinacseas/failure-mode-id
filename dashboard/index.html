@@ -550,6 +550,22 @@ button{font-family:inherit}
           </div>
         </sc-for>
       </div>
+      <sc-if value="{{ hasRunNotes }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line,#e7e3d6)">
+          <button onclick="{{ notesToggle }}" style="display:inline-flex;align-items:center;gap:7px;background:transparent;border:none;cursor:pointer;padding:0;font-size:11px;color:var(--ink-2,#6c6759);text-transform:uppercase;letter-spacing:.07em;font-weight:600">
+            <span style="font-size:9px;color:var(--ink-4,#a8a294)">{{ notesCaret }}</span>
+            <span>Run summary</span>
+            <span style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--ink-4,#a8a294)">{{ notesCount }}</span>
+          </button>
+          <sc-if value="{{ notesOpen }}" hint-placeholder-val="{{ false }}">
+            <ul style="margin:10px 0 2px;padding-left:18px;display:flex;flex-direction:column;gap:6px">
+              <sc-for list="{{ runNotes }}" as="rn" hint-placeholder-count="3">
+                <li style="font-size:12.5px;line-height:1.55;color:var(--ink-1,#46423a)">{{ rn.text }}</li>
+              </sc-for>
+            </ul>
+          </sc-if>
+        </div>
+      </sc-if>
     </div>
 
     <!-- metric row -->
@@ -937,7 +953,7 @@ class Component extends DCLogic {
     sortKey:'id', sortDir:'asc',
     selectedId:null, critFilter:'all', expanded:{},
     data:null, dataRaw:null, judge:null, error:null,
-    runs:[], currentRun:null, runOpen:false,
+    runs:[], currentRun:null, runOpen:false, notesOpen:false,
   };
 
   passCount(p,model){ let n=0; (p.criteria||[]).forEach(function(c){ var r=c.results&&c.results[model]; if(r&&r.pass) n++; }); return n; }
@@ -988,7 +1004,7 @@ class Component extends DCLogic {
   }
   loadRun(run){
     var self=this;
-    this.setState({data:null, dataRaw:null, judge:null, error:null, currentRun:run, model:null, selectedId:null, screen:'overview', fInstr:null, fUse:null, fStyle:null, openMenu:null, runOpen:false});
+    this.setState({data:null, dataRaw:null, judge:null, error:null, currentRun:run, model:null, selectedId:null, screen:'overview', fInstr:null, fUse:null, fStyle:null, openMenu:null, runOpen:false, notesOpen:false});
     __loadJson(run.path).then(function(d){
       var judges=(d.meta&&d.meta.judges)||[];
       var defJudge=judges[0]||(d.meta&&d.meta.judge)||null;
@@ -1058,6 +1074,7 @@ class Component extends DCLogic {
         footDate:'', footJudge:'', footCrit:'', footPrompts:'', footModels:'',
         isOverview:false, isDrill:false, isDetail:false,
         modelTabs:[], modelLabel:'', detailId:'', judgeTabs:[], hasJudgeToggle:false,
+        hasRunNotes:false, runNotes:[], notesOpen:false, notesCaret:'▸', notesCount:'', notesToggle:()=>{},
         goOverview:()=>this.go('overview'),
         goPromptsAll:()=>this.setState({screen:'drilldown',openMenu:null}),
         bcOverviewStyle:'color:var(--ink,#2a2722);font-weight:600;cursor:pointer',
@@ -1216,6 +1233,12 @@ class Component extends DCLogic {
       modelTabs: models.map(m=>({ label:prettyModel(m), onClick:()=>this.setModel(m), btnStyle:this.btn(m===model) })),
       hasJudgeToggle: !!(meta.judges && meta.judges.length>1),
       judgeTabs: (meta.judges||[]).map(j=>({ label:prettyJudge(j), onClick:()=>this.setJudge(j), btnStyle:this.btn(j===((this.state.judge)||meta.judge)) })),
+      hasRunNotes: !!(meta.run_notes && meta.run_notes.length),
+      runNotes: (meta.run_notes||[]).map(t=>({text:String(t)})),
+      notesOpen: !!this.state.notesOpen,
+      notesCaret: this.state.notesOpen ? '▾' : '▸',
+      notesCount: (meta.run_notes||[]).length + ' note' + ((meta.run_notes||[]).length===1?'':'s'),
+      notesToggle: ()=>this.setState(s=>({notesOpen:!s.notesOpen})),
       goOverview:()=>this.go('overview'),
       goPromptsAll:()=>this.setState({screen:'drilldown',openMenu:null}),
       goBackDrill:()=>this.setState({screen:'drilldown'}),

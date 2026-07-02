@@ -108,6 +108,14 @@ def run(cfg: RunConfig, monitor: RunMonitor | None = None) -> None:
                 rid = resp_rec["id"]
                 rec = by_id[rid]
                 mon.item_start(model=f"{key}@{judge}", prompt_id=rid)
+                # Defense-in-depth: an empty stored response has nothing to grade.
+                # generate.py should never persist one, but if it does, skip it
+                # (no grade record → prompt excluded at aggregate) rather than
+                # spending judge calls to produce a misleading 0/N.
+                if not (resp_rec.get("response") or "").strip():
+                    mon.record_error(f"grade {judge}/{key} {rid}: empty response — skipped (regenerate)")
+                    mon.item_done()
+                    continue
                 verdicts = _grade_one(judge, rec["prompt"], resp_rec["response"], rec["criteria"])
                 append_jsonl(out_path, {"id": rid, "verdicts": verdicts})
                 reason0 = str(verdicts[0].get("reason", "")) if verdicts else ""

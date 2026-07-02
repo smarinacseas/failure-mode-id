@@ -331,8 +331,9 @@ def update_index(slug: str, meta: dict) -> Path:
         "n_criteria": meta["counts"]["n_criteria"],
         "n_models": meta["counts"]["n_models"],
         "models": list(meta["models"]),
-        "judges": list(meta["judges"]),
-        "judge": meta["judge"],
+        # Restored pre-3.0 deliverables carry a scalar judge only.
+        "judges": list(meta.get("judges") or ([meta["judge"]] if meta.get("judge") else [])),
+        "judge": meta.get("judge", ""),
         "validation_status": v["status"],
         "agreement_pct": v["agreement_pct"],
         "git_commit": meta["git"]["commit"],

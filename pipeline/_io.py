@@ -62,6 +62,7 @@ def retry(
                 or "rate" in msg
                 or "timeout" in msg
                 or "overloaded" in msg
+                or "empty completion" in msg       # transient empty body from a provider
                 or "503" in msg
                 or "502" in msg
                 or "504" in msg
