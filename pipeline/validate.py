@@ -14,27 +14,23 @@ import random
 from datetime import datetime, timezone
 
 from config import (
-    CANDIDATES,
     DATA_JSONL,
-    GRADES_DIR,
-    JUDGE_VALIDATION_PATH,
-    RESPONSES_DIR,
-    RUN_MANIFEST_PATH,
     VALIDATE_RESPONSE_EXCERPT_CHARS,
     VALIDATE_SAMPLE_TARGET,
     VALIDATE_SEED,
 )
 from pipeline._io import read_jsonl
 from pipeline.monitor import RunMonitor, stage_ctx
+from pipeline.run_config import RunConfig
 
 
-def _build_pool() -> list[dict]:
+def _build_pool(cfg: RunConfig) -> list[dict]:
     records = read_jsonl(DATA_JSONL)
     by_id = {r["id"]: r for r in records}
     pool: list[dict] = []
-    for key in CANDIDATES:
-        grades = read_jsonl(GRADES_DIR / f"{key}.jsonl")
-        responses = {r["id"]: r["response"] for r in read_jsonl(RESPONSES_DIR / f"{key}.jsonl")}
+    for key in cfg.candidates:
+        grades = read_jsonl(cfg.grades_path(key))
+        responses = {r["id"]: r["response"] for r in read_jsonl(cfg.responses_path(key))}
         for g in grades:
             rec = by_id.get(g["id"])
             if not rec:
@@ -61,42 +57,42 @@ def _build_pool() -> list[dict]:
     return pool
 
 
-def sample(mon: "RunMonitor | None" = None) -> None:
-    pool = _build_pool()
+def sample(cfg: RunConfig, mon: "RunMonitor | None" = None) -> None:
+    pool = _build_pool(cfg)
     if not pool:
         raise RuntimeError("No graded rows found. Run `grade` first.")
     n = min(VALIDATE_SAMPLE_TARGET, len(pool))
     rng = random.Random(VALIDATE_SEED)
     rows = rng.sample(pool, n)
-    JUDGE_VALIDATION_PATH.parent.mkdir(parents=True, exist_ok=True)
-    JUDGE_VALIDATION_PATH.write_text(
+    cfg.judge_validation_path.parent.mkdir(parents=True, exist_ok=True)
+    cfg.judge_validation_path.write_text(
         json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    msg = (f"validate sample: wrote {n} rows → {JUDGE_VALIDATION_PATH}; "
+    msg = (f"validate sample: wrote {n} rows → {cfg.judge_validation_path}; "
            f"fill the `human` field (PASS/FAIL), then run `validate --mode score`.")
     mon.note(msg) if mon is not None else print(msg)
 
 
-def _merge_manifest(update: dict) -> None:
+def _merge_manifest(cfg: RunConfig, update: dict) -> None:
     existing: dict = {}
-    if RUN_MANIFEST_PATH.exists():
+    if cfg.run_manifest_path.exists():
         try:
-            existing = json.loads(RUN_MANIFEST_PATH.read_text(encoding="utf-8"))
+            existing = json.loads(cfg.run_manifest_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             existing = {}
     existing.update(update)
-    RUN_MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
-    RUN_MANIFEST_PATH.write_text(
+    cfg.run_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    cfg.run_manifest_path.write_text(
         json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
 
-def score() -> None:
-    if not JUDGE_VALIDATION_PATH.exists():
+def score(cfg: RunConfig) -> None:
+    if not cfg.judge_validation_path.exists():
         raise RuntimeError(
-            f"{JUDGE_VALIDATION_PATH} missing. Run `validate --mode sample` first."
+            f"{cfg.judge_validation_path} missing. Run `validate --mode sample` first."
         )
-    rows = json.loads(JUDGE_VALIDATION_PATH.read_text(encoding="utf-8"))
+    rows = json.loads(cfg.judge_validation_path.read_text(encoding="utf-8"))
     filled = [r for r in rows if str(r.get("human", "")).strip().upper() in {"PASS", "FAIL"}]
     if not filled:
         raise RuntimeError(
@@ -133,7 +129,7 @@ def score() -> None:
                 f"— {d['criterion_text'][:80]}"
             )
 
-    _merge_manifest({
+    _merge_manifest(cfg, {
         "judge_agreement": {
             "n_filled": n,
             "n_agree": agree,
@@ -142,22 +138,18 @@ def score() -> None:
             "scored_at": datetime.now(timezone.utc).isoformat(),
         }
     })
-    print(f"  merged judge_agreement → {RUN_MANIFEST_PATH}")
+    print(f"  merged judge_agreement → {cfg.run_manifest_path}")
 
 
-def run(mode: str = "sample", monitor: RunMonitor | None = None) -> None:
+def run(cfg: RunConfig, mode: str = "sample", monitor: RunMonitor | None = None) -> None:
     if mode not in {"sample", "score"}:
         raise ValueError(f"validate mode must be 'sample' or 'score', got {mode!r}")
     with stage_ctx(monitor, "validate", 1) as mon:
         mon.start_stage("validate", total=1)
         mon.item_start()
         if mode == "sample":
-            sample(mon)
+            sample(cfg, mon)
         else:
-            score()
+            score(cfg)
         mon.item_done()
         mon.end_stage()
-
-
-if __name__ == "__main__":
-    run()

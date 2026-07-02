@@ -24,19 +24,11 @@ from collections import Counter
 from pathlib import Path
 
 from config import (
-    CANDIDATE_EXTRA_BODY,
-    CANDIDATE_MAX_TOKENS,
-    CANDIDATE_TEMPERATURE,
-    CANDIDATE_TIMEOUT_S,
-    CANDIDATES,
     EXPERIMENT_INDEX_PATH,
     EXPERIMENTS_DIR,
-    JUDGE,
     JUDGE_MAX_TOKENS,
-    JUDGE_VALIDATION_PATH,
     PROMPTS_DIR,
     ROOT,
-    RUN_MANIFEST_PATH,
     VALIDATE_RESPONSE_EXCERPT_CHARS,
     VALIDATE_SAMPLE_TARGET,
     VALIDATE_SEED,
@@ -58,6 +50,7 @@ JUDGE_FAMILY_NOTE = (
     "self-preference bias is structurally absent by v1 design."
 )
 
+from pipeline.run_config import RunConfig
 from pipeline.run_config import InvalidSlugError, SLUG_RE, parse_slug  # noqa: F401 — re-export
 
 
@@ -84,32 +77,13 @@ def _git(*args: str) -> str | None:
     return out.stdout.strip() or None
 
 
-def experiment_block(
-    slug: str | None,
-    description: str | None,
-    run_report: str | None,
-    run_date_iso: str,
-) -> dict:
-    """`meta.experiment` — identity + description + when.
-
-    When `slug` is None the run is "untagged"; the block still carries
-    every key so the shape stays stable.
-    """
-    if slug is None:
-        return {
-            "slug": None,
-            "number": None,
-            "label": None,
-            "description": description or "",
-            "run_report": run_report or "",
-            "run_date": run_date_iso,
-        }
-    number, label = parse_slug(slug)
+def experiment_block(cfg: RunConfig, run_report: str | None, run_date_iso: str) -> dict:
+    number, label = parse_slug(cfg.slug)
     return {
-        "slug": slug,
+        "slug": cfg.slug,
         "number": number,
         "label": label,
-        "description": description or "",
+        "description": cfg.description,
         "run_report": run_report or "",
         "run_date": run_date_iso,
     }
@@ -120,50 +94,50 @@ def dataset_block() -> dict:
     return dict(DATASET)
 
 
-def models_block() -> list[str]:
+def models_block(cfg: RunConfig) -> list[str]:
     """`meta.models` — ordered candidate KEYS.
 
     Dashboards use these keys directly to index `summary.criterion_pass_rate`,
     `prompt.responses`, `criterion.results`, etc. — i.e. the same short
     strings the pipeline uses as its model handles.
     """
-    return list(CANDIDATES.keys())
+    return list(cfg.candidates.keys())
 
 
-def model_details_block() -> list[dict]:
+def model_details_block(cfg: RunConfig) -> list[dict]:
     """`meta.model_details` — the {key, id, role} rich variant.
 
     Optional companion to `meta.models`. Kept for future dashboards / analyses
     that want provider-side IDs or role tags; the ConstraintLens dashboard
     doesn't read this.
     """
-    return [{"key": k, "id": v, "role": "candidate"} for k, v in CANDIDATES.items()]
+    return [{"key": k, "id": v, "role": "candidate"} for k, v in cfg.candidates.items()]
 
 
-def judge_block() -> str:
+def judge_block(cfg: RunConfig) -> str:
     """`meta.judge` — grader model ID (short string).
 
     Dashboards render this verbatim in metadata panels/footers. Richer info
     (provider, role, self-preference bias note) lives in `meta.judge_details`.
     """
-    return JUDGE
+    return cfg.judge
 
 
-def judge_details_block() -> dict:
+def judge_details_block(cfg: RunConfig) -> dict:
     """`meta.judge_details` — provider + role + family-stake note."""
     return {
-        "id": JUDGE,
+        "id": cfg.judge,
         "provider": JUDGE_PROVIDER,
         "role": JUDGE_ROLE,
         "family_stake_note": JUDGE_FAMILY_NOTE,
     }
 
 
-def counts_block(prompts: list[dict]) -> dict:
+def counts_block(prompts: list[dict], cfg: RunConfig) -> dict:
     """`meta.counts` — cross-referencing sums the dashboard prints as headers."""
     n_prompts = len(prompts)
     n_criteria = sum(len(p["criteria"]) for p in prompts)
-    n_models = len(CANDIDATES)
+    n_models = len(cfg.candidates)
     return {
         "n_prompts": n_prompts,
         "n_criteria": n_criteria,
@@ -184,7 +158,7 @@ def categories_block(prompts: list[dict]) -> dict:
     }
 
 
-def config_block() -> dict:
+def config_block(cfg: RunConfig) -> dict:
     """`meta.config` — every knob that could differ across experiments.
 
     `candidates` and `judge id` live in `meta.models` / `meta.judge`
@@ -192,10 +166,10 @@ def config_block() -> dict:
     when explaining "what was different about this run."
     """
     return {
-        "candidate_temperature": CANDIDATE_TEMPERATURE,
-        "candidate_max_tokens": CANDIDATE_MAX_TOKENS,
-        "candidate_extra_body": CANDIDATE_EXTRA_BODY,
-        "candidate_timeout_s": CANDIDATE_TIMEOUT_S,
+        "candidate_temperature": cfg.temperature,
+        "candidate_max_tokens": cfg.max_tokens,
+        "candidate_extra_body": cfg.extra_body,
+        "candidate_timeout_s": cfg.timeout_s,
         "judge_max_tokens": JUDGE_MAX_TOKENS,
         "judge_prompt_sha256_12": _sha256_prefix(PROMPTS_DIR / "judge.txt"),
         "classifier_prompt_sha256_12": _sha256_prefix(PROMPTS_DIR / "classifier.txt"),
@@ -214,7 +188,7 @@ def git_block() -> dict:
     }
 
 
-def validation_block() -> dict:
+def validation_block(cfg: RunConfig) -> dict:
     """`meta.validation` — judge-validation status for the dashboard limitations panel.
 
     Read-only view of two files:
@@ -230,17 +204,17 @@ def validation_block() -> dict:
     agreement_pct: float | None = None
     scored_at: str | None = None
 
-    if JUDGE_VALIDATION_PATH.exists():
+    if cfg.judge_validation_path.exists():
         try:
-            rows = json.loads(JUDGE_VALIDATION_PATH.read_text(encoding="utf-8"))
+            rows = json.loads(cfg.judge_validation_path.read_text(encoding="utf-8"))
             n_sampled = len(rows) if isinstance(rows, list) else 0
             status = "sampled"
         except json.JSONDecodeError:
             pass
 
-    if RUN_MANIFEST_PATH.exists():
+    if cfg.run_manifest_path.exists():
         try:
-            manifest = json.loads(RUN_MANIFEST_PATH.read_text(encoding="utf-8"))
+            manifest = json.loads(cfg.run_manifest_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             manifest = {}
         ja = manifest.get("judge_agreement")
@@ -260,7 +234,7 @@ def validation_block() -> dict:
     }
 
 
-def _promoted_config_fields() -> dict:
+def _promoted_config_fields(cfg: RunConfig) -> dict:
     """Top-level meta fields lifted out of `meta.config` for the dashboard.
 
     The ConstraintLens dashboard's Logic reads a fixed set of `meta.*` keys
@@ -272,22 +246,14 @@ def _promoted_config_fields() -> dict:
     Additive since schema 2.1 — dashboards that pre-date these fields still
     render fine (they fall back to "Not recorded" / omitted rows).
     """
-    reasoning = CANDIDATE_EXTRA_BODY.get("reasoning") if isinstance(CANDIDATE_EXTRA_BODY, dict) else None
-    reasoning_enabled = reasoning.get("enabled") if isinstance(reasoning, dict) else None
     return {
         "run_date": None,  # filled by build_meta from run_date_iso
-        "max_tokens": CANDIDATE_MAX_TOKENS,
-        "reasoning_enabled": reasoning_enabled,
+        "max_tokens": cfg.max_tokens,
+        "reasoning_enabled": cfg.reasoning,
     }
 
 
-def build_meta(
-    slug: str | None,
-    description: str | None,
-    run_report: str | None,
-    run_date_iso: str,
-    prompts: list[dict],
-) -> dict:
+def build_meta(cfg: RunConfig, run_report: str | None, run_date_iso: str, prompts: list[dict]) -> dict:
     """Assemble the entire `meta` block from the standardized sub-blocks.
 
     Dashboard-facing top-level fields (`run_date`, `max_tokens`,
@@ -295,20 +261,20 @@ def build_meta(
     `meta.experiment` / `meta.config` so the design's Logic can read them
     without knowing our nesting.
     """
-    promoted = _promoted_config_fields()
+    promoted = _promoted_config_fields(cfg)
     promoted["run_date"] = run_date_iso
     return {
-        "experiment": experiment_block(slug, description, run_report, run_date_iso),
+        "experiment": experiment_block(cfg, run_report, run_date_iso),
         "dataset": dataset_block(),
-        "models": models_block(),
-        "model_details": model_details_block(),
-        "judge": judge_block(),
-        "judge_details": judge_details_block(),
-        "counts": counts_block(prompts),
+        "models": models_block(cfg),
+        "model_details": model_details_block(cfg),
+        "judge": judge_block(cfg),
+        "judge_details": judge_details_block(cfg),
+        "counts": counts_block(prompts, cfg),
         "categories": categories_block(prompts),
-        "config": config_block(),
+        "config": config_block(cfg),
         "git": git_block(),
-        "validation": validation_block(),
+        "validation": validation_block(cfg),
         # --- Promoted display-only aliases (dashboard reads these) ---
         **promoted,
     }
