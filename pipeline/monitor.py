@@ -433,8 +433,9 @@ def default_sinks(experiment: str | None) -> list[Sink]:
 
 
 def build_monitor(step: str, limit: int, experiment: str | None = None,
-                  sinks: list[Sink] | None = None) -> RunMonitor:
-    plan = WorkPlan.for_step(step, limit, len(CANDIDATES))
+                  sinks: list[Sink] | None = None,
+                  n_candidates: int | None = None) -> RunMonitor:
+    plan = WorkPlan.for_step(step, limit, n_candidates or len(CANDIDATES))
     return RunMonitor(plan, experiment=experiment,
                       sinks=default_sinks(experiment) if sinks is None else sinks)
 

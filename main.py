@@ -1,17 +1,17 @@
-"""CLI orchestrator for the ComplexConstraints v1 eval pipeline.
+"""CLI orchestrator for the ComplexConstraints eval pipeline.
 
 Usage:
-    uv run python main.py <step> [--limit N] [--mode sample|score]
-                                 [--experiment SLUG] [--description STR]
-                                 [--run-report PATH]
-    uv run python main.py status          # print the live progress heartbeat
+    uv run python main.py <step> --experiment E<NN>-<label> [param flags]
+    uv run python main.py status
 
 Steps: load · generate · grade · classify · validate · aggregate · all
        · connectivity · status
 
-`all` runs connectivity → load → generate → grade → classify →
-validate(sample) → aggregate, all under one live progress display.
-`--limit N` is honored by every step; `all` REQUIRES `--limit`.
+Data-producing steps require --experiment. The first invocation of a slug
+freezes its parameters to runs/<slug>/experiment.json; later invocations
+need only the slug. `all` runs connectivity → load → generate → grade →
+classify → validate(sample) → aggregate under one live progress display
+and requires --limit on first invocation.
 """
 
 from __future__ import annotations
@@ -26,42 +26,85 @@ from pipeline import (
     aggregate, classify, connectivity, generate, grade, load, validate,
 )
 from pipeline.monitor import build_monitor, render_lines
+from pipeline.run_config import (
+    ConfigConflictError,
+    InvalidSlugError,
+    parse_candidates,
+    resolve,
+    validate_judge,
+)
 
-STEPS = ("load", "generate", "grade", "classify", "validate", "aggregate")
+DATA_STEPS = ("generate", "grade", "classify", "validate", "aggregate", "all")
 
 # A heartbeat only refreshes between items; a single in-flight model call can
-# legitimately freeze `updated_at` for up to CANDIDATE_TIMEOUT_S. Only warn well
-# beyond that, so a healthy slow call is never mistaken for a dead process.
+# legitimately freeze `updated_at` for up to the candidate timeout. Only warn
+# well beyond that, so a healthy slow call is never mistaken for a dead process.
 _STALE_AFTER_S = CANDIDATE_TIMEOUT_S + 60.0
 
 
 def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="main.py", description=__doc__)
-    p.add_argument("step", choices=(*STEPS, "all", "connectivity", "status"),
+    p.add_argument("step", choices=("load", *DATA_STEPS, "connectivity", "status"),
                    help="Pipeline step to run.")
+    p.add_argument("--experiment", default=None,
+                   help="Experiment slug E<NN>-<label>. Required for data steps; "
+                        "first use freezes this run's parameters.")
     p.add_argument("--limit", type=int, default=None,
-                   help="Process only the first N prompts. Required for `all`.")
+                   help="Prompt count (frozen). Required for a new experiment via `all`.")
+    p.add_argument("--max-tokens", type=int, default=None, dest="max_tokens",
+                   help="Candidate max output tokens (frozen; default 8000).")
+    p.add_argument("--reasoning", choices=("on", "off"), default=None,
+                   help="Candidate reasoning mode (frozen; default off).")
+    p.add_argument("--temperature", type=float, default=None,
+                   help="Candidate temperature (frozen; default 0.0).")
+    p.add_argument("--timeout", type=float, default=None,
+                   help="Per-call timeout seconds (frozen; default 300).")
+    p.add_argument("--candidates", default=None,
+                   help="Comma list: registry keys and/or key=provider/model-id pairs "
+                        "(frozen; default: full registry).")
+    p.add_argument("--judge", default=None,
+                   help="Anthropic judge/classifier model id (frozen; default claude-fable-5).")
+    p.add_argument("--description", default=None,
+                   help="One-liner describing what makes this experiment distinct (frozen).")
+    p.add_argument("--run-report", default=None, dest="run_report",
+                   help="Path to the meta/ run report (aggregate-time; not frozen).")
     p.add_argument("--mode", choices=("sample", "score"), default="sample",
                    help="For `validate`: sample (default) or score.")
-    p.add_argument("--experiment", default=None,
-                   help="Experiment slug E<NN>-<label> (tags the run + heartbeat).")
-    p.add_argument("--description", default=None,
-                   help="One-liner describing what makes this experiment distinct.")
-    p.add_argument("--run-report", default=None, dest="run_report",
-                   help="Path to the meta/ run report for this experiment.")
     return p
 
 
-def _run_all(limit, experiment, description, run_report) -> None:
-    with build_monitor("all", limit, experiment) as mon:
-        connectivity.run(monitor=mon)
-        load.run(limit=limit, monitor=mon)
-        generate.run(limit=limit, monitor=mon)
-        grade.run(limit=limit, monitor=mon)
-        classify.run(limit=limit, monitor=mon)
-        validate.run(mode="sample", monitor=mon)
-        aggregate.run(limit=limit, experiment=experiment,
-                      description=description, run_report=run_report, monitor=mon)
+def _overrides(args: argparse.Namespace) -> dict:
+    """Map explicitly-passed flags to RunConfig param names."""
+    out: dict = {}
+    if args.limit is not None:
+        out["limit"] = args.limit
+    if args.max_tokens is not None:
+        out["max_tokens"] = args.max_tokens
+    if args.reasoning is not None:
+        out["reasoning"] = args.reasoning == "on"
+    if args.temperature is not None:
+        out["temperature"] = args.temperature
+    if args.timeout is not None:
+        out["timeout_s"] = args.timeout
+    if args.candidates is not None:
+        out["candidates"] = parse_candidates(args.candidates)
+    if args.judge is not None:
+        out["judge"] = validate_judge(args.judge)
+    if args.description is not None:
+        out["description"] = args.description
+    return out
+
+
+def _run_all(cfg, run_report) -> None:
+    with build_monitor("all", cfg.limit or 0, cfg.slug,
+                       n_candidates=len(cfg.candidates)) as mon:
+        connectivity.run(cfg, monitor=mon)
+        load.run(limit=cfg.limit, monitor=mon)
+        generate.run(cfg, monitor=mon)
+        grade.run(cfg, monitor=mon)
+        classify.run(cfg, monitor=mon)
+        validate.run(cfg, mode="sample", monitor=mon)
+        aggregate.run(cfg, run_report=run_report, monitor=mon)
 
 
 def _print_status() -> None:
@@ -91,34 +134,50 @@ def main(argv: list[str] | None = None) -> int:
         _print_status()
         return 0
 
+    if args.step == "load":
+        with build_monitor("load", args.limit or 0, args.experiment) as mon:
+            load.run(limit=args.limit, monitor=mon)
+        return 0
+
+    # connectivity: cfg optional — with a slug it pings that experiment's models.
+    cfg = None
+    if args.experiment is not None or args.step in DATA_STEPS:
+        if args.experiment is None:
+            print(f"error: `{args.step}` requires --experiment E<NN>-<label> "
+                  "(parameters freeze on the slug's first run).", file=sys.stderr)
+            return 2
+        try:
+            cfg = resolve(args.experiment, _overrides(args))
+        except (ConfigConflictError, InvalidSlugError, ValueError) as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 2
+
     if args.step == "connectivity":
-        with build_monitor("connectivity", 0, args.experiment) as mon:
-            connectivity.run(monitor=mon)
+        n = len(cfg.candidates) if cfg else None
+        with build_monitor("connectivity", 0, args.experiment, n_candidates=n) as mon:
+            connectivity.run(cfg, monitor=mon)
         return 0
 
     if args.step == "all":
-        if args.limit is None:
-            print("error: `all` requires --limit (e.g. `--limit 3` for a smoke test, "
-                  "`--limit 75` for the full set).", file=sys.stderr)
+        if cfg.limit is None:
+            print("error: a new `all` run requires --limit (e.g. `--limit 3` for a "
+                  "smoke test, `--limit 75` for the full set).", file=sys.stderr)
             return 2
-        _run_all(args.limit, args.experiment, args.description, args.run_report)
+        _run_all(cfg, args.run_report)
         return 0
 
-    with build_monitor(args.step, args.limit or 0, args.experiment) as mon:
-        if args.step == "load":
-            load.run(limit=args.limit, monitor=mon)
-        elif args.step == "generate":
-            generate.run(limit=args.limit, monitor=mon)
+    with build_monitor(args.step, cfg.limit or 0, cfg.slug,
+                       n_candidates=len(cfg.candidates)) as mon:
+        if args.step == "generate":
+            generate.run(cfg, monitor=mon)
         elif args.step == "grade":
-            grade.run(limit=args.limit, monitor=mon)
+            grade.run(cfg, monitor=mon)
         elif args.step == "classify":
-            classify.run(limit=args.limit, monitor=mon)
+            classify.run(cfg, monitor=mon)
         elif args.step == "validate":
-            validate.run(mode=args.mode, monitor=mon)
+            validate.run(cfg, mode=args.mode, monitor=mon)
         elif args.step == "aggregate":
-            aggregate.run(limit=args.limit, experiment=args.experiment,
-                          description=args.description, run_report=args.run_report,
-                          monitor=mon)
+            aggregate.run(cfg, run_report=args.run_report, monitor=mon)
     return 0
 
 
