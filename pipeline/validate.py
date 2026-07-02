@@ -28,32 +28,35 @@ def _build_pool(cfg: RunConfig) -> list[dict]:
     records = read_jsonl(DATA_JSONL)
     by_id = {r["id"]: r for r in records}
     pool: list[dict] = []
-    for key in cfg.candidates:
-        grades = read_jsonl(cfg.grades_path(key))
-        responses = {r["id"]: r["response"] for r in read_jsonl(cfg.responses_path(key))}
-        for g in grades:
-            rec = by_id.get(g["id"])
-            if not rec:
-                continue
-            criteria = rec["criteria"]
-            for v in g["verdicts"]:
-                idx = int(v["index"])
-                if not 1 <= idx <= len(criteria):
+    for judge in cfg.judges:
+        for key in cfg.candidates:
+            grades = read_jsonl(cfg.grades_path(judge, key))
+            responses = {r["id"]: r["response"] for r in read_jsonl(cfg.responses_path(key))}
+            for g in grades:
+                rec = by_id.get(g["id"])
+                if not rec:
                     continue
-                # Skip judge errors — they aren't a real verdict to grade against.
-                if v.get("reason", "").startswith("judge_parse_error"):
-                    continue
-                pool.append({
-                    "model": key,
-                    "id": g["id"],
-                    "criterion_index": idx,
-                    "criterion_text": criteria[idx - 1],
-                    "prompt_text": rec["prompt"],
-                    "response_excerpt": (responses.get(g["id"], "") or "")[:VALIDATE_RESPONSE_EXCERPT_CHARS],
-                    "judge_verdict": v["verdict"],
-                    "judge_reason": v["reason"],
-                    "human": "",
-                })
+                criteria = rec["criteria"]
+                for v in g["verdicts"]:
+                    idx = int(v["index"])
+                    if not 1 <= idx <= len(criteria):
+                        continue
+                    # Skip judge failures — they aren't a real verdict to grade against.
+                    reason = v.get("reason", "")
+                    if reason.startswith("judge_parse_error") or reason.startswith("judge_truncated"):
+                        continue
+                    pool.append({
+                        "judge": judge,
+                        "model": key,
+                        "id": g["id"],
+                        "criterion_index": idx,
+                        "criterion_text": criteria[idx - 1],
+                        "prompt_text": rec["prompt"],
+                        "response_excerpt": (responses.get(g["id"], "") or "")[:VALIDATE_RESPONSE_EXCERPT_CHARS],
+                        "judge_verdict": v["verdict"],
+                        "judge_reason": v["reason"],
+                        "human": "",
+                    })
     return pool
 
 

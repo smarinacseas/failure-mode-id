@@ -26,7 +26,9 @@ from config import DATA_JSONL, RESULTS_PATH, ROOT
 from pipeline._experiment import (
     SCHEMA_VERSION,
     build_meta,
+    judge_details_for,
     update_index,
+    validation_block,
     write_experiment_copy,
 )
 from pipeline._io import read_jsonl
@@ -40,15 +42,25 @@ def _pct(num: int, den: int) -> float:
     return round(100.0 * num / den, 2) if den else 0.0
 
 
-def _load_all(cfg: RunConfig) -> tuple[list[dict], dict[str, dict[str, str]], dict[str, dict[str, list[dict]]], dict[str, list[dict]]]:
+def _load_all(cfg: RunConfig):
+    """Return (records, responses, grades_by_judge, tags).
+
+    responses/tags are judge-independent (shared). grades_by_judge is
+    {judge: {candidate: {id: verdicts}}} — one grade set per judge over the
+    same responses.
+    """
     records = read_jsonl(DATA_JSONL)
     responses: dict[str, dict[str, str]] = {}
-    grades: dict[str, dict[str, list[dict]]] = {}
     for key in cfg.candidates:
         responses[key] = {r["id"]: r["response"] for r in read_jsonl(cfg.responses_path(key))}
-        grades[key] = {r["id"]: r["verdicts"] for r in read_jsonl(cfg.grades_path(key))}
+    grades_by_judge: dict[str, dict[str, dict[str, list[dict]]]] = {}
+    for judge in cfg.judges:
+        grades_by_judge[judge] = {
+            key: {r["id"]: r["verdicts"] for r in read_jsonl(cfg.grades_path(judge, key))}
+            for key in cfg.candidates
+        }
     tags = {r["id"]: r["tags"] for r in read_jsonl(cfg.criteria_tags_path)}
-    return records, responses, grades, tags
+    return records, responses, grades_by_judge, tags
 
 
 def _build_prompt_entry(rec: dict, responses: dict, grades: dict, tags: dict, models: list[str]) -> dict:
@@ -205,11 +217,15 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
                 f"           Copy meta/TEMPLATE.md → {run_report} and fill it in.",
             )
 
-    records, responses, grades, tags = _load_all(cfg)
+    records, responses, grades_by_judge, tags = _load_all(cfg)
     if cfg.limit is not None:
         records = records[: cfg.limit]
 
     models = list(cfg.candidates.keys())
+    judges = list(cfg.judges)
+
+    def _grade_present(rid: str, key: str) -> bool:
+        return all(rid in grades_by_judge[j][key] for j in judges)
 
     eligible: list[dict] = []
     skipped: list[str] = []
@@ -218,7 +234,7 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
         if rid not in tags:
             skipped.append(f"{rid} (no tags)")
             continue
-        missing = [k for k in models if rid not in responses[k] or rid not in grades[k]]
+        missing = [k for k in models if rid not in responses[k] or not _grade_present(rid, k)]
         if missing:
             skipped.append(f"{rid} (missing {','.join(missing)})")
             continue
@@ -231,9 +247,26 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
         if len(skipped) > 10:
             mon.note(f"  · …and {len(skipped) - 10} more")
 
-    prompts = [_build_prompt_entry(rec, responses, grades, tags, models) for rec in eligible]
-    summary = _summary(prompts, models)
+    # Build a self-contained view per judge over the SAME eligible prompts.
+    validation = validation_block(cfg)
+    by_judge: dict[str, dict] = {}
+    for judge in judges:
+        j_prompts = [_build_prompt_entry(rec, responses, grades_by_judge[judge], tags, models)
+                     for rec in eligible]
+        by_judge[judge] = {
+            "judge": judge,
+            "judge_details": judge_details_for(judge),
+            "validation": validation,
+            "summary": _summary(j_prompts, models),
+            "prompts": j_prompts,
+        }
+
     run_date = datetime.now(timezone.utc).isoformat()
+
+    # Default (top-level) view = first judge — back-compat for single-judge readers.
+    default = by_judge[cfg.judge]
+    prompts = default["prompts"]
+    summary = default["summary"]
 
     meta = build_meta(cfg, run_report, run_date, prompts)
     results = {
@@ -241,6 +274,7 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
         "meta": meta,
         "summary": summary,
         "prompts": prompts,
+        "by_judge": by_judge,
     }
 
     RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -261,6 +295,7 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
         "experiment": meta["experiment"],
         "models": list(meta["models"]),
         "counts": meta["counts"],
+        "judges": meta["judges"],
         "judge": meta["judge"],
         "run_date": run_date,
         "git": meta["git"],

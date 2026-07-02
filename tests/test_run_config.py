@@ -5,7 +5,7 @@ import pytest
 import config
 from pipeline.run_config import (
     ConfigConflictError, InvalidSlugError, RunConfig, parse_candidates,
-    parse_slug, resolve, validate_judge,
+    parse_judges, parse_slug, resolve, validate_judge,
 )
 
 
@@ -13,7 +13,7 @@ def _cfg(**kw):
     params = dict(
         slug="E99-test",
         candidates={"m1": "prov/model-1"},
-        judge="claude-fable-5",
+        judges=("claude-fable-5",),
         max_tokens=100,
         temperature=0.0,
         reasoning=False,
@@ -38,7 +38,10 @@ def test_paths_derive_from_runs_dir_and_slug(tmp_path, monkeypatch):
     assert cfg.run_dir == tmp_path / "E99-test"
     assert cfg.experiment_json_path == tmp_path / "E99-test" / "experiment.json"
     assert cfg.responses_path("m1") == tmp_path / "E99-test" / "responses" / "m1.jsonl"
-    assert cfg.grades_path("m1") == tmp_path / "E99-test" / "grades" / "m1.jsonl"
+    assert cfg.grades_path("claude-fable-5", "m1") == (
+        tmp_path / "E99-test" / "grades" / "claude-fable-5" / "m1.jsonl"
+    )
+    assert cfg.judge == "claude-fable-5"  # first judge is canonical
     assert cfg.criteria_tags_path == tmp_path / "E99-test" / "criteria_tags.jsonl"
     assert cfg.judge_validation_path == tmp_path / "E99-test" / "judge_validation.json"
     assert cfg.run_manifest_path == tmp_path / "E99-test" / "run_manifest.json"
@@ -57,7 +60,25 @@ def test_json_round_trip():
 
 def test_runs_dir_default_and_judge_default():
     assert config.RUNS_DIR == config.ROOT / "runs"
-    assert config.JUDGE == "claude-fable-5"
+    assert config.JUDGES == ["claude-opus-4-8", "claude-fable-5"]
+    assert config.JUDGE == config.JUDGES[0]
+
+
+def test_parse_judges_dedups_and_validates():
+    assert parse_judges("claude-opus-4-8, claude-fable-5, claude-opus-4-8") == (
+        "claude-opus-4-8", "claude-fable-5",
+    )
+    with pytest.raises(ValueError, match="claude-"):
+        parse_judges("gpt-5")
+
+
+def test_judges_default_filled_and_json_round_trip(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
+    cfg = resolve("E14-judges", {"limit": 3})
+    assert cfg.judges == tuple(config.JUDGES)
+    # re-passing the same judges must NOT trip the frozen-conflict guard
+    cfg2 = resolve("E14-judges", {"judges": tuple(config.JUDGES)})
+    assert cfg2.judges == tuple(config.JUDGES)
 
 
 def test_parse_candidates_registry_keys_and_pairs(monkeypatch):
@@ -85,7 +106,7 @@ def test_resolve_freezes_on_first_run(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
     cfg = resolve("E10-frozen", {"max_tokens": 1234, "limit": 5})
     assert cfg.max_tokens == 1234 and cfg.limit == 5
-    assert cfg.judge == config.JUDGE                     # default filled in
+    assert cfg.judges == tuple(config.JUDGES)            # default filled in
     frozen = json.loads((tmp_path / "E10-frozen" / "experiment.json").read_text())
     assert frozen["params"]["max_tokens"] == 1234
     assert "created_at" in frozen
@@ -120,6 +141,6 @@ def test_resolve_rejects_bad_slug(tmp_path, monkeypatch):
 
 def test_from_json_dict_missing_field_raises_readable_value_error():
     d = _cfg().to_json_dict()
-    del d["judge"]
-    with pytest.raises(ValueError, match=r"missing field 'judge'.*hand-edited.*runs/E99-test/"):
+    del d["judges"]
+    with pytest.raises(ValueError, match=r"missing field 'judges'.*hand-edited.*runs/E99-test/"):
         RunConfig.from_json_dict("E99-test", d)

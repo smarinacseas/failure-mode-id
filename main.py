@@ -31,6 +31,7 @@ from pipeline.run_config import (
     ConfigConflictError,
     InvalidSlugError,
     parse_candidates,
+    parse_judges,
     resolve,
     validate_judge,
 )
@@ -64,7 +65,11 @@ def _parser() -> argparse.ArgumentParser:
                    help="Comma list: registry keys and/or key=provider/model-id pairs "
                         "(frozen; default: full registry).")
     p.add_argument("--judge", default=None,
-                   help="Anthropic judge/classifier model id (frozen; default claude-fable-5).")
+                   help="Single Anthropic judge model id (frozen). Shorthand for --judges with one entry.")
+    p.add_argument("--judges", default=None,
+                   help="Comma list of Anthropic judge model ids (frozen; default "
+                        "claude-opus-4-8,claude-fable-5). Each grades the same responses; "
+                        "the dashboard toggles between them.")
     p.add_argument("--description", default=None,
                    help="One-liner describing what makes this experiment distinct (frozen).")
     p.add_argument("--run-report", default=None, dest="run_report",
@@ -89,8 +94,10 @@ def _overrides(args: argparse.Namespace) -> dict:
         out["timeout_s"] = args.timeout
     if args.candidates is not None:
         out["candidates"] = parse_candidates(args.candidates)
-    if args.judge is not None:
-        out["judge"] = validate_judge(args.judge)
+    if args.judges is not None:
+        out["judges"] = parse_judges(args.judges)
+    elif args.judge is not None:
+        out["judges"] = (validate_judge(args.judge),)
     if args.description is not None:
         out["description"] = args.description
     return out

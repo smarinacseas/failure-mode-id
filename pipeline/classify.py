@@ -6,8 +6,9 @@ runs/<slug>/criteria_tags.jsonl. Resumable.
 
 from __future__ import annotations
 
-from config import DATA_JSONL, JUDGE_MAX_TOKENS, PROMPTS_DIR, anthropic
-from pipeline._io import append_jsonl, limited, read_jsonl, retry
+from config import DATA_JSONL, PROMPTS_DIR
+from pipeline._io import append_jsonl, limited, read_jsonl
+from pipeline._judge_llm import call_json
 from pipeline._json_extract import extract_json_array
 from pipeline.monitor import RunMonitor, stage_ctx
 from pipeline.run_config import RunConfig
@@ -21,16 +22,9 @@ def _user_message(criteria: list[str]) -> str:
 
 
 def _classifier_call(cfg: RunConfig, user_msg: str) -> str:
-    def _call():
-        msg = anthropic.messages.create(
-            model=cfg.judge,
-            max_tokens=JUDGE_MAX_TOKENS,
-            system=CLASSIFIER_SYSTEM,
-            messages=[{"role": "user", "content": user_msg}],
-        )
-        return "".join(b.text for b in msg.content if hasattr(b, "text"))
-
-    return retry(_call, label=f"anthropic:{cfg.judge}:classify")
+    # Criterion tagging is model-independent; the first (canonical) judge does it.
+    text, _stop = call_json(cfg.judge, CLASSIFIER_SYSTEM, user_msg, label=f"anthropic:{cfg.judge}:classify")
+    return text
 
 
 def _normalize_tags(parsed: list, n_criteria: int) -> list[dict]:

@@ -20,7 +20,7 @@ import config
 SLUG_RE = re.compile(r"^E(\d{2,})-[a-z0-9]+(-[a-z0-9]+)*$")
 
 _PARAM_FIELDS = (
-    "candidates", "judge", "max_tokens", "temperature",
+    "candidates", "judges", "max_tokens", "temperature",
     "reasoning", "timeout_s", "limit", "description",
 )
 
@@ -52,13 +52,19 @@ class RunConfig:
 
     slug: str
     candidates: dict[str, str]      # key -> provider model id
-    judge: str                      # Anthropic model id (grader + classifier)
+    judges: tuple[str, ...]         # Anthropic model ids; each grades the same responses
     max_tokens: int
     temperature: float
     reasoning: bool
     timeout_s: float
     limit: int | None               # prompt count; None = all
     description: str
+
+    @property
+    def judge(self) -> str:
+        """The canonical judge (first) — used for criterion classification and
+        as the default view. Grades exist for every judge in `self.judges`."""
+        return self.judges[0]
 
     # --- derived paths (config.RUNS_DIR read at access time for testability) ---
     @property
@@ -72,8 +78,10 @@ class RunConfig:
     def responses_path(self, key: str) -> Path:
         return self.run_dir / "responses" / f"{key}.jsonl"
 
-    def grades_path(self, key: str) -> Path:
-        return self.run_dir / "grades" / f"{key}.jsonl"
+    def grades_path(self, judge: str, key: str) -> Path:
+        """Grades are keyed by (judge, candidate): grades/<judge>/<candidate>.jsonl.
+        Each judge scores the same responses, so its verdicts live in its own dir."""
+        return self.run_dir / "grades" / judge / f"{key}.jsonl"
 
     @property
     def criteria_tags_path(self) -> Path:
@@ -94,17 +102,25 @@ class RunConfig:
 
     # --- serialization (slug is the filename's job, not the payload's) ---
     def to_json_dict(self) -> dict:
-        return {f: getattr(self, f) for f in _PARAM_FIELDS}
+        d = {f: getattr(self, f) for f in _PARAM_FIELDS}
+        d["judges"] = list(self.judges)  # tuple → JSON array
+        return d
 
     @classmethod
     def from_json_dict(cls, slug: str, d: dict) -> "RunConfig":
+        d = dict(d)
+        # Back-compat: pre-multi-judge freezes carry a scalar `judge`.
+        if "judges" not in d and "judge" in d:
+            d["judges"] = [d["judge"]]
         try:
-            return cls(slug=slug, **{f: d[f] for f in _PARAM_FIELDS})
+            kwargs = {f: d[f] for f in _PARAM_FIELDS}
         except KeyError as e:
             raise ValueError(
                 f"experiment.json for {slug!r} is missing field {e.args[0]!r} — "
                 f"was it hand-edited? Delete runs/{slug}/ to start over."
             ) from e
+        kwargs["judges"] = tuple(kwargs["judges"])
+        return cls(slug=slug, **kwargs)
 
 
 FREEZE_SCHEMA = 1
@@ -148,10 +164,22 @@ def validate_judge(judge: str) -> str:
     return judge
 
 
+def parse_judges(spec: str) -> tuple[str, ...]:
+    """Parse `--judges`: comma list of Anthropic model ids (dedup, order-preserving)."""
+    out: list[str] = []
+    for entry in spec.split(","):
+        entry = entry.strip()
+        if entry and entry not in out:
+            out.append(validate_judge(entry))
+    if not out:
+        raise ValueError("--judges parsed to an empty set")
+    return tuple(out)
+
+
 def _defaults() -> dict:
     return {
         "candidates": dict(config.CANDIDATES),
-        "judge": config.JUDGE,
+        "judges": tuple(config.JUDGES),
         "max_tokens": config.CANDIDATE_MAX_TOKENS,
         "temperature": config.CANDIDATE_TEMPERATURE,
         "reasoning": False,
@@ -173,9 +201,13 @@ def resolve(slug: str, overrides: dict) -> RunConfig:
 
     if path.exists():
         frozen = json.loads(path.read_text(encoding="utf-8"))["params"]
+
+        def _norm(x):  # JSON round-trips tuples to lists; compare shape-agnostically
+            return list(x) if isinstance(x, (list, tuple)) else x
+
         diffs = {
             k: (frozen[k], v) for k, v in overrides.items()
-            if k in frozen and frozen[k] != v
+            if k in frozen and _norm(frozen[k]) != _norm(v)
         }
         if diffs:
             lines = "\n".join(

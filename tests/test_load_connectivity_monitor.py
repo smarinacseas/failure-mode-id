@@ -45,6 +45,7 @@ def test_connectivity_pings_all_and_reports(monkeypatch):
     monkeypatch.setattr(connectivity, "router", _FakeRouter)
     monkeypatch.setattr(connectivity, "anthropic", _FakeAnthropic)
     monkeypatch.setattr(config, "CANDIDATES", {"m1": "x", "m2": "y"})
+    monkeypatch.setattr(config, "JUDGES", ["claude-j1"])
 
     m = RunMonitor(WorkPlan.for_step("connectivity", 2, 2), sinks=[RecordingSink()])
     with m:
@@ -71,6 +72,7 @@ def test_connectivity_reports_failures_and_exits(monkeypatch):
     monkeypatch.setattr(connectivity, "router", _FailRouter)
     monkeypatch.setattr(connectivity, "anthropic", _OkAnthropic)
     monkeypatch.setattr(config, "CANDIDATES", {"m1": "x"})
+    monkeypatch.setattr(config, "JUDGES", ["claude-j1"])
 
     m = RunMonitor(WorkPlan.for_step("connectivity", 1, 1), sinks=[RecordingSink()])
     with pytest.raises(SystemExit) as exc:
@@ -85,7 +87,7 @@ def test_connectivity_pings_cfg_models(monkeypatch):
     pinged = []
     monkeypatch.setattr(connectivity, "_ping_candidate", lambda k, mid: pinged.append(("c", k, mid)) or "ok")
     monkeypatch.setattr(connectivity, "_ping_judge", lambda judge: pinged.append(("j", judge)) or "ok")
-    cfg = make_cfg(candidates={"x": "prov/x"}, judge="claude-fable-5")
+    cfg = make_cfg(candidates={"x": "prov/x"}, judges=("claude-fable-5",))
     m = RunMonitor(WorkPlan.for_step("connectivity", 0, 1), sinks=[RecordingSink()])
     with m:
         connectivity.run(cfg, monitor=m)

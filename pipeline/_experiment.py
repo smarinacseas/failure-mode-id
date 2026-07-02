@@ -36,7 +36,7 @@ from config import (
 from pipeline.run_config import RunConfig
 from pipeline.run_config import InvalidSlugError, SLUG_RE, parse_slug  # noqa: F401 — re-export
 
-SCHEMA_VERSION = "2.1"
+SCHEMA_VERSION = "3.0"
 
 DATASET = {
     "name": "Complex Constraints Benchmark Set",
@@ -113,23 +113,34 @@ def model_details_block(cfg: RunConfig) -> list[dict]:
     return [{"key": k, "id": v, "role": "candidate"} for k, v in cfg.candidates.items()]
 
 
-def judge_block(cfg: RunConfig) -> str:
-    """`meta.judge` — grader model ID (short string).
+def judges_block(cfg: RunConfig) -> list[str]:
+    """`meta.judges` — every grader model ID, in order. The dashboard builds its
+    judge toggle from this; the first entry is the default view."""
+    return list(cfg.judges)
 
-    Dashboards render this verbatim in metadata panels/footers. Richer info
-    (provider, role, self-preference bias note) lives in `meta.judge_details`.
+
+def judge_block(cfg: RunConfig) -> str:
+    """`meta.judge` — the DEFAULT grader model ID (first judge, short string).
+
+    Kept for back-compat / single-judge dashboards; multi-judge views read
+    `meta.judges` and the per-judge blocks under `by_judge`.
     """
     return cfg.judge
 
 
-def judge_details_block(cfg: RunConfig) -> dict:
-    """`meta.judge_details` — provider + role + family-stake note."""
+def judge_details_for(judge: str) -> dict:
+    """Provider + role + family-stake note for one grader model ID."""
     return {
-        "id": cfg.judge,
+        "id": judge,
         "provider": JUDGE_PROVIDER,
         "role": JUDGE_ROLE,
         "family_stake_note": JUDGE_FAMILY_NOTE,
     }
+
+
+def judge_details_block(cfg: RunConfig) -> dict:
+    """`meta.judge_details` — details for the default (first) grader."""
+    return judge_details_for(cfg.judge)
 
 
 def counts_block(prompts: list[dict], cfg: RunConfig) -> dict:
@@ -137,10 +148,13 @@ def counts_block(prompts: list[dict], cfg: RunConfig) -> dict:
     n_prompts = len(prompts)
     n_criteria = sum(len(p["criteria"]) for p in prompts)
     n_models = len(cfg.candidates)
+    # n_grade_cells is per-judge (criteria × models) — matches the dashboard's
+    # "criteria graded" tile, which shows one judge's view at a time.
     return {
         "n_prompts": n_prompts,
         "n_criteria": n_criteria,
         "n_models": n_models,
+        "n_judges": len(cfg.judges),
         "n_grade_cells": n_criteria * n_models,
     }
 
@@ -267,6 +281,7 @@ def build_meta(cfg: RunConfig, run_report: str | None, run_date_iso: str, prompt
         "dataset": dataset_block(),
         "models": models_block(cfg),
         "model_details": model_details_block(cfg),
+        "judges": judges_block(cfg),
         "judge": judge_block(cfg),
         "judge_details": judge_details_block(cfg),
         "counts": counts_block(prompts, cfg),
@@ -316,6 +331,7 @@ def update_index(slug: str, meta: dict) -> Path:
         "n_criteria": meta["counts"]["n_criteria"],
         "n_models": meta["counts"]["n_models"],
         "models": list(meta["models"]),
+        "judges": list(meta["judges"]),
         "judge": meta["judge"],
         "validation_status": v["status"],
         "agreement_pct": v["agreement_pct"],

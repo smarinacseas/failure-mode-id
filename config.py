@@ -26,7 +26,12 @@ router = OpenAI(
 # Judge + classifier via Anthropic. Non-candidate family → no self-preference bias.
 anthropic = Anthropic()
 
-JUDGE: str = "claude-fable-5"
+# Judges (graders). A run may carry several — each grades the SAME candidate
+# responses, so the dashboard can toggle between them apples-to-apples. The
+# first entry doubles as the criterion classifier. JUDGE kept as a back-compat
+# alias for any single-judge caller.
+JUDGES: list[str] = ["claude-opus-4-8", "claude-fable-5"]
+JUDGE: str = JUDGES[0]
 
 # Single family (Qwen) for v1 size ladder. DeepSeek added later for cross-family.
 CANDIDATES: dict[str, str] = {
@@ -45,8 +50,12 @@ CANDIDATE_TEMPERATURE: float = 0.0
 CANDIDATE_MAX_TOKENS: int = 8000
 CANDIDATE_TIMEOUT_S: float = 300.0
 
-# Judge / classifier calls.
-JUDGE_MAX_TOKENS: int = 4000
+# Judge / classifier calls. Judges run with adaptive thinking on (see
+# pipeline/_judge_llm.py) so both Opus and Fable reason before emitting the
+# JSON verdict — apples-to-apples. Thinking tokens count against max_tokens,
+# so the budget must cover hidden thinking PLUS the verdict array; the call is
+# streamed, so this can exceed the ~16k non-streaming SDK timeout guard.
+JUDGE_MAX_TOKENS: int = 32000
 
 # Validate sampler.
 VALIDATE_SEED: int = 20260101

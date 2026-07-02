@@ -16,7 +16,7 @@ def make_cfg(slug="E99-test", **kw):
     from pipeline.run_config import RunConfig
     params = dict(
         candidates={"m1": "model-1"},
-        judge="claude-fable-5",
+        judges=("claude-fable-5",),
         max_tokens=100,
         temperature=0.0,
         reasoning=False,

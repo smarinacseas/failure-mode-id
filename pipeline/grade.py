@@ -1,14 +1,19 @@
-"""Grade candidate responses with the blind Opus judge.
+"""Grade candidate responses with each blind judge.
 
-ONE judge call per (prompt, candidate response). Never include the model
-name — the judge is structurally blind. JSON parsing is defensive with
-one retry; persistent parse failure records all-FAIL with an error note.
+ONE judge call per (judge, prompt, candidate response). Never include the
+model name — the judge is structurally blind. Every judge in `cfg.judges`
+grades the SAME responses, so the dashboard can compare graders
+apples-to-apples. JSON parsing is defensive with one retry; a truncated
+response (judge spent its whole budget thinking) or a persistent parse
+failure records all-FAIL with an error note — see pipeline/_judge_llm.py
+for why the budget is generous and the call is streamed.
 """
 
 from __future__ import annotations
 
-from config import DATA_JSONL, JUDGE_MAX_TOKENS, PROMPTS_DIR, anthropic
-from pipeline._io import append_jsonl, limited, read_jsonl, retry
+from config import DATA_JSONL, PROMPTS_DIR
+from pipeline._io import append_jsonl, limited, read_jsonl
+from pipeline._judge_llm import call_json
 from pipeline._json_extract import extract_json_array
 from pipeline.monitor import RunMonitor, stage_ctx
 from pipeline.run_config import RunConfig
@@ -26,19 +31,6 @@ def _user_message(prompt: str, response: str, criteria: list[str]) -> str:
         "CRITERIA:\n"
         f"{numbered}"
     )
-
-
-def _judge_call(cfg: RunConfig, user_msg: str) -> str:
-    def _call():
-        msg = anthropic.messages.create(
-            model=cfg.judge,
-            max_tokens=JUDGE_MAX_TOKENS,
-            system=JUDGE_SYSTEM,
-            messages=[{"role": "user", "content": user_msg}],
-        )
-        return "".join(b.text for b in msg.content if hasattr(b, "text"))
-
-    return retry(_call, label=f"anthropic:{cfg.judge}")
 
 
 def _normalize_verdicts(parsed: list, n_criteria: int) -> list[dict]:
@@ -63,20 +55,27 @@ def _normalize_verdicts(parsed: list, n_criteria: int) -> list[dict]:
     return out
 
 
-def _grade_one(cfg: RunConfig, prompt: str, response: str, criteria: list[str]) -> list[dict]:
+def _grade_one(judge: str, prompt: str, response: str, criteria: list[str]) -> list[dict]:
     user_msg = _user_message(prompt, response, criteria)
     last_err: str | None = None
     for attempt in (1, 2):
         try:
-            raw = _judge_call(cfg, user_msg)
+            raw, stop_reason = call_json(judge, JUDGE_SYSTEM, user_msg, label=f"anthropic:{judge}")
+            if stop_reason == "max_tokens":
+                # Truncated before finishing the JSON — almost always thinking eating
+                # the whole budget. Distinct from a genuine parse failure.
+                last_err = "judge_truncated: stop_reason=max_tokens (raise JUDGE_MAX_TOKENS)"
+                if attempt == 2:
+                    break
+                continue
             parsed = extract_json_array(raw)
             return _normalize_verdicts(parsed, len(criteria))
         except Exception as e:  # noqa: BLE001
-            last_err = f"{type(e).__name__}: {e}"
+            last_err = f"judge_parse_error: {type(e).__name__}: {e}"
             if attempt == 2:
                 break
     return [
-        {"index": i, "verdict": "FAIL", "reason": f"judge_parse_error: {last_err}"}
+        {"index": i, "verdict": "FAIL", "reason": last_err}
         for i in range(1, len(criteria) + 1)
     ]
 
@@ -88,28 +87,31 @@ def run(cfg: RunConfig, monitor: RunMonitor | None = None) -> None:
     by_id = {r["id"]: r for r in records}
 
     with stage_ctx(monitor, "grade", len(records)) as mon:
-        total = len(records) * len(cfg.candidates)
-        plan: list[tuple[str, list[dict]]] = []
+        # total spans every (judge, candidate, prompt) cell.
+        total = len(records) * len(cfg.candidates) * len(cfg.judges)
+        plan: list[tuple[str, str, list[dict]]] = []  # (judge, candidate, todo responses)
         already = 0
-        for key in cfg.candidates:
-            responses = read_jsonl(cfg.responses_path(key))
-            done_ids = {r["id"] for r in read_jsonl(cfg.grades_path(key))}
-            todo = [r for r in responses if r["id"] in by_id and r["id"] not in done_ids]
-            already += len(done_ids)
-            if not responses:
-                mon.note(f"grade {key}: no responses yet — skipping.")
-            plan.append((key, todo))
+        for judge in cfg.judges:
+            for key in cfg.candidates:
+                responses = read_jsonl(cfg.responses_path(key))
+                done_ids = {r["id"] for r in read_jsonl(cfg.grades_path(judge, key))}
+                todo = [r for r in responses if r["id"] in by_id and r["id"] not in done_ids]
+                already += len(done_ids)
+                if not responses:
+                    mon.note(f"grade {judge}/{key}: no responses yet — skipping.")
+                plan.append((judge, key, todo))
 
         mon.start_stage("grade", total=total, already_done=already)
-        for key, todo in plan:
-            out_path = cfg.grades_path(key)
+        for judge, key, todo in plan:
+            out_path = cfg.grades_path(judge, key)
             for resp_rec in todo:
                 rid = resp_rec["id"]
                 rec = by_id[rid]
-                mon.item_start(model=key, prompt_id=rid)
-                verdicts = _grade_one(cfg, rec["prompt"], resp_rec["response"], rec["criteria"])
+                mon.item_start(model=f"{key}@{judge}", prompt_id=rid)
+                verdicts = _grade_one(judge, rec["prompt"], resp_rec["response"], rec["criteria"])
                 append_jsonl(out_path, {"id": rid, "verdicts": verdicts})
-                if verdicts and str(verdicts[0].get("reason", "")).startswith("judge_parse_error"):
-                    mon.record_error(f"grade {key} {rid}: judge parse failure")
+                reason0 = str(verdicts[0].get("reason", "")) if verdicts else ""
+                if reason0.startswith("judge_parse_error") or reason0.startswith("judge_truncated"):
+                    mon.record_error(f"grade {judge}/{key} {rid}: {reason0.split(':', 1)[0]}")
                 mon.item_done()
         mon.end_stage()

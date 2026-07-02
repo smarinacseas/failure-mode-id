@@ -32,10 +32,10 @@ def _ping_judge(judge: str) -> str:
 
 def run(cfg: RunConfig | None = None, monitor: RunMonitor | None = None) -> None:
     candidates = cfg.candidates if cfg is not None else dict(config.CANDIDATES)
-    judge = cfg.judge if cfg is not None else config.JUDGE
+    judges = list(cfg.judges) if cfg is not None else list(config.JUDGES)
     ctx = nullcontext(monitor) if monitor is not None else build_monitor("connectivity", 0)
     with ctx as mon:
-        mon.start_stage("connectivity", total=len(candidates) + 1)
+        mon.start_stage("connectivity", total=len(candidates) + len(judges))
         failures: list[tuple[str, str, str]] = []
         for key, model_id in candidates.items():
             mon.item_start(model=key, prompt_id=model_id)
@@ -47,14 +47,15 @@ def run(cfg: RunConfig | None = None, monitor: RunMonitor | None = None) -> None
                 failures.append((key, model_id, f"{type(e).__name__}: {e}"))
             mon.item_done()
 
-        mon.item_start(model="judge", prompt_id=judge)
-        try:
-            txt = _ping_judge(judge)
-            mon.note(f"judge ({judge}) ok ({txt[:40]!r})")
-        except Exception as e:  # noqa: BLE001
-            mon.record_error(f"judge ({judge}): {type(e).__name__}: {e}")
-            failures.append(("judge", judge, f"{type(e).__name__}: {e}"))
-        mon.item_done()
+        for judge in judges:
+            mon.item_start(model="judge", prompt_id=judge)
+            try:
+                txt = _ping_judge(judge)
+                mon.note(f"judge ({judge}) ok ({txt[:40]!r})")
+            except Exception as e:  # noqa: BLE001
+                mon.record_error(f"judge ({judge}): {type(e).__name__}: {e}")
+                failures.append(("judge", judge, f"{type(e).__name__}: {e}"))
+            mon.item_done()
         mon.end_stage()
 
         if failures:

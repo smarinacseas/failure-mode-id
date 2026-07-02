@@ -490,6 +490,16 @@ button{font-family:inherit}
         </div>
       </div>
       <div style="flex:1"></div>
+      <sc-if value="{{ hasJudgeToggle }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:9px;flex:none;padding-right:14px;margin-right:2px;border-right:1px solid var(--border,#e2e6ec)">
+          <span style="font-size:10px;color:var(--ink-4,#9aa0ab);text-transform:uppercase;letter-spacing:.08em;font-weight:600">Judge</span>
+          <div style="display:flex;background:var(--surface-2,#eaedf1);border-radius:8px;padding:3px;gap:2px">
+            <sc-for list="{{ judgeTabs }}" as="jt" hint-placeholder-count="2">
+              <button onclick="{{ jt.onClick }}" style="{{ jt.btnStyle }}">{{ jt.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
       <div style="display:flex;align-items:center;gap:9px;flex:none">
         <span style="font-size:10px;color:var(--ink-4,#9aa0ab);text-transform:uppercase;letter-spacing:.08em;font-weight:600">Model</span>
         <div style="display:flex;background:var(--surface-2,#eaedf1);border-radius:8px;padding:3px;gap:2px">
@@ -870,6 +880,8 @@ const PILL_TONES=[
 ];
 function instrPill(idx){ const t=PILL_TONES[((idx%PILL_TONES.length)+PILL_TONES.length)%PILL_TONES.length]; return PILL_BASE+'background:'+t[0]+';color:'+t[1]; }
 function prettyModel(id){ if(!id) return ''; const m=/^(.*?)[-_ ](\d+)([a-z]*)$/.exec(id); return m ? (m[1].charAt(0).toUpperCase()+m[1].slice(1)+' '+m[2]+m[3].toUpperCase()) : id; }
+// Judge ids like "claude-opus-4-8" / "claude-fable-5" → "Opus 4.8" / "Fable 5".
+function prettyJudge(id){ if(!id) return ''; const s=String(id).replace(/^claude-/,''); const m=/^([a-z]+)-(\d+)(?:-(\d+))?/.exec(s); return m ? (m[1].charAt(0).toUpperCase()+m[1].slice(1)+' '+m[2]+(m[3]?'.'+m[3]:'')) : s; }
 function pctNum(x){ return (x==null||isNaN(x))?0:Number(x); }
 function fmtPct(x){ const n=pctNum(x); return (Math.round(n*10)/10)+'%'; }
 
@@ -924,7 +936,7 @@ class Component extends DCLogic {
     fInstr:null, fUse:null, fStyle:null, openMenu:null,
     sortKey:'id', sortDir:'asc',
     selectedId:null, critFilter:'all', expanded:{},
-    data:null, error:null,
+    data:null, dataRaw:null, judge:null, error:null,
     runs:[], currentRun:null, runOpen:false,
   };
 
@@ -933,6 +945,21 @@ class Component extends DCLogic {
 
   go(screen,patch){this.setState(Object.assign({screen},patch||{}));}
   setModel(m){this.setState({model:m});}
+  // Project the raw multi-judge payload down to a single-judge view so every
+  // downstream render (summary, prompts, meta.judge/validation) reads the
+  // selected judge's data unchanged. Runs without a judge axis pass through.
+  projectJudge(raw, judge){
+    if(!raw) return {data:null, judge:null};
+    const bj = raw.by_judge && raw.by_judge[judge];
+    if(!bj) return {data:raw, judge:(raw.meta&&raw.meta.judge)||null};
+    const data = Object.assign({}, raw, {
+      summary: bj.summary,
+      prompts: bj.prompts,
+      meta: Object.assign({}, raw.meta, {judge:bj.judge, judge_details:bj.judge_details, validation:bj.validation}),
+    });
+    return {data:data, judge:judge};
+  }
+  setJudge(j){ this.setState(this.projectJudge(this.state.dataRaw, j)); }
   drillTo(dim,key){const patch={screen:'drilldown',fInstr:null,fUse:null,fStyle:null,openMenu:null};patch['f'+dim]=key;this.setState(patch);}
   openPrompt(id){this.setState({screen:'detail',selectedId:id,critFilter:'all',expanded:{}});}
   toggleCrit(idx){this.setState(s=>({expanded:Object.assign({},s.expanded,{[idx]:!s.expanded[idx]})}));}
@@ -961,8 +988,13 @@ class Component extends DCLogic {
   }
   loadRun(run){
     var self=this;
-    this.setState({data:null, error:null, currentRun:run, model:null, selectedId:null, screen:'overview', fInstr:null, fUse:null, fStyle:null, openMenu:null, runOpen:false});
-    __loadJson(run.path).then(function(d){ self.setState({data:d, model:(d.meta&&d.meta.models&&d.meta.models[0])||null}); }).catch(function(e){ self.setState({error:String((e&&e.message)||e)}); });
+    this.setState({data:null, dataRaw:null, judge:null, error:null, currentRun:run, model:null, selectedId:null, screen:'overview', fInstr:null, fUse:null, fStyle:null, openMenu:null, runOpen:false});
+    __loadJson(run.path).then(function(d){
+      var judges=(d.meta&&d.meta.judges)||[];
+      var defJudge=judges[0]||(d.meta&&d.meta.judge)||null;
+      var proj=self.projectJudge(d, defJudge);
+      self.setState(Object.assign({dataRaw:d, model:(d.meta&&d.meta.models&&d.meta.models[0])||null}, proj));
+    }).catch(function(e){ self.setState({error:String((e&&e.message)||e)}); });
   }
   runSelVals(){
     var self=this;
@@ -1025,7 +1057,7 @@ class Component extends DCLogic {
         headerMeta:'ComplexConstraints', runMeta:'loading…',
         footDate:'', footJudge:'', footCrit:'', footPrompts:'', footModels:'',
         isOverview:false, isDrill:false, isDetail:false,
-        modelTabs:[], modelLabel:'', detailId:'',
+        modelTabs:[], modelLabel:'', detailId:'', judgeTabs:[], hasJudgeToggle:false,
         goOverview:()=>this.go('overview'),
         goPromptsAll:()=>this.setState({screen:'drilldown',openMenu:null}),
         bcOverviewStyle:'color:var(--ink,#2a2722);font-weight:600;cursor:pointer',
@@ -1182,6 +1214,8 @@ class Component extends DCLogic {
       isOverview:screen==='overview', isDrill:screen==='drilldown', isDetail:screen==='detail',
       modelLabel,
       modelTabs: models.map(m=>({ label:prettyModel(m), onClick:()=>this.setModel(m), btnStyle:this.btn(m===model) })),
+      hasJudgeToggle: !!(meta.judges && meta.judges.length>1),
+      judgeTabs: (meta.judges||[]).map(j=>({ label:prettyJudge(j), onClick:()=>this.setJudge(j), btnStyle:this.btn(j===((this.state.judge)||meta.judge)) })),
       goOverview:()=>this.go('overview'),
       goPromptsAll:()=>this.setState({screen:'drilldown',openMenu:null}),
       goBackDrill:()=>this.setState({screen:'drilldown'}),
