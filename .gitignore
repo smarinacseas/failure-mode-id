@@ -157,6 +157,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# Playwright
+.playwright-mcp/
+
 # Spyder project settings
 .spyderproject
 .spyproject
