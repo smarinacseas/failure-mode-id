@@ -6,17 +6,11 @@ outputs/criteria_tags.jsonl. Resumable.
 
 from __future__ import annotations
 
-from config import (
-    CRITERIA_TAGS_PATH,
-    DATA_JSONL,
-    JUDGE,
-    JUDGE_MAX_TOKENS,
-    PROMPTS_DIR,
-    anthropic,
-)
+from config import DATA_JSONL, JUDGE_MAX_TOKENS, PROMPTS_DIR, anthropic
 from pipeline._io import append_jsonl, limited, read_jsonl, retry
 from pipeline._json_extract import extract_json_array
 from pipeline.monitor import RunMonitor, stage_ctx
+from pipeline.run_config import RunConfig
 
 CLASSIFIER_SYSTEM = (PROMPTS_DIR / "classifier.txt").read_text(encoding="utf-8")
 
@@ -26,17 +20,17 @@ def _user_message(criteria: list[str]) -> str:
     return f"CRITERIA:\n{numbered}"
 
 
-def _classifier_call(user_msg: str) -> str:
+def _classifier_call(cfg: RunConfig, user_msg: str) -> str:
     def _call():
         msg = anthropic.messages.create(
-            model=JUDGE,
+            model=cfg.judge,
             max_tokens=JUDGE_MAX_TOKENS,
             system=CLASSIFIER_SYSTEM,
             messages=[{"role": "user", "content": user_msg}],
         )
         return "".join(b.text for b in msg.content if hasattr(b, "text"))
 
-    return retry(_call, label=f"anthropic:{JUDGE}:classify")
+    return retry(_call, label=f"anthropic:{cfg.judge}:classify")
 
 
 def _normalize_tags(parsed: list, n_criteria: int) -> list[dict]:
@@ -74,12 +68,12 @@ def _normalize_tags(parsed: list, n_criteria: int) -> list[dict]:
     return out
 
 
-def _classify_one(criteria: list[str]) -> list[dict]:
+def _classify_one(cfg: RunConfig, criteria: list[str]) -> list[dict]:
     user_msg = _user_message(criteria)
     last_err: str | None = None
     for attempt in (1, 2):
         try:
-            raw = _classifier_call(user_msg)
+            raw = _classifier_call(cfg, user_msg)
             parsed = extract_json_array(raw)
             return _normalize_tags(parsed, len(criteria))
         except Exception as e:  # noqa: BLE001
@@ -91,22 +85,18 @@ def _classify_one(criteria: list[str]) -> list[dict]:
     return _normalize_tags([], len(criteria))
 
 
-def run(limit: int | None = None, monitor: RunMonitor | None = None) -> None:
-    records = limited(read_jsonl(DATA_JSONL), limit)
+def run(cfg: RunConfig, monitor: RunMonitor | None = None) -> None:
+    records = limited(read_jsonl(DATA_JSONL), cfg.limit)
     if not records:
         raise RuntimeError(f"No records in {DATA_JSONL}. Run `load` first.")
 
     with stage_ctx(monitor, "classify", len(records)) as mon:
-        done_ids = {r["id"] for r in read_jsonl(CRITERIA_TAGS_PATH)}
+        done_ids = {r["id"] for r in read_jsonl(cfg.criteria_tags_path)}
         todo = [r for r in records if r["id"] not in done_ids]
         mon.start_stage("classify", total=len(records), already_done=len(done_ids))
         for rec in todo:
             mon.item_start(prompt_id=rec["id"])
-            tags = _classify_one(rec["criteria"])
-            append_jsonl(CRITERIA_TAGS_PATH, {"id": rec["id"], "tags": tags})
+            tags = _classify_one(cfg, rec["criteria"])
+            append_jsonl(cfg.criteria_tags_path, {"id": rec["id"], "tags": tags})
             mon.item_done()
         mon.end_stage()
-
-
-if __name__ == "__main__":
-    run()
