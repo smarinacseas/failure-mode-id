@@ -459,18 +459,23 @@ button{font-family:inherit}
   <sc-if value="{{ runOpen }}" hint-placeholder-val="{{ false }}"><div onclick="{{ closeRun }}" style="position:fixed;inset:0;z-index:25"></div></sc-if>
 
   <div style="position:sticky;top:0;z-index:30;background:var(--surface-glass,rgba(255,255,255,.86));backdrop-filter:blur(10px);border-bottom:1px solid var(--border,#e2e6ec)">
-    <div style="max-width:1320px;margin:0 auto;padding:13px 30px;display:flex;align-items:center;gap:16px">
+    <!-- flex-wrap is the no-overlap guarantee: when the run selector's minimum
+         content plus the Judge/Model groups can't fit, the toggle groups wrap to
+         a second header line instead of being painted over. -->
+    <div style="max-width:1320px;margin:0 auto;padding:13px 30px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;row-gap:9px">
       <div style="display:flex;align-items:center;gap:11px;min-width:0">
         <div style="width:23px;height:23px;border-radius:6px;background:var(--ink,#161a22);display:flex;align-items:center;justify-content:center;flex:none">
           <div style="width:9px;height:9px;border:2px solid var(--surface,#fff);border-radius:50%"></div>
         </div>
         <div style="font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:18px;letter-spacing:0;flex:none">ConstraintLens</div>
         <div style="position:relative;z-index:50;padding-left:12px;margin-left:2px;border-left:1px solid var(--border,#e2e6ec);min-width:0">
+          <!-- every text span needs min-width:0 + its own ellipsis: nowrap spans
+               refuse to shrink (min-width:auto) and paint past the button box. -->
           <button onclick="{{ runOnToggle }}" style="{{ runBtnStyle }}">
-            <span style="font-size:9px;color:var(--ink-4,#a8a294);text-transform:uppercase;letter-spacing:.09em;font-weight:600">Run</span>
-            <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink-1,#46423a);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px">{{ runLabel }}</span>
-            <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-4,#a8a294);white-space:nowrap">{{ runMeta }}</span>
-            <span style="font-size:9px;color:var(--ink-4,#a8a294)">{{ runCaret }}</span>
+            <span style="font-size:9px;color:var(--ink-4,#a8a294);text-transform:uppercase;letter-spacing:.09em;font-weight:600;flex:none">Run</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink-1,#46423a);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px;min-width:0;flex:0 1 auto">{{ runLabel }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-4,#a8a294);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto">{{ runMeta }}</span>
+            <span style="font-size:9px;color:var(--ink-4,#a8a294);flex:none">{{ runCaret }}</span>
           </button>
           <sc-if value="{{ runOpen }}" hint-placeholder-val="{{ false }}">
             <div style="position:absolute;top:calc(100% + 8px);left:12px;min-width:262px;background:var(--surface,#fbfaf5);border:1px solid var(--border,#e4dfd1);border-radius:10px;box-shadow:0 14px 34px rgba(0,0,0,.18);padding:6px;z-index:80">
@@ -1021,7 +1026,7 @@ class Component extends DCLogic {
       runCaret: open?'▴':'▾', runOpen: open,
       runOnToggle: ()=> this.setState(s=>({runOpen:!s.runOpen})),
       closeRun: ()=> this.setState({runOpen:false}),
-      runBtnStyle: 'display:inline-flex;align-items:baseline;gap:8px;background:transparent;border:none;cursor:pointer;padding:0;max-width:100%;text-align:left',
+      runBtnStyle: 'display:inline-flex;align-items:baseline;gap:8px;background:transparent;border:none;cursor:pointer;padding:0;max-width:100%;min-width:0;overflow:hidden;text-align:left',
       runOptions: runs.map(r=>({ label:r.label||r.id||r.path, date:r.date||'', rowStyle:optRowR(cur&&r.path===cur.path), checkStyle:(cur&&r.path===cur.path)?'color:var(--accent,#b06a3c);font-weight:700;font-size:12px;flex:none':'display:none', onClick:()=>self.loadRun(r) })),
     };
   }
