@@ -17,6 +17,19 @@ def test_all_requires_limit_for_new_experiment(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
     assert main.main(["all", "--experiment", "E90-x"]) == 2
     assert "--limit" in capsys.readouterr().err
+    # Erroring out before doing anything must not freeze the slug's params —
+    # otherwise a retry with --limit hits a manufactured ConfigConflictError.
+    assert not (tmp_path / "E90-x" / "experiment.json").exists()
+
+    captured = {}
+
+    def fake_run_all(cfg, run_report):
+        captured["cfg"] = cfg
+    monkeypatch.setattr(main, "_run_all", fake_run_all)
+    monkeypatch.setattr(main, "build_monitor", _noop_monitor_factory())
+
+    assert main.main(["all", "--experiment", "E90-x", "--limit", "3"]) == 0
+    assert captured["cfg"].limit == 3
 
 
 def test_conflicting_flag_exits_2_with_diff(tmp_path, monkeypatch, capsys):

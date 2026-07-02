@@ -21,6 +21,7 @@ import json
 import sys
 from datetime import datetime, timezone
 
+import config
 from config import CANDIDATE_TIMEOUT_S, PROGRESS_PATH
 from pipeline import (
     aggregate, classify, connectivity, generate, grade, load, validate,
@@ -145,6 +146,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.experiment is None:
             print(f"error: `{args.step}` requires --experiment E<NN>-<label> "
                   "(parameters freeze on the slug's first run).", file=sys.stderr)
+            return 2
+        if (args.step == "all" and args.limit is None
+                and not (config.RUNS_DIR / args.experiment / "experiment.json").exists()):
+            print("error: a new `all` run requires --limit (e.g. `--limit 3` for a "
+                  "smoke test, `--limit 75` for the full set).", file=sys.stderr)
             return 2
         try:
             cfg = resolve(args.experiment, _overrides(args))
