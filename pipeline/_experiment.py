@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 import subprocess
 from collections import Counter
 from pathlib import Path
@@ -59,28 +58,7 @@ JUDGE_FAMILY_NOTE = (
     "self-preference bias is structurally absent by v1 design."
 )
 
-SLUG_RE = re.compile(r"^E(\d{2,})-[a-z0-9]+(-[a-z0-9]+)*$")
-
-
-class InvalidSlugError(ValueError):
-    """Raised when an experiment slug does not match the E<NN>-<name> convention."""
-
-
-def parse_slug(slug: str) -> tuple[int, str]:
-    """Return (number, label) for a valid slug or raise InvalidSlugError.
-
-    Example: `E01-smoke-3p` → (1, "smoke-3p").
-    """
-    m = SLUG_RE.match(slug)
-    if not m:
-        raise InvalidSlugError(
-            f"experiment slug {slug!r} must match E<NN>-<kebab-case-label> "
-            "(e.g. E01-smoke-3p). Digits ≥ 2; label is lowercase-alphanumeric "
-            "words separated by hyphens."
-        )
-    number = int(m.group(1))
-    label = slug.split("-", 1)[1]
-    return number, label
+from pipeline.run_config import InvalidSlugError, SLUG_RE, parse_slug  # noqa: F401 — re-export
 
 
 def _sha256_prefix(path: Path, n: int = 12) -> str:

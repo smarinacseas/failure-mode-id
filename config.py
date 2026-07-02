@@ -26,7 +26,7 @@ router = OpenAI(
 # Judge + classifier via Anthropic. Non-candidate family → no self-preference bias.
 anthropic = Anthropic()
 
-JUDGE: str = "claude-opus-4-8"
+JUDGE: str = "claude-fable-5"
 
 # Single family (Qwen) for v1 size ladder. DeepSeek added later for cross-family.
 CANDIDATES: dict[str, str] = {
@@ -59,6 +59,7 @@ DATA_JSONL = ROOT / "data" / "complexconstraints.jsonl"
 RESPONSES_DIR = ROOT / "responses"
 GRADES_DIR = ROOT / "grades"
 OUTPUTS_DIR = ROOT / "outputs"
+RUNS_DIR = ROOT / "runs"          # per-experiment isolated data: runs/<slug>/
 PROMPTS_DIR = ROOT / "prompts"
 LOGS_DIR = OUTPUTS_DIR / "logs"
 PROGRESS_PATH = OUTPUTS_DIR / "progress.json"
