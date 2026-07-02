@@ -116,3 +116,10 @@ def test_resolve_rejects_bad_slug(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
     with pytest.raises(InvalidSlugError):
         resolve("not-a-slug", {})
+
+
+def test_from_json_dict_missing_field_raises_readable_value_error():
+    d = _cfg().to_json_dict()
+    del d["judge"]
+    with pytest.raises(ValueError, match=r"missing field 'judge'.*hand-edited.*runs/E99-test/"):
+        RunConfig.from_json_dict("E99-test", d)

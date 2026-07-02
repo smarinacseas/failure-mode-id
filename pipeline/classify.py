@@ -1,7 +1,7 @@
 """Classify each criterion for verifiability / gameability / ambiguity.
 
 ONE call per prompt (model-independent). Output appended to
-outputs/criteria_tags.jsonl. Resumable.
+runs/<slug>/criteria_tags.jsonl. Resumable.
 """
 
 from __future__ import annotations

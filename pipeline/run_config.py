@@ -9,6 +9,7 @@ knob mutation anywhere.
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -97,7 +98,13 @@ class RunConfig:
 
     @classmethod
     def from_json_dict(cls, slug: str, d: dict) -> "RunConfig":
-        return cls(slug=slug, **{f: d[f] for f in _PARAM_FIELDS})
+        try:
+            return cls(slug=slug, **{f: d[f] for f in _PARAM_FIELDS})
+        except KeyError as e:
+            raise ValueError(
+                f"experiment.json for {slug!r} is missing field {e.args[0]!r} — "
+                f"was it hand-edited? Delete runs/{slug}/ to start over."
+            ) from e
 
 
 FREEZE_SCHEMA = 1
@@ -186,15 +193,15 @@ def resolve(slug: str, overrides: dict) -> RunConfig:
     params.update(overrides)
     cfg = RunConfig(slug=slug, **params)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(
-            {
-                "schema": FREEZE_SCHEMA,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "params": cfg.to_json_dict(),
-            },
-            ensure_ascii=False, indent=2,
-        ),
-        encoding="utf-8",
+    payload = json.dumps(
+        {
+            "schema": FREEZE_SCHEMA,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "params": cfg.to_json_dict(),
+        },
+        ensure_ascii=False, indent=2,
     )
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(payload, encoding="utf-8")
+    os.replace(tmp, path)
     return cfg

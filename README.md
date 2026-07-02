@@ -128,6 +128,8 @@ uv run python main.py grade --experiment E06-smoke-3p  # re-run one step
 
 Passing a flag that conflicts with the frozen value errors with a diff — one
 experiment, one parameter set, forever. Different parameters → new slug.
+Typoed a slug or froze the wrong parameters before any real work happened?
+Delete its folder (`rm -rf runs/<slug>`) and re-create it.
 
 ### Flags
 

@@ -70,7 +70,7 @@ Identity of this run.
 
 | key | type | notes |
 | --- | --- | --- |
-| `slug` | str \| null | `E<NN>-<kebab-label>` (e.g. `E01-smoke-3p`). `null` for untagged runs — those still write `outputs/results.json` but do not appear in `index.json`. |
+| `slug` | str \| null | `E<NN>-<kebab-label>` (e.g. `E01-smoke-3p`). As of the parameterized CLI, every aggregate run carries a slug; `null` remains schema-legal for backward compatibility with pre-existing consumers, and those runs still write `outputs/results.json` but do not appear in `index.json`. |
 | `number` | int \| null | Two-digit prefix parsed from `slug`. Used for dropdown ordering. |
 | `label` | str \| null | Kebab-case portion after the prefix. |
 | `description` | str | Free-text one-liner passed via `--description`. |

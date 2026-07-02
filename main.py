@@ -100,7 +100,9 @@ def _run_all(cfg, run_report) -> None:
     with build_monitor("all", cfg.limit or 0, cfg.slug,
                        n_candidates=len(cfg.candidates)) as mon:
         connectivity.run(cfg, monitor=mon)
-        load.run(limit=cfg.limit, monitor=mon)
+        # data/complexconstraints.jsonl is parameter-independent (spec invariant);
+        # cfg.limit does all limiting downstream, so load the full dataset here.
+        load.run(limit=None, monitor=mon)
         generate.run(cfg, monitor=mon)
         grade.run(cfg, monitor=mon)
         classify.run(cfg, monitor=mon)
@@ -147,6 +149,15 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: `{args.step}` requires --experiment E<NN>-<label> "
                   "(parameters freeze on the slug's first run).", file=sys.stderr)
             return 2
+        if (args.step == "connectivity"
+                and not (config.RUNS_DIR / args.experiment / "experiment.json").exists()):
+            print(
+                f"error: experiment '{args.experiment}' has no frozen parameters yet — "
+                "run a data step first, or run connectivity without --experiment to ping "
+                "the default models.",
+                file=sys.stderr,
+            )
+            return 2
         if (args.step == "all" and args.limit is None
                 and not (config.RUNS_DIR / args.experiment / "experiment.json").exists()):
             print("error: a new `all` run requires --limit (e.g. `--limit 3` for a "
@@ -166,8 +177,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.step == "all":
         if cfg.limit is None:
-            print("error: a new `all` run requires --limit (e.g. `--limit 3` for a "
-                  "smoke test, `--limit 75` for the full set).", file=sys.stderr)
+            print(f"error: experiment '{cfg.slug}' was frozen without a limit; 'all' needs "
+                  "one. Run steps individually, or start a new slug with --limit.",
+                  file=sys.stderr)
             return 2
         _run_all(cfg, args.run_report)
         return 0

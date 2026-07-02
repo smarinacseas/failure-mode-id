@@ -1,7 +1,7 @@
 """Judge-validation: sample 60 rows for the human, then score agreement.
 
 Two subcommands:
-  - sample : write outputs/judge_validation.json with 60 fixed-seed random
+  - sample : write runs/<slug>/judge_validation.json with 60 fixed-seed random
             (model, id, criterion) rows; human fills the `human` field.
   - score  : read the filled file, compute agreement %, list disagreements,
             and merge `judge_agreement` into run_manifest.json.

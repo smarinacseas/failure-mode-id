@@ -33,6 +33,8 @@ from config import (
     VALIDATE_SAMPLE_TARGET,
     VALIDATE_SEED,
 )
+from pipeline.run_config import RunConfig
+from pipeline.run_config import InvalidSlugError, SLUG_RE, parse_slug  # noqa: F401 — re-export
 
 SCHEMA_VERSION = "2.1"
 
@@ -49,9 +51,6 @@ JUDGE_FAMILY_NOTE = (
     "Non-candidate family (Anthropic judge, non-Anthropic candidates) → "
     "self-preference bias is structurally absent by v1 design."
 )
-
-from pipeline.run_config import RunConfig
-from pipeline.run_config import InvalidSlugError, SLUG_RE, parse_slug  # noqa: F401 — re-export
 
 
 def _sha256_prefix(path: Path, n: int = 12) -> str:
@@ -192,8 +191,8 @@ def validation_block(cfg: RunConfig) -> dict:
     """`meta.validation` — judge-validation status for the dashboard limitations panel.
 
     Read-only view of two files:
-      - outputs/judge_validation.json (written by `validate --mode sample`)
-      - outputs/run_manifest.json's judge_agreement block (merged in by
+      - runs/<slug>/judge_validation.json (written by `validate --mode sample`)
+      - runs/<slug>/run_manifest.json's judge_agreement block (merged in by
         `validate --mode score`)
 
     Status transitions: not_run → sampled → scored. Never reverses.
