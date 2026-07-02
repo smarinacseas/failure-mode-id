@@ -7,7 +7,15 @@
       "path": "./E01-smoke-3p.json",
       "n_prompts": 3,
       "n_models": 3
+    },
+    {
+      "id": "E02-smoke-fable-3p",
+      "label": "E02-smoke-fable-3p — pipeline fable judge",
+      "date": "2026-07-02",
+      "path": "./E02-smoke-fable-3p.json",
+      "n_prompts": 3,
+      "n_models": 3
     }
   ],
-  "synced_at": "2026-07-02T02:25:12.748760+00:00"
+  "synced_at": "2026-07-02T03:47:55.686614+00:00"
 }
