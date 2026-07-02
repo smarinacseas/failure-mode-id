@@ -143,6 +143,7 @@ experiment, one parameter set, forever. Different parameters → new slug.
 | `--judge` | `claude-fable-5` | Anthropic model for grading + classification |
 | `--description` | `""` | what makes this experiment distinct |
 | `--run-report` | — | path to the `meta/` report (pass at `aggregate` time) |
+| `--mode` | `sample` | `validate` selector: `sample` or `score`; never frozen |
 
 All flags except `--run-report` and `--mode` freeze on first use.
 
@@ -179,6 +180,7 @@ runs/<slug>/                  # isolated per-experiment data (gitignored)
   responses/  grades/         # raw candidate outputs + judge verdicts
   criteria_tags.jsonl         # classifier output
   judge_validation.json       # 60-row human-grading sample
+  run_manifest.json           # per-run summary (counts, git state, validation)
 outputs/experiments/<slug>.json   # the versioned deliverable the dashboard reads
 ```
 
@@ -274,7 +276,9 @@ runs/              # runs/<slug>/: frozen experiment.json, responses/, grades/,
                    #   criteria_tags.jsonl, judge_validation.json, run_manifest.json
                    #   — per-experiment isolated data + frozen params (gitignored)
 outputs/           # results.json (latest-run convenience); experiments/ is the
-                   #   versioned per-experiment deliverable (committed)
+                   #   versioned per-experiment deliverable (gitignored locally —
+                   #   scripts/dashboard_sync.py copies published deliverables
+                   #   into the committed dashboard/ folder)
 meta/              # run reports, RESULTS_SCHEMA.md, TEMPLATE.md
 design/, dashboard/, scripts/   # ConstraintLens design bundle → unpacked static site
 ```
