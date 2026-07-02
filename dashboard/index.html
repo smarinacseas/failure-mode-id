@@ -453,7 +453,10 @@ button{font-family:inherit}
 </helmet>
 
 <div style="min-height:100vh">
-  <sc-if value="{{ runOpen }}" hint-placeholder-val="{{ false }}"><div onclick="{{ closeRun }}" style="position:fixed;inset:0;z-index:40"></div></sc-if>
+  <!-- Click-outside overlay must stack BELOW the sticky header (z-index:30): the run menu
+       lives inside the header's stacking context, so any overlay z-index >= 30 would paint
+       over the menu and swallow its clicks. Mirrors the filter-menu overlay (z 15 < container 20). -->
+  <sc-if value="{{ runOpen }}" hint-placeholder-val="{{ false }}"><div onclick="{{ closeRun }}" style="position:fixed;inset:0;z-index:25"></div></sc-if>
 
   <div style="position:sticky;top:0;z-index:30;background:var(--surface-glass,rgba(255,255,255,.86));backdrop-filter:blur(10px);border-bottom:1px solid var(--border,#e2e6ec)">
     <div style="max-width:1320px;margin:0 auto;padding:13px 30px;display:flex;align-items:center;gap:16px">
