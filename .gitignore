@@ -223,3 +223,8 @@ responses/
 grades/
 outputs/
 data/complexconstraints.jsonl
+
+# Personal planning / AI-assisted development artifacts (local only)
+docs/superpowers/
+.superpowers/
+.claude/
