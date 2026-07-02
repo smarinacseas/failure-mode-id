@@ -1,8 +1,10 @@
 import pandas as pd
 import pytest
 
+import config
 import pipeline.connectivity as connectivity
 import pipeline.load as load
+from conftest import make_cfg
 from pipeline.monitor import RecordingSink, RunMonitor, WorkPlan
 
 
@@ -42,7 +44,7 @@ def test_connectivity_pings_all_and_reports(monkeypatch):
 
     monkeypatch.setattr(connectivity, "router", _FakeRouter)
     monkeypatch.setattr(connectivity, "anthropic", _FakeAnthropic)
-    monkeypatch.setattr(connectivity, "CANDIDATES", {"m1": "x", "m2": "y"})
+    monkeypatch.setattr(config, "CANDIDATES", {"m1": "x", "m2": "y"})
 
     m = RunMonitor(WorkPlan.for_step("connectivity", 2, 2), sinks=[RecordingSink()])
     with m:
@@ -68,7 +70,7 @@ def test_connectivity_reports_failures_and_exits(monkeypatch):
 
     monkeypatch.setattr(connectivity, "router", _FailRouter)
     monkeypatch.setattr(connectivity, "anthropic", _OkAnthropic)
-    monkeypatch.setattr(connectivity, "CANDIDATES", {"m1": "x"})
+    monkeypatch.setattr(config, "CANDIDATES", {"m1": "x"})
 
     m = RunMonitor(WorkPlan.for_step("connectivity", 1, 1), sinks=[RecordingSink()])
     with pytest.raises(SystemExit) as exc:
@@ -77,3 +79,14 @@ def test_connectivity_reports_failures_and_exits(monkeypatch):
     assert exc.value.code == 2                        # fails loudly on bad IDs
     assert m.snapshot()["errors"] == 1                # the one failed candidate ping recorded
     assert m.snapshot()["stages"][0]["done"] == 2     # candidate + judge both item_done'd before exit
+
+
+def test_connectivity_pings_cfg_models(monkeypatch):
+    pinged = []
+    monkeypatch.setattr(connectivity, "_ping_candidate", lambda k, mid: pinged.append(("c", k, mid)) or "ok")
+    monkeypatch.setattr(connectivity, "_ping_judge", lambda judge: pinged.append(("j", judge)) or "ok")
+    cfg = make_cfg(candidates={"x": "prov/x"}, judge="claude-fable-5")
+    m = RunMonitor(WorkPlan.for_step("connectivity", 0, 1), sinks=[RecordingSink()])
+    with m:
+        connectivity.run(cfg, monitor=m)
+    assert ("c", "x", "prov/x") in pinged and ("j", "claude-fable-5") in pinged
