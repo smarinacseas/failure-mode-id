@@ -6,8 +6,8 @@
       "number": 4,
       "label": "reasoning-smoke-3p",
       "description": "Reasoning-on ablation of E03: same 3 prompts, Qwen candidates think before answering. temp 0.6 per Qwen thinking-mode guidance (greedy+thinking loops endlessly); 48k shared thinking+answer budget after two 32k cap-outs; provider sort=throughput (default routing drew ~20 tok/s providers → 25-min calls); dual judges (Opus 4.8 + Fable 5).",
-      "run_report": "",
-      "run_date": "2026-07-03T18:17:19.365664+00:00"
+      "run_report": "meta/2026-07-03-reasoning-smoke.md",
+      "run_date": "2026-07-03T19:08:15.050277+00:00"
     },
     "dataset": {
       "name": "Complex Constraints Benchmark Set",
@@ -90,7 +90,7 @@
       "validate_response_excerpt_chars": 800
     },
     "git": {
-      "commit": "f92f858",
+      "commit": "0a5aebc",
       "dirty": true
     },
     "validation": {
@@ -100,7 +100,7 @@
       "agreement_pct": null,
       "scored_at": null
     },
-    "run_date": "2026-07-03T18:17:19.365664+00:00",
+    "run_date": "2026-07-03T19:08:15.050277+00:00",
     "max_tokens": 48000,
     "reasoning_enabled": true,
     "run_notes": [
