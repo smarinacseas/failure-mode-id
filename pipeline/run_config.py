@@ -21,8 +21,10 @@ SLUG_RE = re.compile(r"^E(\d{2,})-[a-z0-9]+(-[a-z0-9]+)*$")
 
 _PARAM_FIELDS = (
     "candidates", "judges", "max_tokens", "temperature",
-    "reasoning", "timeout_s", "limit", "description",
+    "reasoning", "timeout_s", "limit", "description", "provider_sort",
 )
+
+PROVIDER_SORTS = ("throughput", "latency", "price")
 
 
 class InvalidSlugError(ValueError):
@@ -59,6 +61,13 @@ class RunConfig:
     timeout_s: float
     limit: int | None               # prompt count; None = all
     description: str
+    # OpenRouter provider routing preference (None = default routing).
+    # Default routing is a provider lottery whose throughput spans ~10x
+    # (20 vs 164 tok/s observed 2026-07-02); "throughput" pins the fast end,
+    # which reasoning runs need — a 32k+ thinking budget at 20 tok/s is a
+    # ~25-minute call. Caveat: fast providers may serve quantized weights,
+    # so routing preference is itself a (frozen, documented) treatment.
+    provider_sort: str | None = None
 
     @property
     def judge(self) -> str:
@@ -97,8 +106,12 @@ class RunConfig:
 
     @property
     def extra_body(self) -> dict:
-        """OpenRouter extra_body for candidate calls (reasoning toggle)."""
-        return {"reasoning": {"enabled": self.reasoning}}
+        """OpenRouter extra_body for candidate calls (reasoning toggle +
+        optional provider routing preference)."""
+        body: dict = {"reasoning": {"enabled": self.reasoning}}
+        if self.provider_sort:
+            body["provider"] = {"sort": self.provider_sort}
+        return body
 
     # --- serialization (slug is the filename's job, not the payload's) ---
     def to_json_dict(self) -> dict:
@@ -112,6 +125,8 @@ class RunConfig:
         # Back-compat: pre-multi-judge freezes carry a scalar `judge`.
         if "judges" not in d and "judge" in d:
             d["judges"] = [d["judge"]]
+        # Back-compat: freezes older than the provider_sort knob (pre-E04).
+        d.setdefault("provider_sort", None)
         try:
             kwargs = {f: d[f] for f in _PARAM_FIELDS}
         except KeyError as e:
@@ -186,6 +201,7 @@ def _defaults() -> dict:
         "timeout_s": config.CANDIDATE_TIMEOUT_S,
         "limit": None,
         "description": "",
+        "provider_sort": None,
     }
 
 

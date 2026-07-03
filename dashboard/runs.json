@@ -23,7 +23,15 @@
       "path": "./E03-judge-compare-3p.json",
       "n_prompts": 3,
       "n_models": 3
+    },
+    {
+      "id": "E04-reasoning-smoke-3p",
+      "label": "E04-reasoning-smoke-3p — Reasoning-on ablation of E03: same 3 prompts, Qwen candidates think before answe",
+      "date": "2026-07-03",
+      "path": "./E04-reasoning-smoke-3p.json",
+      "n_prompts": 3,
+      "n_models": 3
     }
   ],
-  "synced_at": "2026-07-02T17:21:03.573947+00:00"
+  "synced_at": "2026-07-03T18:17:19.478184+00:00"
 }

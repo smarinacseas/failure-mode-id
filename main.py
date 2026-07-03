@@ -70,6 +70,12 @@ def _parser() -> argparse.ArgumentParser:
                    help="Comma list of Anthropic judge model ids (frozen; default "
                         "claude-opus-4-8,claude-fable-5). Each grades the same responses; "
                         "the dashboard toggles between them.")
+    p.add_argument("--provider-sort", choices=("throughput", "latency", "price"),
+                   default=None, dest="provider_sort",
+                   help="OpenRouter provider routing preference for candidate calls "
+                        "(frozen; default: OpenRouter's own routing). Reasoning runs "
+                        "want 'throughput' — thinking budgets on a slow provider mean "
+                        "20+ minute calls.")
     p.add_argument("--description", default=None,
                    help="One-liner describing what makes this experiment distinct (frozen).")
     p.add_argument("--run-report", default=None, dest="run_report",
@@ -100,6 +106,8 @@ def _overrides(args: argparse.Namespace) -> dict:
         out["judges"] = (validate_judge(args.judge),)
     if args.description is not None:
         out["description"] = args.description
+    if args.provider_sort is not None:
+        out["provider_sort"] = args.provider_sort
     return out
 
 
