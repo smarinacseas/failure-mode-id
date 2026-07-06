@@ -62,6 +62,13 @@ def _grade_one(judge: str, prompt: str, response: str, criteria: list[str]) -> l
     for attempt in (1, 2):
         try:
             raw, stop_reason = call_json(judge, JUDGE_SYSTEM, user_msg, label=f"anthropic:{judge}")
+            if stop_reason == "refusal":
+                # Model-level refusal to grade (empty output). Sticky: 7/7
+                # identical refusals observed on E05 Fable × CIF-006, so a
+                # second attempt is a wasted call.
+                last_err = ("judge_refusal: model declined to grade this cell "
+                            "(stop_reason=refusal)")
+                break
             if stop_reason == "max_tokens":
                 # Truncated before finishing the JSON — almost always thinking eating
                 # the whole budget. Distinct from a genuine parse failure.

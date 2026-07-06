@@ -19,6 +19,40 @@ def test_validate_marks_stage_done(tmp_path, monkeypatch):
     assert m.snapshot()["stages"][0]["state"] == "done"
 
 
+def test_validate_pool_excludes_judge_refusals(tmp_path, monkeypatch):
+    """Refusal rows are grading artifacts (all-FAIL with no real verdict);
+    they must not enter the human-validation pool, like parse errors."""
+    data = tmp_path / "prompts.jsonl"
+    write_jsonl(data, [{"id": "p1", "prompt": "a", "use_case": "A",
+                        "instruction_type": "Negative", "prompt_style": "Direct",
+                        "criteria": ["c1", "c2"]}])
+    monkeypatch.setattr(validate, "DATA_JSONL", data)
+    monkeypatch.setattr(config, "RUNS_DIR", tmp_path / "runs")
+    cfg = make_cfg()
+    write_jsonl(cfg.responses_path("m1"), [{"id": "p1", "response": "r"}])
+    write_jsonl(cfg.grades_path("claude-fable-5", "m1"), [{
+        "id": "p1",
+        "verdicts": [
+            {"index": 1, "verdict": "PASS", "reason": "fine"},
+            {"index": 2, "verdict": "FAIL",
+             "reason": "judge_refusal: model declined to grade this cell"},
+        ],
+    }])
+    pool = validate._build_pool(cfg)
+    assert [p["criterion_index"] for p in pool] == [1]
+
+
+def test_aggregate_run_notes_count_judge_refusals():
+    by_judge = {"claude-fable-5": {"prompts": [{
+        "criteria": [{"results": {"m1": {
+            "pass": False,
+            "reason": "judge_refusal: model declined to grade this cell",
+        }}}],
+    }]}}
+    notes = aggregate._build_run_notes(make_cfg(), {}, by_judge, [])
+    assert any("judge_refusal" in n for n in notes)
+
+
 def test_aggregate_uses_seeded_sample_not_first_n(tmp_path, monkeypatch):
     """With sample_seed frozen, aggregate must compose results over the SAME
     stratified subset the other stages used — slicing records[:limit] would

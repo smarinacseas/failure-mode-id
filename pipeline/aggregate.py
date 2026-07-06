@@ -207,7 +207,8 @@ def _build_run_notes(cfg: RunConfig, responses: dict, by_judge: dict, skipped: l
             for c in p["criteria"]:
                 for r in c["results"].values():
                     reason = str(r.get("reason", ""))
-                    for tag in ("judge_parse_error", "judge_truncated", "missing_in_judge_output"):
+                    for tag in ("judge_parse_error", "judge_truncated", "judge_refusal",
+                                "missing_in_judge_output"):
                         if reason.startswith(tag):
                             counts[tag] = counts.get(tag, 0) + 1
         if counts:

@@ -55,6 +55,24 @@ def test_grade_records_error_on_judge_parse_failure(tmp_path, monkeypatch):
     assert m.snapshot()["stages"][0]["done"] == 1
 
 
+def test_grade_one_records_refusal_distinctly(monkeypatch):
+    """A judge-level refusal (stop_reason=refusal, empty text) is not a parse
+    error: record it as judge_refusal and don't burn a second attempt —
+    refusals proved sticky (7/7 on E05 Fable × CIF-006)."""
+    calls = {"n": 0}
+
+    def fake_call_json(judge, system, user_msg, label):
+        calls["n"] += 1
+        return "", "refusal"
+    monkeypatch.setattr(grade, "call_json", fake_call_json)
+
+    out = grade._grade_one("claude-fable-5", "prompt", "resp", ["c1", "c2"])
+    assert len(out) == 2
+    assert all(v["verdict"] == "FAIL" for v in out)
+    assert all(v["reason"].startswith("judge_refusal") for v in out)
+    assert calls["n"] == 1
+
+
 def test_classify_records_error_on_parse_failure(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "RUNS_DIR", tmp_path / "runs")
     cfg = make_cfg()

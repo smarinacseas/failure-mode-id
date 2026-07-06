@@ -43,7 +43,7 @@ def _build_pool(cfg: RunConfig) -> list[dict]:
                         continue
                     # Skip judge failures — they aren't a real verdict to grade against.
                     reason = v.get("reason", "")
-                    if reason.startswith("judge_parse_error") or reason.startswith("judge_truncated"):
+                    if reason.startswith(("judge_parse_error", "judge_truncated", "judge_refusal")):
                         continue
                     pool.append({
                         "judge": judge,
