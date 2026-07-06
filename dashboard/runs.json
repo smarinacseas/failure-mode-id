@@ -31,7 +31,15 @@
       "path": "./E04-reasoning-smoke-3p.json",
       "n_prompts": 3,
       "n_models": 3
+    },
+    {
+      "id": "E05-reasoning-rand20p",
+      "label": "E05-reasoning-rand20p — Randomized-sample scale-up of E04: identical reasoning-on treatment (temp 0",
+      "date": "2026-07-06",
+      "path": "./E05-reasoning-rand20p.json",
+      "n_prompts": 20,
+      "n_models": 3
     }
   ],
-  "synced_at": "2026-07-03T19:08:15.149658+00:00"
+  "synced_at": "2026-07-06T23:54:58.194893+00:00"
 }
