@@ -4,11 +4,24 @@ from __future__ import annotations
 
 import json
 import random
+import threading
 import time
 from pathlib import Path
 from typing import Callable, Iterable, TypeVar
 
 T = TypeVar("T")
+
+# One lock per output file so concurrent workers can never interleave lines.
+# Keyed by resolved path; the guard lock only protects dict access (cheap),
+# the per-file lock is held for the actual write.
+_APPEND_LOCKS: dict[str, threading.Lock] = {}
+_APPEND_LOCKS_GUARD = threading.Lock()
+
+
+def _append_lock(path: Path) -> threading.Lock:
+    key = str(Path(path).resolve())
+    with _APPEND_LOCKS_GUARD:
+        return _APPEND_LOCKS.setdefault(key, threading.Lock())
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -24,9 +37,20 @@ def read_jsonl(path: Path) -> list[dict]:
 
 
 def append_jsonl(path: Path, record: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    """Append one record as a single line, atomically w.r.t. other threads.
+
+    Contract: on success the record is appended whole (serialize first, then
+    one write() of line+newline under this file's lock, then flush); on any
+    failure nothing is written. Records from concurrent workers can therefore
+    never interleave or tear — resume logic (`done_ids` from re-reading the
+    file) stays byte-simple.
+    """
+    line = json.dumps(record, ensure_ascii=False) + "\n"
+    with _append_lock(path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as f:
+            f.write(line)
+            f.flush()
 
 
 def write_jsonl(path: Path, records: Iterable[dict]) -> None:
@@ -61,6 +85,8 @@ def retry(
                 "429" in msg
                 or "rate" in msg
                 or "timeout" in msg
+                or "deadline" in msg              # wall-clock deadline guard abort
+                or "deadline" in name
                 or "overloaded" in msg
                 or "empty completion" in msg       # transient empty body from a provider
                 or "503" in msg

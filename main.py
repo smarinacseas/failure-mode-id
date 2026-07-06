@@ -81,6 +81,12 @@ def _parser() -> argparse.ArgumentParser:
                         "(frozen; default: OpenRouter's own routing). Reasoning runs "
                         "want 'throughput' — thinking budgets on a slow provider mean "
                         "20+ minute calls.")
+    p.add_argument("--judge-mode", choices=("batch", "sequential"),
+                   default=None, dest="judge_mode",
+                   help="Judge transport (frozen; default batch): 'batch' grades via "
+                        "the Anthropic Message Batches API (submit → poll → collect); "
+                        "'sequential' keeps the one-streamed-call-per-cell path. "
+                        "Grading params are identical either way.")
     p.add_argument("--description", default=None,
                    help="One-liner describing what makes this experiment distinct (frozen).")
     p.add_argument("--run-report", default=None, dest="run_report",
@@ -115,6 +121,8 @@ def _overrides(args: argparse.Namespace) -> dict:
         out["provider_sort"] = args.provider_sort
     if args.sample_seed is not None:
         out["sample_seed"] = args.sample_seed
+    if args.judge_mode is not None:
+        out["judge_mode"] = args.judge_mode
     return out
 
 

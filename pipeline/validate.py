@@ -57,6 +57,11 @@ def _build_pool(cfg: RunConfig) -> list[dict]:
                         "judge_reason": v["reason"],
                         "human": "",
                     })
+    # Batch-collected grades land in the JSONL in arbitrary order, and
+    # rng.sample() is order-sensitive: the fixed-seed sample must be a pure
+    # function of the pool's CONTENT, never of file order. Sort on the cell's
+    # identity before sampling.
+    pool.sort(key=lambda r: (r["judge"], r["model"], r["id"], r["criterion_index"]))
     return pool
 
 

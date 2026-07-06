@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 import time
 from contextlib import nullcontext
 from dataclasses import dataclass, field
@@ -47,8 +48,11 @@ class Stage:
     total: int
     done: int = 0
     state: str = "pending"                     # pending | running | done
-    current_model: str | None = None
-    current_prompt_id: str | None = None
+    # In-flight work items: (model, prompt_id) -> monotonic start time.
+    # Replaces the old single-item current_model/current_prompt_id fields —
+    # with a worker pool several items are live at once. Insertion-ordered,
+    # so a bare item_done() (sequential callers) pops the oldest.
+    in_flight: dict = field(default_factory=dict, repr=False)
     _durations: list[float] = field(default_factory=list, repr=False)
 
     WINDOW = 20
@@ -155,78 +159,109 @@ class RunMonitor:
         self.errors = 0
         self.started_at = ""
         self._start_monotonic: float | None = None
-        self._item_start: float | None = None
         self._current: Stage | None = None
+        # Batch-judge stage accounting (submitted/pending/collected/errored);
+        # None outside a batch stage. Reported in the heartbeat.
+        self.batch: dict | None = None
+        # One re-entrant lock guards ALL state mutation and every sink write
+        # (progress.json included): note_retry()/note_error()/item_* arrive
+        # from worker threads, and an unlocked snapshot mid-mutation could
+        # write a torn heartbeat. Re-entrant because sinks call snapshot()
+        # back on this monitor from inside _emit().
+        self._lock = threading.RLock()
 
     # -- lifecycle ---------------------------------------------------------- #
     def __enter__(self) -> "RunMonitor":
         global ACTIVE
-        ACTIVE = self
-        self.state = "running"
-        self.started_at = _now_iso()
-        self._start_monotonic = time.monotonic()
-        self._emit()
+        with self._lock:
+            ACTIVE = self
+            self.state = "running"
+            self.started_at = _now_iso()
+            self._start_monotonic = time.monotonic()
+            self._emit()
         return self
 
     def __exit__(self, exc_type, exc, tb) -> bool:
         global ACTIVE
-        self.state = "error" if exc_type else "done"
-        self._emit()
-        for s in self.sinks:
-            s.close(self)
-        ACTIVE = None
+        with self._lock:
+            self.state = "error" if exc_type else "done"
+            self._emit()
+            for s in self.sinks:
+                s.close(self)
+            ACTIVE = None
         return False                          # never suppress exceptions
 
     # -- events ------------------------------------------------------------- #
     def start_stage(self, name: str, total: int, already_done: int = 0) -> None:
-        st = self.plan.get(name)
-        st.total = total
-        st.done = min(already_done, total)
-        st.state = "running"
-        self._current = st
-        self._log("INFO", f"stage {name} started (total={total}, resumed={st.done})")
-        self._emit()
+        with self._lock:
+            st = self.plan.get(name)
+            st.total = total
+            st.done = min(already_done, total)
+            st.state = "running"
+            self._current = st
+            self._log("INFO", f"stage {name} started (total={total}, resumed={st.done})")
+            self._emit()
 
     def item_start(self, model: str | None = None, prompt_id: str | None = None) -> None:
-        if self._current is None:
-            return
-        self._current.current_model = model
-        self._current.current_prompt_id = prompt_id
-        self._item_start = time.monotonic()
-        self._emit()
+        with self._lock:
+            if self._current is None:
+                return
+            self._current.in_flight[(model, prompt_id)] = time.monotonic()
+            self._emit()
 
-    def item_done(self) -> None:
-        st = self._current
-        if st is None:
-            return
-        if self._item_start is not None:
-            st.record_duration(time.monotonic() - self._item_start)
-            self._item_start = None
-        st.done = min(st.done + 1, st.total)
-        self._log("INFO", f"{st.name} {st.current_model} {st.current_prompt_id} done")
-        self._emit()
+    def item_done(self, model: str | None = None, prompt_id: str | None = None) -> None:
+        """Complete one item. Concurrent callers pass the same identifiers they
+        gave item_start(); a bare call (sequential stages) pops the oldest
+        in-flight item, preserving the old one-at-a-time behavior."""
+        with self._lock:
+            st = self._current
+            if st is None:
+                return
+            key = (model, prompt_id)
+            if key not in st.in_flight and st.in_flight:
+                key = next(iter(st.in_flight))          # oldest (insertion order)
+            started = st.in_flight.pop(key, None)
+            if started is not None:
+                st.record_duration(time.monotonic() - started)
+            st.done = min(st.done + 1, st.total)
+            self._log("INFO", f"{st.name} {key[0]} {key[1]} done")
+            self._emit()
 
     def end_stage(self) -> None:
-        st = self._current
-        if st is not None:
-            st.state = "done"
-            st.done = st.total
-            st.current_model = st.current_prompt_id = None
-        self._emit()
+        with self._lock:
+            st = self._current
+            if st is not None:
+                st.state = "done"
+                st.done = st.total
+                st.in_flight.clear()
+            self._emit()
 
     def record_retry(self, label: str) -> None:
-        self.retries += 1
-        self._log("WARNING", f"retry {label}")
-        self._emit()
+        with self._lock:
+            self.retries += 1
+            self._log("WARNING", f"retry {label}")
+            self._emit()
 
     def record_error(self, context: str) -> None:
-        self.errors += 1
-        self._log("ERROR", context)
-        self._emit()
+        with self._lock:
+            self.errors += 1
+            self._log("ERROR", context)
+            self._emit()
+
+    def set_batch_counts(self, submitted: int, pending: int,
+                         collected: int, errored: int) -> None:
+        """Heartbeat accounting for the batch-judge stage (updated at submit
+        and on every poll): requests submitted, still processing, results
+        collected (succeeded), per-item errored results observed."""
+        with self._lock:
+            self.batch = {"submitted": submitted, "pending": pending,
+                          "collected": collected, "errored": errored}
+            self._emit()
 
     def note(self, message: str) -> None:
-        self._log("NOTE", message)
-        self._emit()
+        with self._lock:
+            self._log("NOTE", message)
+            self._emit()
 
     # -- math + snapshot ---------------------------------------------------- #
     @property
@@ -253,32 +288,37 @@ class RunMonitor:
         return total if seen else None
 
     def snapshot(self) -> dict:
-        cur = self._current
-        done, total = self._overall()
-        eta = self.eta_s()
-        return {
-            "experiment": self.experiment,
-            "state": self.state,
-            "pid": os.getpid(),
-            "started_at": self.started_at,
-            "updated_at": _now_iso(),
-            "elapsed_s": round(self.elapsed_s, 1),
-            "eta_s": round(eta, 1) if eta is not None else None,
-            "current": {
-                "stage": cur.name if cur else None,
-                "model": cur.current_model if cur else None,
-                "prompt_id": cur.current_prompt_id if cur else None,
-            },
-            "overall": {"done": done, "total": total,
-                        "pct": round(100.0 * done / total, 1) if total else 0.0},
-            "stages": [
-                {"name": s.name, "state": s.state, "done": s.done,
-                 "total": s.total, "pct": s.pct}
-                for s in self.plan.stages
-            ],
-            "retries": self.retries,
-            "errors": self.errors,
-        }
+        with self._lock:
+            cur = self._current
+            done, total = self._overall()
+            eta = self.eta_s()
+            in_flight_items = [
+                {"model": m, "prompt_id": p} for (m, p) in cur.in_flight
+            ] if cur else []
+            return {
+                "experiment": self.experiment,
+                "state": self.state,
+                "pid": os.getpid(),
+                "started_at": self.started_at,
+                "updated_at": _now_iso(),
+                "elapsed_s": round(self.elapsed_s, 1),
+                "eta_s": round(eta, 1) if eta is not None else None,
+                "current": {
+                    "stage": cur.name if cur else None,
+                    "in_flight": len(in_flight_items),
+                    "in_flight_items": in_flight_items,
+                },
+                "overall": {"done": done, "total": total,
+                            "pct": round(100.0 * done / total, 1) if total else 0.0},
+                "stages": [
+                    {"name": s.name, "state": s.state, "done": s.done,
+                     "total": s.total, "pct": s.pct}
+                    for s in self.plan.stages
+                ],
+                "batch": self.batch,
+                "retries": self.retries,
+                "errors": self.errors,
+            }
 
     # -- fan-out ------------------------------------------------------------ #
     def _emit(self) -> None:
@@ -311,6 +351,22 @@ def _bar(pct: float, width: int = 16) -> str:
     return "█" * filled + "░" * (width - filled)
 
 
+def _in_flight_display(cur: dict) -> tuple[int, list[str]]:
+    """(count, labels) from a snapshot's `current` block. Tolerates the
+    pre-concurrency single-item shape ({model, prompt_id}) so `status` can
+    still render a progress.json written by an older run."""
+    items = cur.get("in_flight_items")
+    if items is None:
+        if cur.get("model") or cur.get("prompt_id"):
+            items = [{"model": cur.get("model"), "prompt_id": cur.get("prompt_id")}]
+        else:
+            items = []
+    labels = [" ".join(str(x) for x in (i.get("model"), i.get("prompt_id"))
+                       if x is not None) for i in items]
+    count = cur.get("in_flight")
+    return (len(labels) if count is None else count), labels
+
+
 def render_lines(snap: dict) -> str:
     o = snap["overall"]
     cur = snap.get("current") or {}
@@ -326,10 +382,21 @@ def render_lines(snap: dict) -> str:
             lines.append(f"{name:<12} pending  {st['done']}/{st['total']}")
         else:
             suffix = ""
-            if cur.get("stage") == name and cur.get("model"):
-                suffix = f" · {cur['model']} · {cur.get('prompt_id') or ''}"
+            if cur.get("stage") == name:
+                n_flight, labels = _in_flight_display(cur)
+                if labels:
+                    shown = " · ".join(labels[:4])
+                    more = f" (+{n_flight - 4} more)" if n_flight > 4 else ""
+                    suffix = f" · {n_flight} in flight · {shown}{more}"
             lines.append(f"{name:<10}{_bar(st['pct'])}  {st['done']}/{st['total']}  "
                          f"{int(st['pct'])}%{suffix}")
+    batch = snap.get("batch")
+    if batch:
+        lines.append("")
+        lines.append(f"batch: submitted {batch.get('submitted', 0)} · "
+                     f"pending {batch.get('pending', 0)} · "
+                     f"collected {batch.get('collected', 0)} · "
+                     f"errored {batch.get('errored', 0)}")
     lines.append("")
     lines.append(f"retries: {snap['retries']}   errors: {snap['errors']}   "
                  f"elapsed: {_fmt_dur(snap['elapsed_s'])}")

@@ -70,6 +70,27 @@ def test_sample_seed_flag_flows_to_cfg(tmp_path, monkeypatch):
     assert captured["sample_seed"] == 42
 
 
+def test_judge_mode_flag_flows_to_cfg_and_defaults_batch(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
+    captured = {}
+
+    def fake_grade_run(cfg, monitor=None):
+        captured["judge_mode"] = cfg.judge_mode
+    monkeypatch.setattr(main.grade, "run", fake_grade_run)
+    monkeypatch.setattr(main, "build_monitor", _noop_monitor_factory())
+
+    assert main.main(["grade", "--experiment", "E98-seq", "--limit", "5",
+                      "--judge-mode", "sequential"]) == 0
+    assert captured["judge_mode"] == "sequential"
+
+    assert main.main(["grade", "--experiment", "E98-batch", "--limit", "5"]) == 0
+    assert captured["judge_mode"] == "batch"        # frozen default
+
+    # judge_mode is frozen like every other param: a conflicting re-pass errors.
+    assert main.main(["grade", "--experiment", "E98-seq",
+                      "--judge-mode", "batch"]) == 2
+
+
 def test_bad_judge_exits_2(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
     assert main.main(["grade", "--experiment", "E93-j", "--judge", "gpt-5"]) == 2

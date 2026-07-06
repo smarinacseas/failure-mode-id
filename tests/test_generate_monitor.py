@@ -87,17 +87,33 @@ def test_generate_uses_seeded_stratified_sample(tmp_path, monkeypatch):
 def test_generate_empty_completion_is_error_not_data(tmp_path, monkeypatch):
     """A provider returning empty content must NOT be stored as a valid response
     (it would silently grade 0/N downstream). It's an error: recorded, skipped,
-    resumable. Regression test for the E03 qwen-397b/CIF-002 empty cell."""
+    resumable. Regression test for the E03 qwen-397b/CIF-002 empty cell.
+
+    Mock updated for the streamed transport: the fake stream delivers only
+    whitespace content deltas, so the accumulated text is empty."""
     cfg = _setup(tmp_path, monkeypatch)
 
-    class _EmptyChoice:
-        message = type("M", (), {"content": "   "})()
+    class _EmptyStream:
+        def __init__(self):
+            delta = type("D", (), {"content": "   ", "reasoning": None})()
+            choice = type("C", (), {"delta": delta, "finish_reason": "stop"})()
+            self._chunks = [type("R", (), {"choices": [choice]})()]
+        def __iter__(self):
+            return self
+        def __next__(self):
+            if self._chunks:
+                return self._chunks.pop(0)
+            raise StopIteration
+        def close(self):
+            pass
+
     class _EmptyRouter:
         class chat:
             class completions:
                 @staticmethod
                 def create(**_k):
-                    return type("R", (), {"choices": [_EmptyChoice()]})()
+                    assert _k.get("stream") is True     # deadline guard needs streaming
+                    return _EmptyStream()
 
     monkeypatch.setattr(generate, "router", _EmptyRouter)
     # retry() must treat empty completions as retriable, then give up loudly.
