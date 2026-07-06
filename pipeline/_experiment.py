@@ -183,6 +183,8 @@ def config_block(cfg: RunConfig) -> dict:
         "candidate_max_tokens": cfg.max_tokens,
         "candidate_extra_body": cfg.extra_body,
         "candidate_timeout_s": cfg.timeout_s,
+        "limit": cfg.limit,
+        "sample_seed": cfg.sample_seed,
         "judge_max_tokens": JUDGE_MAX_TOKENS,
         "judge_prompt_sha256_12": _sha256_prefix(PROMPTS_DIR / "judge.txt"),
         "classifier_prompt_sha256_12": _sha256_prefix(PROMPTS_DIR / "classifier.txt"),

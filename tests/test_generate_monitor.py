@@ -56,6 +56,34 @@ def test_generate_respects_cfg_limit(tmp_path, monkeypatch):
     assert [r["id"] for r in read_jsonl(cfg.responses_path("m1"))] == ["p1"]
 
 
+def test_generate_uses_seeded_stratified_sample(tmp_path, monkeypatch):
+    """With sample_seed frozen, generate must process the stratified subset,
+    not the first N rows. p4 is a singleton use case at the end of the file:
+    round-robin selection must include it; first-N never would."""
+    data = tmp_path / "prompts.jsonl"
+    write_jsonl(data, [
+        {"id": "p1", "prompt": "a", "use_case": "A",
+         "instruction_type": "Negative", "prompt_style": "Direct", "criteria": []},
+        {"id": "p2", "prompt": "b", "use_case": "A",
+         "instruction_type": "Negative", "prompt_style": "Direct", "criteria": []},
+        {"id": "p3", "prompt": "c", "use_case": "A",
+         "instruction_type": "Negative", "prompt_style": "Direct", "criteria": []},
+        {"id": "p4", "prompt": "d", "use_case": "B",
+         "instruction_type": "Implicit", "prompt_style": "Rambling", "criteria": []},
+    ])
+    monkeypatch.setattr(generate, "DATA_JSONL", data)
+    monkeypatch.setattr(config, "RUNS_DIR", tmp_path / "runs")
+    cfg = make_cfg(limit=2, sample_seed=1)
+    monkeypatch.setattr(generate, "_generate_one", lambda c, m, p: {"response": "RESP"})
+
+    m = RunMonitor(WorkPlan.for_step("generate", 2, 1), sinks=[RecordingSink()])
+    with m:
+        generate.run(cfg, monitor=m)
+
+    ids = {r["id"] for r in read_jsonl(cfg.responses_path("m1"))}
+    assert "p4" in ids and len(ids) == 2
+
+
 def test_generate_empty_completion_is_error_not_data(tmp_path, monkeypatch):
     """A provider returning empty content must NOT be stored as a valid response
     (it would silently grade 0/N downstream). It's an error: recorded, skipped,

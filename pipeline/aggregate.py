@@ -32,6 +32,7 @@ from pipeline._experiment import (
     write_experiment_copy,
 )
 from pipeline._io import read_jsonl
+from pipeline._select import select_prompts
 from pipeline.monitor import RunMonitor, stage_ctx
 from pipeline.run_config import RunConfig
 
@@ -264,8 +265,9 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
             )
 
     records, responses, grades_by_judge, tags = _load_all(cfg)
-    if cfg.limit is not None:
-        records = records[: cfg.limit]
+    # Same selection every stage used — with a sample_seed this is the
+    # stratified subset, NOT the first `limit` rows.
+    records = select_prompts(records, cfg.limit, cfg.sample_seed)
 
     models = list(cfg.candidates.keys())
     judges = list(cfg.judges)

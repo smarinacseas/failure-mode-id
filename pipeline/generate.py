@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from config import DATA_JSONL, router
-from pipeline._io import append_jsonl, limited, read_jsonl, retry
+from pipeline._io import append_jsonl, read_jsonl, retry
+from pipeline._select import select_prompts
 from pipeline.monitor import RunMonitor, stage_ctx
 from pipeline.run_config import RunConfig
 
@@ -58,7 +59,7 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str) -> dict:
 
 
 def run(cfg: RunConfig, monitor: RunMonitor | None = None) -> None:
-    records = limited(read_jsonl(DATA_JSONL), cfg.limit)
+    records = select_prompts(read_jsonl(DATA_JSONL), cfg.limit, cfg.sample_seed)
     if not records:
         raise RuntimeError(f"No records in {DATA_JSONL}. Run `load` first.")
 

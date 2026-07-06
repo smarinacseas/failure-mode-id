@@ -12,8 +12,9 @@ for why the budget is generous and the call is streamed.
 from __future__ import annotations
 
 from config import DATA_JSONL, PROMPTS_DIR
-from pipeline._io import append_jsonl, limited, read_jsonl
+from pipeline._io import append_jsonl, read_jsonl
 from pipeline._judge_llm import call_json
+from pipeline._select import select_prompts
 from pipeline._json_extract import extract_json_array
 from pipeline.monitor import RunMonitor, stage_ctx
 from pipeline.run_config import RunConfig
@@ -81,7 +82,7 @@ def _grade_one(judge: str, prompt: str, response: str, criteria: list[str]) -> l
 
 
 def run(cfg: RunConfig, monitor: RunMonitor | None = None) -> None:
-    records = limited(read_jsonl(DATA_JSONL), cfg.limit)
+    records = select_prompts(read_jsonl(DATA_JSONL), cfg.limit, cfg.sample_seed)
     if not records:
         raise RuntimeError(f"No records in {DATA_JSONL}. Run `load` first.")
     by_id = {r["id"]: r for r in records}

@@ -81,7 +81,3 @@ def retry(
             monitor.note_retry(f"{label} in {delay:.1f}s ({type(e).__name__})")
             time.sleep(delay)
     raise last_exc  # type: ignore[misc]
-
-
-def limited(records: list[dict], limit: int | None) -> list[dict]:
-    return records if limit is None else records[:limit]

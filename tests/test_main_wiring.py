@@ -56,6 +56,20 @@ def test_single_step_gets_cfg_and_monitor(tmp_path, monkeypatch):
     assert captured == {"slug": "E92-z", "limit": 5, "has_monitor": True}
 
 
+def test_sample_seed_flag_flows_to_cfg(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
+    captured = {}
+
+    def fake_grade_run(cfg, monitor=None):
+        captured["sample_seed"] = cfg.sample_seed
+    monkeypatch.setattr(main.grade, "run", fake_grade_run)
+    monkeypatch.setattr(main, "build_monitor", _noop_monitor_factory())
+
+    assert main.main(["grade", "--experiment", "E94-s", "--limit", "5",
+                      "--sample-seed", "42"]) == 0
+    assert captured["sample_seed"] == 42
+
+
 def test_bad_judge_exits_2(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
     assert main.main(["grade", "--experiment", "E93-j", "--judge", "gpt-5"]) == 2

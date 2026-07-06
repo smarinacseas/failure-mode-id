@@ -22,6 +22,7 @@ SLUG_RE = re.compile(r"^E(\d{2,})-[a-z0-9]+(-[a-z0-9]+)*$")
 _PARAM_FIELDS = (
     "candidates", "judges", "max_tokens", "temperature",
     "reasoning", "timeout_s", "limit", "description", "provider_sort",
+    "sample_seed",
 )
 
 PROVIDER_SORTS = ("throughput", "latency", "price")
@@ -68,6 +69,12 @@ class RunConfig:
     # ~25-minute call. Caveat: fast providers may serve quantized weights,
     # so routing preference is itself a (frozen, documented) treatment.
     provider_sort: str | None = None
+    # Seeded stratified sampling: None = first-`limit` rows (E01–E04
+    # behavior); an int selects `limit` prompts spread across use cases /
+    # instruction types / prompt styles (see pipeline/_select.py). Frozen —
+    # a different seed is a different prompt subset, hence a different
+    # experiment.
+    sample_seed: int | None = None
 
     @property
     def judge(self) -> str:
@@ -127,6 +134,8 @@ class RunConfig:
             d["judges"] = [d["judge"]]
         # Back-compat: freezes older than the provider_sort knob (pre-E04).
         d.setdefault("provider_sort", None)
+        # Back-compat: freezes older than the sample_seed knob (pre-E05).
+        d.setdefault("sample_seed", None)
         try:
             kwargs = {f: d[f] for f in _PARAM_FIELDS}
         except KeyError as e:
@@ -202,6 +211,7 @@ def _defaults() -> dict:
         "limit": None,
         "description": "",
         "provider_sort": None,
+        "sample_seed": None,
     }
 
 

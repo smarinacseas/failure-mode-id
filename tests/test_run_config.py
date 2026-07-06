@@ -139,6 +139,35 @@ def test_resolve_rejects_bad_slug(tmp_path, monkeypatch):
         resolve("not-a-slug", {})
 
 
+def test_sample_seed_freezes_reloads_and_conflicts(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
+    cfg = resolve("E15-sampled", {"limit": 20, "sample_seed": 20260706})
+    assert cfg.sample_seed == 20260706
+    frozen = json.loads((tmp_path / "E15-sampled" / "experiment.json").read_text())
+    assert frozen["params"]["sample_seed"] == 20260706
+    # bare re-invocation reloads the frozen seed
+    assert resolve("E15-sampled", {}).sample_seed == 20260706
+    # a different seed would silently select different prompts — must conflict
+    with pytest.raises(ConfigConflictError, match="sample_seed"):
+        resolve("E15-sampled", {"sample_seed": 1})
+
+
+def test_config_block_records_sampling_knobs():
+    """meta.config is 'every knob that could differ across experiments' —
+    the prompt subset (limit + sample_seed) is exactly such a knob."""
+    from pipeline._experiment import config_block
+    block = config_block(_cfg(limit=20, sample_seed=20260706))
+    assert block["limit"] == 20
+    assert block["sample_seed"] == 20260706
+
+
+def test_sample_seed_backcompat_defaults_none():
+    """Freezes older than the sample_seed knob (E01–E04) must load as None."""
+    d = _cfg().to_json_dict()
+    d.pop("sample_seed", None)
+    assert RunConfig.from_json_dict("E99-test", d).sample_seed is None
+
+
 def test_from_json_dict_missing_field_raises_readable_value_error():
     d = _cfg().to_json_dict()
     del d["judges"]

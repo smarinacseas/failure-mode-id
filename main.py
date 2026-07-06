@@ -70,6 +70,11 @@ def _parser() -> argparse.ArgumentParser:
                    help="Comma list of Anthropic judge model ids (frozen; default "
                         "claude-opus-4-8,claude-fable-5). Each grades the same responses; "
                         "the dashboard toggles between them.")
+    p.add_argument("--sample-seed", type=int, default=None, dest="sample_seed",
+                   help="Seeded stratified sampling (frozen): pick --limit prompts "
+                        "spread across use cases / instruction types / prompt styles "
+                        "instead of the first N rows. Same seed → same subset in "
+                        "every stage and on resume.")
     p.add_argument("--provider-sort", choices=("throughput", "latency", "price"),
                    default=None, dest="provider_sort",
                    help="OpenRouter provider routing preference for candidate calls "
@@ -108,6 +113,8 @@ def _overrides(args: argparse.Namespace) -> dict:
         out["description"] = args.description
     if args.provider_sort is not None:
         out["provider_sort"] = args.provider_sort
+    if args.sample_seed is not None:
+        out["sample_seed"] = args.sample_seed
     return out
 
 
