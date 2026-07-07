@@ -50,6 +50,35 @@ CANDIDATE_TEMPERATURE: float = 0.0
 CANDIDATE_MAX_TOKENS: int = 8000
 CANDIDATE_TIMEOUT_S: float = 300.0
 
+# --- Concurrency knobs (recorded in every run manifest; see CONCURRENCY.md) ---
+
+# Worker threads for the generate stage's (candidate × prompt) work items.
+GENERATION_WORKERS: int = 4
+
+# Hard wall-clock deadline for a SINGLE candidate generation call. `timeout_s`
+# is an httpx read timeout: it resets on every streamed chunk, so it bounds
+# dead sockets only — not slow-trickle generations, and not the half-open
+# socket a mid-stream client sleep leaves behind (neither bytes nor EOF; the
+# E04 run lost 10.3 h to one such call — see meta/2026-07-03-reasoning-smoke.md).
+# The deadline is enforced in pipeline/generate.py by streaming the call and
+# checking elapsed wall-clock per chunk, plus a watchdog that closes the
+# stream if no chunk ever arrives.
+#
+# Derivation (2026-07-06, scripts kept in CONCURRENCY.md): p99 (nearest-rank)
+# of the 69 observed generation-call durations under the frozen reasoning-on
+# treatment (48k budget, temp 0.6, provider_sort=throughput) — E04 attempt-6
+# log (9 calls) + E05-reasoning-rand20p log (60 calls) — is 1014.6 s
+# (qwen-9b/CIF-024, 16.9 min; per-item log deltas, retries included, so an
+# upper bound on any single call). Deadline = max(2 × p99, 900 s floor)
+# = max(2029.3, 900) → 2030 s. Abandoned-config E04 calls (greedy hangs,
+# 32k cap-outs, up to 45.6 min) are excluded: no current freeze can
+# reproduce that configuration — and all would have been caught by this guard.
+GENERATION_DEADLINE_S: float = 2030.0
+GENERATION_DEADLINE_BASIS: str = (
+    "2 x p99 (nearest-rank) of 69 frozen-treatment generation calls from "
+    "E04/E05 logs (p99=1014.6s, qwen-9b/CIF-024), floor 900s -> 2030s"
+)
+
 # Judge / classifier calls. Judges run with adaptive thinking on (see
 # pipeline/_judge_llm.py) so both Opus and Fable reason before emitting the
 # JSON verdict — apples-to-apples. Thinking tokens count against max_tokens,

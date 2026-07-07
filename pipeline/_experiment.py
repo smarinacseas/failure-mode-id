@@ -26,6 +26,9 @@ from pathlib import Path
 from config import (
     EXPERIMENT_INDEX_PATH,
     EXPERIMENTS_DIR,
+    GENERATION_DEADLINE_BASIS,
+    GENERATION_DEADLINE_S,
+    GENERATION_WORKERS,
     JUDGE_MAX_TOKENS,
     PROMPTS_DIR,
     ROOT,
@@ -185,6 +188,13 @@ def config_block(cfg: RunConfig) -> dict:
         "candidate_timeout_s": cfg.timeout_s,
         "limit": cfg.limit,
         "sample_seed": cfg.sample_seed,
+        # Concurrency knobs (see CONCURRENCY.md): how this run's calls were
+        # executed. judge_mode is frozen per-experiment; the worker count and
+        # generation deadline are config.py constants recorded for the record.
+        "judge_mode": cfg.judge_mode,
+        "generation_workers": GENERATION_WORKERS,
+        "generation_deadline_s": GENERATION_DEADLINE_S,
+        "generation_deadline_basis": GENERATION_DEADLINE_BASIS,
         "judge_max_tokens": JUDGE_MAX_TOKENS,
         "judge_prompt_sha256_12": _sha256_prefix(PROMPTS_DIR / "judge.txt"),
         "classifier_prompt_sha256_12": _sha256_prefix(PROMPTS_DIR / "classifier.txt"),

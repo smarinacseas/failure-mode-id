@@ -7,8 +7,10 @@ from pipeline.monitor import RecordingSink, RunMonitor, WorkPlan
 
 
 def test_grade_emits_events(tmp_path, monkeypatch):
+    # judge_mode="sequential": these tests exercise the per-cell call path
+    # (_grade_one); the batch transport has its own tests in test_concurrency.py.
     monkeypatch.setattr(config, "RUNS_DIR", tmp_path / "runs")
-    cfg = make_cfg()
+    cfg = make_cfg(judge_mode="sequential")
     write_jsonl(tmp_path / "prompts.jsonl",
                 [{"id": "p1", "prompt": "a", "criteria": ["c1"]}])
     write_jsonl(cfg.responses_path("m1"), [{"id": "p1", "response": "r"}])
@@ -42,7 +44,7 @@ def test_classify_emits_events(tmp_path, monkeypatch):
 
 def test_grade_records_error_on_judge_parse_failure(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "RUNS_DIR", tmp_path / "runs")
-    cfg = make_cfg()
+    cfg = make_cfg(judge_mode="sequential")
     write_jsonl(tmp_path / "prompts.jsonl", [{"id": "p1", "prompt": "a", "criteria": ["c1"]}])
     write_jsonl(cfg.responses_path("m1"), [{"id": "p1", "response": "r"}])
     monkeypatch.setattr(grade, "DATA_JSONL", tmp_path / "prompts.jsonl")

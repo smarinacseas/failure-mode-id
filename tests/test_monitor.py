@@ -89,7 +89,11 @@ def test_render_lines_contains_key_fields():
     snap = {
         "experiment": "E02-v1-75p", "state": "running",
         "elapsed_s": 4340, "eta_s": 10800,
-        "current": {"stage": "generate", "model": "qwen-397b", "prompt_id": "prompt-50"},
+        "current": {"stage": "generate", "in_flight": 2,
+                    "in_flight_items": [
+                        {"model": "qwen-397b", "prompt_id": "prompt-50"},
+                        {"model": "qwen-9b", "prompt_id": "prompt-51"},
+                    ]},
         "overall": {"done": 227, "total": 606, "pct": 37.5},
         "stages": [
             {"name": "load", "state": "done", "done": 75, "total": 75, "pct": 100.0},
@@ -103,7 +107,43 @@ def test_render_lines_contains_key_fields():
     assert "148/225" in out
     assert "65%" in out                # int() truncation of 65.8
     assert "37%" in out                # overall
+    assert "2 in flight" in out
     assert "qwen-397b" in out and "prompt-50" in out
     assert "retries: 3" in out and "errors: 0" in out
     assert "✓ done" in out
     assert "pending" in out
+
+
+def test_render_lines_tolerates_old_single_item_shape():
+    """`status` must still render a progress.json written by pre-concurrency
+    code (a live run's heartbeat survives the upgrade)."""
+    snap = {
+        "experiment": "E05-reasoning-rand20p", "state": "running",
+        "elapsed_s": 100, "eta_s": None,
+        "current": {"stage": "generate", "model": "qwen-397b", "prompt_id": "CIF-050"},
+        "overall": {"done": 1, "total": 2, "pct": 50.0},
+        "stages": [
+            {"name": "generate", "state": "running", "done": 1, "total": 2, "pct": 50.0},
+        ],
+        "retries": 0, "errors": 0,
+    }
+    out = render_lines(snap)
+    assert "qwen-397b" in out and "CIF-050" in out
+    assert "1 in flight" in out
+
+
+def test_render_lines_shows_batch_counts():
+    snap = {
+        "experiment": "E99-test", "state": "running",
+        "elapsed_s": 10, "eta_s": None,
+        "current": {"stage": "grade", "in_flight": 0, "in_flight_items": []},
+        "overall": {"done": 0, "total": 6, "pct": 0.0},
+        "stages": [
+            {"name": "grade", "state": "running", "done": 0, "total": 6, "pct": 0.0},
+        ],
+        "batch": {"submitted": 6, "pending": 4, "collected": 2, "errored": 1},
+        "retries": 0, "errors": 0,
+    }
+    out = render_lines(snap)
+    assert "submitted 6" in out and "pending 4" in out
+    assert "collected 2" in out and "errored 1" in out

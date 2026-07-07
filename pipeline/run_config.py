@@ -22,10 +22,11 @@ SLUG_RE = re.compile(r"^E(\d{2,})-[a-z0-9]+(-[a-z0-9]+)*$")
 _PARAM_FIELDS = (
     "candidates", "judges", "max_tokens", "temperature",
     "reasoning", "timeout_s", "limit", "description", "provider_sort",
-    "sample_seed",
+    "sample_seed", "judge_mode",
 )
 
 PROVIDER_SORTS = ("throughput", "latency", "price")
+JUDGE_MODES = ("batch", "sequential")
 
 
 class InvalidSlugError(ValueError):
@@ -75,6 +76,18 @@ class RunConfig:
     # a different seed is a different prompt subset, hence a different
     # experiment.
     sample_seed: int | None = None
+    # Judge transport: "batch" (Anthropic Message Batches: submit → poll →
+    # collect) or "sequential" (one streamed call per grade cell, the
+    # pre-concurrency path). Grading params and judge-blindness are identical
+    # in both modes — this is a transport choice, not a treatment change —
+    # but it is frozen so the manifest records how a run's grades were made.
+    judge_mode: str = "batch"
+
+    def __post_init__(self) -> None:
+        if self.judge_mode not in JUDGE_MODES:
+            raise ValueError(
+                f"judge_mode must be one of {JUDGE_MODES}, got {self.judge_mode!r}"
+            )
 
     @property
     def judge(self) -> str:
@@ -136,6 +149,8 @@ class RunConfig:
         d.setdefault("provider_sort", None)
         # Back-compat: freezes older than the sample_seed knob (pre-E05).
         d.setdefault("sample_seed", None)
+        # Back-compat: freezes older than the judge_mode knob (pre-concurrency).
+        d.setdefault("judge_mode", "batch")
         try:
             kwargs = {f: d[f] for f in _PARAM_FIELDS}
         except KeyError as e:
@@ -212,6 +227,7 @@ def _defaults() -> dict:
         "description": "",
         "provider_sort": None,
         "sample_seed": None,
+        "judge_mode": "batch",
     }
 
 
