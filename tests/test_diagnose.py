@@ -141,3 +141,30 @@ def test_payload_trace_absent_and_truncated(tmp_path, monkeypatch):
     assert "TRUNCATED" in clipped
     short, was_clipped = diagnose._clip("short")
     assert short == "short" and not was_clipped
+
+
+def test_user_message_truncated_and_absent_beats_truncation(tmp_path, monkeypatch):
+    """Characterization of the trace_status contract through _user_message
+    (locks it before Task 4 builds on the pair): an oversized trace yields
+    "truncated"; with no trace, absence beats truncation even though the
+    oversized response still gets clipped in the payload."""
+    # Case A: oversized reasoning trace → "truncated", marker in payload.
+    cfg = _seed_run(tmp_path, monkeypatch,
+                    reasoning_trace="x" * (config.DIAGNOSE_MAX_FIELD_CHARS + 5000))
+    records = read_jsonl(diagnose.DATA_JSONL)
+    (cell,) = diagnose._failed_cells(cfg, records)
+    payload, trace_status = diagnose._user_message(cell)
+    assert trace_status == "truncated"
+    assert "TRUNCATED" in payload
+
+    # Case B: reasoning absent + oversized response → "absent" wins the flag,
+    # but the response is still clipped (marker present).
+    cfg = _seed_run(tmp_path, monkeypatch, reasoning_trace=None)
+    write_jsonl(cfg.responses_path("m1"),
+                [{"id": "p1",
+                  "response": "y" * (config.DIAGNOSE_MAX_FIELD_CHARS + 5000)}])
+    records = read_jsonl(diagnose.DATA_JSONL)
+    (cell,) = diagnose._failed_cells(cfg, records)
+    payload, trace_status = diagnose._user_message(cell)
+    assert trace_status == "absent"
+    assert "TRUNCATED" in payload

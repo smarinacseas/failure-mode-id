@@ -92,10 +92,10 @@ def _user_message(cell: dict) -> tuple[str, str]:
         trace_status = "truncated" if (trace_clipped or resp_clipped) else "present"
         trace_block = f"MODEL REASONING TRACE:\n{reasoning}\n\n"
     else:
+        # Absence beats truncation in the flag: no trace stays "absent" even
+        # when the response itself was clipped.
         trace_status = "absent"
         trace_block = "MODEL REASONING TRACE: (none recorded)\n\n"
-    if not cell["reasoning"] and resp_clipped:
-        trace_status = "absent"          # absence beats truncation in the flag
     payload = (
         "TASK PROMPT GIVEN TO A LANGUAGE MODEL:\n"
         f"{cell['prompt']}\n\n"
