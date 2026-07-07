@@ -962,6 +962,9 @@
             <span onclick="{{ goPromptsAll }}" style="{{ bcPromptsStyle }}"
               >Prompts</span
             >
+            <span onclick="{{ goAnalysis }}" style="{{ bcAnalysisStyle }}"
+              >Analysis</span
+            >
             <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
               <span style="color: var(--ink-5, #c4c9d2)">/</span>
               <span
@@ -2859,6 +2862,56 @@
           </div>
         </sc-if>
 
+        <!-- ============ ANALYSIS ============ -->
+        <sc-if value="{{ isAnalysis }}" hint-placeholder-val="{{ false }}">
+          <div style="max-width:1320px;margin:0 auto;padding:26px 30px 64px">
+            <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+              <h1 style="margin:0;font-family:'Newsreader',Georgia,serif;font-size:25px;font-weight:500;letter-spacing:-0.005em">Failure analysis</h1>
+              <span style="font-size:12.5px;color:var(--ink-3,#878d99)">{{ faBlurb }}</span>
+            </div>
+            <sc-if value="{{ faUnavailable }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:80px 0;text-align:center;color:var(--ink-3,#8c8678);font-family:'IBM Plex Mono',monospace;font-size:12.5px">
+                Analysis not performed for this experiment.
+              </div>
+            </sc-if>
+            <sc-if value="{{ faAvailable }}" hint-placeholder-val="{{ false }}">
+              <!-- Root-cause Pareto -->
+              <div style="background:var(--surface,#fff);border:1px solid var(--border,#e2e6ec);border-radius:12px;padding:16px 20px 18px;margin-bottom:14px">
+                <div style="font-family:'Newsreader',Georgia,serif;font-size:15px;font-weight:500;margin-bottom:4px">Root-cause Pareto</div>
+                <div style="font-size:11.5px;color:var(--ink-3,#8c8678);margin-bottom:14px">Failed criteria by diagnosed cause, all models · faded bar segments are judge-disputed rows (second judge passed the criterion)</div>
+                <sc-for list="{{ faPareto }}" as="pc" hint-placeholder-count="6">
+                  <div style="display:grid;grid-template-columns:260px 1fr 46px;gap:12px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line,#e7e3d6)">
+                    <div>
+                      <div style="font-size:12.5px;font-weight:600;color:var(--ink,#2a2722)">{{ pc.label }}</div>
+                      <div style="font-size:11px;color:var(--ink-3,#8c8678)">{{ pc.note }}</div>
+                    </div>
+                    <div>
+                      <div style="display:flex;height:12px;background:var(--surface-2,#efece2);border-radius:5px;overflow:hidden">
+                        <div style="{{ pc.solidStyle }}"></div>
+                        <div style="{{ pc.dimStyle }}"></div>
+                      </div>
+                      <div style="font-size:10.5px;color:var(--ink-4,#a8a294);margin-top:3px;font-family:'IBM Plex Mono',monospace">{{ pc.perModel }}</div>
+                    </div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;text-align:right">{{ pc.count }}</div>
+                  </div>
+                </sc-for>
+              </div>
+              <!-- Taxonomy legend -->
+              <div style="background:var(--surface,#fff);border:1px solid var(--border,#e2e6ec);border-radius:12px;padding:16px 20px 18px;margin-bottom:14px">
+                <div style="font-family:'Newsreader',Georgia,serif;font-size:15px;font-weight:500;margin-bottom:12px">Taxonomy — what each cause implies for training</div>
+                <sc-for list="{{ faLegend }}" as="lg" hint-placeholder-count="8">
+                  <div style="padding:8px 0;border-bottom:1px solid var(--line,#e7e3d6)">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:var(--ink,#2a2722)">{{ lg.key }}</span>
+                    <span style="font-size:12px;color:var(--ink-2,#6c6759)"> — {{ lg.desc }}</span>
+                    <div style="font-size:11.5px;color:var(--accent,#b06a3c);margin-top:2px">↳ {{ lg.imp }}</div>
+                  </div>
+                </sc-for>
+              </div>
+              <!-- ANALYSIS-PART-2 (Task 12 inserts matrices, ladder, table here) -->
+            </sc-if>
+          </div>
+        </sc-if>
+
         <div
           style="
             max-width: 1320px;
@@ -2991,6 +3044,7 @@
           selectedId:null, critFilter:'all', expanded:{},
           data:null, dataRaw:null, judge:null, error:null,
           runs:[], currentRun:null, runOpen:false, notesOpen:false,
+          faCause:null, faModelF:null, faMenu:null,
         };
 
         passCount(p,model){ let n=0; (p.criteria||[]).forEach(function(c){ var r=c.results&&c.results[model]; if(r&&r.pass) n++; }); return n; }
@@ -3041,7 +3095,7 @@
         }
         loadRun(run){
           var self=this;
-          this.setState({data:null, dataRaw:null, judge:null, error:null, currentRun:run, model:null, selectedId:null, screen:'overview', fInstr:null, fUse:null, fStyle:null, openMenu:null, runOpen:false, notesOpen:false});
+          this.setState({data:null, dataRaw:null, judge:null, error:null, currentRun:run, model:null, selectedId:null, screen:'overview', fInstr:null, fUse:null, fStyle:null, openMenu:null, runOpen:false, notesOpen:false, faCause:null, faModelF:null, faMenu:null});
           __loadJson(run.path).then(function(d){
             var judges=(d.meta&&d.meta.judges)||[];
             var defJudge=judges[0]||(d.meta&&d.meta.judge)||null;
@@ -3112,12 +3166,15 @@
               footBenchUrl:'https://huggingface.co/datasets/surgeai/ComplexConstraints',
               footBenchLabel:'Complex Constraints Benchmark Set',
               isOverview:false, isDrill:false, isDetail:false,
+              isAnalysis:false,
               modelTabs:[], modelLabel:'', detailId:'', judgeTabs:[], hasJudgeToggle:false,
               hasRunNotes:false, runNotes:[], notesOpen:false, notesCaret:'▸', notesCount:'', notesToggle:()=>{},
               goOverview:()=>this.go('overview'),
               goPromptsAll:()=>this.setState({screen:'drilldown',openMenu:null}),
+              goAnalysis:()=>this.go('analysis'),
               bcOverviewStyle:'color:var(--ink,#2a2722);font-weight:600;cursor:pointer',
               bcPromptsStyle:'color:var(--ink-3,#8c8678);cursor:pointer',
+              bcAnalysisStyle:'color:var(--ink-3,#8c8678);cursor:pointer',
             };
           }
           const meta=data.meta||{}, summary=data.summary||{}, prompts=data.prompts||[];
@@ -3251,6 +3308,35 @@
             };
           });
 
+          // ---- ANALYSIS (failure_analysis block; spec 2026-07-06) ----
+          const fa=(this.state.dataRaw&&this.state.dataRaw.failure_analysis)||null;
+          const faAvailable=!!fa;
+          const faRowsAll=fa?(fa.rows||[]):[];
+          const faTax=fa?(fa.taxonomy||[]):[];
+          const taxByKey={}; faTax.forEach(t=>{taxByKey[t.key]=t;});
+          const promptById={}; prompts.forEach(p=>{promptById[p.id]=p;});
+          const faDisputed=(r)=> r.judge_concurrence==='opus_only';
+          const faByCause={};
+          faRowsAll.forEach(r=>{ const b=faByCause[r.root_cause]=faByCause[r.root_cause]||{total:0,disputed:0,byModel:{}}; b.total++; if(faDisputed(r)) b.disputed++; b.byModel[r.model]=(b.byModel[r.model]||0)+1; });
+          const faCauses=Object.keys(faByCause).sort((a,b)=>{
+            const sa=a==='judge_suspect'?1:0, sb=b==='judge_suspect'?1:0;   // suspect sinks: outside the training read
+            return sa-sb || faByCause[b].total-faByCause[a].total;
+          });
+          const faMax=faCauses.reduce((m,c)=>Math.max(m,faByCause[c].total),0)||1;
+          const faPareto=faCauses.map(c=>{
+            const b=faByCause[c], t=taxByKey[c]||{}, dim=(c==='judge_suspect');
+            const solid=b.total-b.disputed;
+            return { key:c, label:(t.label||c), count:String(b.total),
+              perModel: models.map(m=>prettyModel(m)+' '+(b.byModel[m]||0)).join(' · '),
+              solidStyle:'height:100%;width:'+(100*solid/faMax)+'%;background:'+(dim?'var(--ink-4,#a8a294)':'var(--bar-strong,#3a362e)')+';border-radius:5px 0 0 5px;flex:none',
+              dimStyle:'height:100%;width:'+(100*b.disputed/faMax)+'%;background:var(--ink-5,#cec8b8);border-radius:0 5px 5px 0;flex:none',
+              note: dim?'judge-noise candidate — excluded from the training read':(t.training_implication||'') };
+          });
+          const faLegend=faTax.map(t=>({key:t.key,label:t.label,desc:t.description,imp:t.training_implication}));
+          const faBlurb= fa
+            ? ('Root causes for '+(fa.counts&&fa.counts.diagnosed)+' failed criteria across '+(fa.counts&&fa.counts.cells)+' response cells · diagnosed on '+(fa.verdict_basis||'')+' verdicts by '+(fa.diagnose_judge||'')+' · taxonomy v'+fa.taxonomy_version)
+            : 'Root-cause diagnosis of failed criteria';
+
           return {
             ...this.runSelVals(),
             loading:false, hasError:false, loadError:'',
@@ -3270,6 +3356,7 @@
             footBenchUrl:(meta.dataset&&meta.dataset.source)||'https://huggingface.co/datasets/surgeai/ComplexConstraints',
             footBenchLabel:(meta.dataset&&meta.dataset.name)||'Complex Constraints Benchmark Set',
             isOverview:screen==='overview', isDrill:screen==='drilldown', isDetail:screen==='detail',
+            isAnalysis:screen==='analysis',
             modelLabel,
             modelTabs: models.map(m=>({ label:prettyModel(m), onClick:()=>this.setModel(m), btnStyle:this.btn(m===model) })),
             hasJudgeToggle: !!(meta.judges && meta.judges.length>1),
@@ -3283,8 +3370,11 @@
             goOverview:()=>this.go('overview'),
             goPromptsAll:()=>this.setState({screen:'drilldown',openMenu:null}),
             goBackDrill:()=>this.setState({screen:'drilldown'}),
+            goAnalysis:()=>this.go('analysis'),
             bcOverviewStyle: screen==='overview'?'color:var(--ink,#2a2722);font-weight:600;cursor:pointer':'color:var(--ink-3,#8c8678);cursor:pointer',
             bcPromptsStyle: (screen==='drilldown'||screen==='detail')?'color:var(--ink,#2a2722);font-weight:600;cursor:pointer':'color:var(--ink-3,#8c8678);cursor:pointer',
+            bcAnalysisStyle: screen==='analysis'?'color:var(--ink,#2a2722);font-weight:600;cursor:pointer':'color:var(--ink-3,#8c8678);cursor:pointer',
+            faAvailable, faUnavailable: !faAvailable, faBlurb, faPareto, faLegend,
             detailId:dPrompt.id||'',
             metricCards, instrBars, styleBars, useBars, verifBars, compareRows, compareLegend,
             gapCritNum:fmtPct(crate), gapFullNum:fmtPct(frate), gapCritBar, gapFullBar,
