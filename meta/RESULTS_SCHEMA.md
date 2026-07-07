@@ -12,7 +12,23 @@ automatically for tagged runs.
 The compact registry at `outputs/experiments/index.json` is a legacy /
 back-compat index for consumers other than the dashboard.
 
-Current schema version: **`2.1`**.
+Current schema version: **`3.1`**.
+
+### Changes in `3.1` (additive)
+
+Optional top-level `failure_analysis` block — root-cause diagnosis rows,
+`by_root_cause` rollups, taxonomy echo, and post-hoc judge-concurrence
+labels produced by the `diagnose` stage. Absent when the diagnose stage
+has not run for the experiment. Documented in the `failure_analysis`
+section below.
+
+### Changes in `3.0` (multi-judge)
+
+Top-level `by_judge` map added — one self-contained `{judge, judge_details,
+validation, summary, prompts}` view per grader, all over the SAME candidate
+responses. The top-level `summary` / `prompts` became the DEFAULT (first)
+judge's view, kept for single-judge readers. `meta.judges` (ordered grader
+array; first entry is the default) and `meta.counts.n_judges` added.
 
 ### Changes in `2.1` (additive)
 
@@ -46,10 +62,12 @@ display-only aliases.
 
 ```json
 {
-  "schema_version": "2.1",
+  "schema_version": "3.1",
   "meta":    { … },
   "summary": { … },
-  "prompts": [ … ]
+  "prompts": [ … ],
+  "by_judge": { … },
+  "failure_analysis": { … }
 }
 ```
 
@@ -57,8 +75,10 @@ display-only aliases.
 | --- | --- | --- |
 | `schema_version` | str | Matches this document. Dashboards refuse to render mismatched majors. |
 | `meta` | object | Identity + configuration + validation status. |
-| `summary` | object | Six pre-computed aggregate breakdowns. |
-| `prompts` | array | One entry per included prompt, in benchmark_id order. |
+| `summary` | object | Six pre-computed aggregate breakdowns (default judge's view). |
+| `prompts` | array | One entry per included prompt, in benchmark_id order (default judge's view). |
+| `by_judge` | object | One self-contained `{judge, judge_details, validation, summary, prompts}` view per grader (schema 3.0). Top-level `summary`/`prompts` mirror the first judge's. |
+| `failure_analysis` | object | **Optional** (schema 3.1) — root-cause diagnosis; see its section below. The one exception to the never-absent principle: a missing key means the diagnose stage has not run. |
 
 ---
 

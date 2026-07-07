@@ -388,6 +388,34 @@ def test_failure_analysis_block_joins_concurrence_and_rolls_up(tmp_path, monkeyp
     assert any(c["key"] == "judge_suspect" for c in block["taxonomy"])
 
 
+def test_failure_analysis_concurrence_both_fail(tmp_path, monkeypatch):
+    """Characterization test (behavior shipped in the fold-in commit, not TDD):
+    the majority case — second judge independently FAILs the same criterion
+    with a normal reason — must map to both_fail, not opus_only/fable_refused."""
+    cfg = _seed_run(tmp_path, monkeypatch)
+    write_jsonl(cfg.grades_path("claude-fable-5", "m1"), [{
+        "id": "p1",
+        "verdicts": [
+            {"index": 1, "verdict": "PASS", "reason": ""},
+            {"index": 2, "verdict": "FAIL", "reason": "mentions cats"},
+            {"index": 3, "verdict": "FAIL", "reason": ""},
+        ],
+    }])
+    write_jsonl(cfg.diagnosis_path("m1"), [{
+        "id": "p1", "trace_status": "present",
+        "diagnoses": [{"index": 2, "evidence": "q", "root_cause": "other",
+                       "secondary": None, "confidence": "high", "rationale": "r"}],
+    }])
+    records = read_jsonl(diagnose.DATA_JSONL)
+    grades_by_judge = {
+        j: {"m1": {g["id"]: g["verdicts"]
+                   for g in read_jsonl(cfg.grades_path(j, "m1"))}}
+        for j in cfg.judges
+    }
+    block = aggregate._failure_analysis_block(cfg, records, grades_by_judge)
+    assert block["rows"][0]["judge_concurrence"] == "both_fail"
+
+
 def test_failure_analysis_concurrence_refused_and_single_judge(tmp_path, monkeypatch):
     cfg = _seed_run(tmp_path, monkeypatch)
     write_jsonl(cfg.diagnosis_path("m1"), [{
