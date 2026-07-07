@@ -2901,13 +2901,89 @@
                 <div style="font-family:'Newsreader',Georgia,serif;font-size:15px;font-weight:500;margin-bottom:12px">Taxonomy — what each cause implies for training</div>
                 <sc-for list="{{ faLegend }}" as="lg" hint-placeholder-count="8">
                   <div style="padding:8px 0;border-bottom:1px solid var(--line,#e7e3d6)">
-                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:var(--ink,#2a2722)">{{ lg.key }}</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:var(--ink,#2a2722)">{{ lg.key }}</span> <span style="font-size:12px;font-weight:600;color:var(--ink-1,#46423a)">{{ lg.label }}</span>
                     <span style="font-size:12px;color:var(--ink-2,#6c6759)"> — {{ lg.desc }}</span>
                     <div style="font-size:11.5px;color:var(--accent,#b06a3c);margin-top:2px">↳ {{ lg.imp }}</div>
                   </div>
                 </sc-for>
               </div>
-              <!-- ANALYSIS-PART-2 (Task 12 inserts matrices, ladder, table here) -->
+              <!-- Ladder persistence -->
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:14px">
+                <sc-for list="{{ faLadderCards }}" as="lc" hint-placeholder-count="3">
+                  <div style="background:var(--surface,#fff);border:1px solid var(--border,#e2e6ec);border-radius:12px;padding:14px 18px">
+                    <div style="font-size:11px;color:var(--ink-3,#8c8678);text-transform:uppercase;letter-spacing:.06em;font-weight:600">{{ lc.label }}</div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;margin:4px 0 2px;{{ lc.colorCss }}">{{ lc.value }}</div>
+                    <div style="font-size:11.5px;color:var(--ink-3,#8c8678)">{{ lc.sub }}</div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="font-size:12px;color:var(--ink-2,#6c6759);margin:-4px 0 14px 2px">{{ faSharedNote }}</div>
+              <!-- Targeting matrices -->
+              <div style="background:var(--surface,#fff);border:1px solid var(--border,#e2e6ec);border-radius:12px;padding:16px 20px 18px;margin-bottom:14px;overflow-x:auto">
+                <div style="font-family:'Newsreader',Georgia,serif;font-size:15px;font-weight:500;margin-bottom:12px">Root cause × instruction type</div>
+                <table style="border-collapse:collapse;min-width:520px">
+                  <thead><tr>
+                    <th style="text-align:left;font-size:11px;color:var(--ink-3,#8c8678);padding:4px 10px 6px 0">cause</th>
+                    <sc-for list="{{ faMatrixCols }}" as="mc" hint-placeholder-count="4"><th style="font-size:11px;color:var(--ink-3,#8c8678);padding:4px 10px 6px;font-weight:600">{{ mc.label }}</th></sc-for>
+                  </tr></thead>
+                  <tbody><sc-for list="{{ faMatrix }}" as="mr" hint-placeholder-count="6">
+                    <tr style="border-top:1px solid var(--line,#e7e3d6)">
+                      <td style="font-size:12.5px;padding:6px 10px 6px 0;white-space:nowrap">{{ mr.label }}</td>
+                      <sc-for list="{{ mr.cells }}" as="mv" hint-placeholder-count="4"><td style="{{ mv.css }};padding:6px 10px">{{ mv.v }}</td></sc-for>
+                    </tr>
+                  </sc-for></tbody>
+                </table>
+                <div style="font-family:'Newsreader',Georgia,serif;font-size:15px;font-weight:500;margin:18px 0 12px">Root cause × use case</div>
+                <table style="border-collapse:collapse;min-width:520px">
+                  <thead><tr>
+                    <th style="text-align:left;font-size:11px;color:var(--ink-3,#8c8678);padding:4px 10px 6px 0">cause</th>
+                    <sc-for list="{{ faMatrixUseCols }}" as="uc" hint-placeholder-count="7"><th style="font-size:11px;color:var(--ink-3,#8c8678);padding:4px 10px 6px;font-weight:600">{{ uc.label }}</th></sc-for>
+                  </tr></thead>
+                  <tbody><sc-for list="{{ faMatrixUse }}" as="ur" hint-placeholder-count="6">
+                    <tr style="border-top:1px solid var(--line,#e7e3d6)">
+                      <td style="font-size:12.5px;padding:6px 10px 6px 0;white-space:nowrap">{{ ur.label }}</td>
+                      <sc-for list="{{ ur.cells }}" as="uv" hint-placeholder-count="7"><td style="{{ uv.css }};padding:6px 10px">{{ uv.v }}</td></sc-for>
+                    </tr>
+                  </sc-for></tbody>
+                </table>
+              </div>
+              <!-- Diagnosed failures table -->
+              <div style="background:var(--surface,#fff);border:1px solid var(--border,#e2e6ec);border-radius:12px;padding:16px 20px 18px">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+                  <div style="font-family:'Newsreader',Georgia,serif;font-size:15px;font-weight:500">Diagnosed failures</div>
+                  <span style="font-size:11.5px;color:var(--ink-4,#a8a294)">{{ faTableCount }} rows</span>
+                  <sc-for list="{{ faFilterMenus }}" as="fm" hint-placeholder-count="2">
+                    <div style="position:relative">
+                      <button onclick="{{ fm.onToggle }}" style="{{ fm.btnStyle }}">{{ fm.label }} <span>{{ fm.caret }}</span></button>
+                      <sc-if value="{{ fm.isOpen }}" hint-placeholder-val="{{ false }}">
+                        <div style="position:absolute;top:110%;left:0;z-index:30;background:var(--raise,#fff);border:1px solid var(--border,#e4dfd1);border-radius:9px;padding:5px;min-width:200px;box-shadow:0 8px 22px rgba(0,0,0,.12)">
+                          <sc-for list="{{ fm.options }}" as="fo" hint-placeholder-count="5">
+                            <div onclick="{{ fo.onClick }}" style="{{ fo.rowStyle }}"><span>{{ fo.label }}</span><span>{{ fo.check }}</span></div>
+                          </sc-for>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ faTableEmpty }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:26px 0;text-align:center;color:var(--ink-3,#8c8678);font-size:12.5px">No diagnosed failures match these filters.</div>
+                </sc-if>
+                <sc-for list="{{ faTableRows }}" as="fr" hint-placeholder-count="10">
+                  <div onclick="{{ fr.onClick }}" style="padding:11px 2px;border-top:1px solid var(--line,#e7e3d6);cursor:pointer">
+                    <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:700">{{ fr.id }}</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-3,#8c8678)">{{ fr.idx }}</span>
+                      <span style="font-size:11.5px;color:var(--ink-2,#6c6759)">{{ fr.model }}</span>
+                      <span style="font-size:11.5px;font-weight:600;color:var(--accent,#b06a3c)">{{ fr.cause }}</span>
+                      <span style="font-size:10.5px;color:var(--ink-4,#a8a294)">conf: {{ fr.confidence }}</span>
+                      <span style="{{ fr.concCss }}">{{ fr.conc }}</span>
+                    </div>
+                    <div style="font-size:12px;color:var(--ink-1,#46423a);margin-top:4px">{{ fr.critText }}</div>
+                    <div style="font-size:11.5px;color:var(--ink-3,#8c8678);margin-top:2px">evidence: {{ fr.evidence }}</div>
+                    <div style="font-size:11.5px;color:var(--ink-3,#8c8678)">{{ fr.rationale }}</div>
+                  </div>
+                </sc-for>
+              </div>
             </sc-if>
           </div>
         </sc-if>
@@ -3336,6 +3412,68 @@
           const faBlurb= fa
             ? ('Root causes for '+(fa.counts&&fa.counts.diagnosed)+' failed criteria across '+(fa.counts&&fa.counts.cells)+' response cells · diagnosed on '+(fa.verdict_basis||'')+' verdicts by '+(fa.diagnose_judge||'')+' · taxonomy v'+fa.taxonomy_version)
             : 'Root-cause diagnosis of failed criteria';
+          const faMatrixCols=instrTypes.map(t=>({label:t}));
+          const faMatrix=faCauses.map(c=>{
+            const bit=((fa&&fa.by_root_cause&&fa.by_root_cause[c])||{}).by_instruction_type||{};
+            return { label:(taxByKey[c]||{}).label||c,
+              cells:instrTypes.map(t=>({ v:String(bit[t]||0),
+                css:'text-align:center;font-family:\'IBM Plex Mono\',monospace;font-size:12px;'+(bit[t]?'color:var(--ink,#2a2722);font-weight:600':'color:var(--ink-5,#cec8b8)') })) };
+          });
+          const faMatrixUseCols=useCases.map(u=>({label:u}));
+          const faMatrixUse=faCauses.map(c=>{
+            const buc=((fa&&fa.by_root_cause&&fa.by_root_cause[c])||{}).by_use_case||{};
+            return { label:(taxByKey[c]||{}).label||c,
+              cells:useCases.map(u=>({ v:String(buc[u]||0),
+                css:'text-align:center;font-family:\'IBM Plex Mono\',monospace;font-size:12px;'+(buc[u]?'color:var(--ink,#2a2722);font-weight:600':'color:var(--ink-5,#cec8b8)') })) };
+          });
+          // Ladder persistence: same (prompt, criterion) failing across models.
+          const faByCrit={};
+          faRowsAll.forEach(r=>{ const k=r.id+'#'+r.criterion_index; (faByCrit[k]=faByCrit[k]||[]).push(r); });
+          let faShared=0, faSolo=0, faMixed=0; const faSharedCauses={};
+          Object.keys(faByCrit).forEach(k=>{
+            const rs=faByCrit[k], n=new Set(rs.map(r=>r.model)).size;
+            if(n>=models.length){ faShared++; rs.forEach(r=>{faSharedCauses[r.root_cause]=(faSharedCauses[r.root_cause]||0)+1;}); }
+            else if(n===1) faSolo++; else faMixed++;
+          });
+          const faLadderCards=[
+            {label:'Failed by ALL '+models.length+' models', value:String(faShared), sub:'scale-resistant — prime training targets', colorCss:'color:var(--fail,#a8483b)'},
+            {label:'Failed by exactly one model', value:String(faSolo), sub:'scale (or luck) already fixes these', colorCss:'color:var(--pass,#4f7a51)'},
+            {label:'Failed by some models', value:String(faMixed), sub:'mixed — draw noise candidates', colorCss:'color:var(--ink,#2a2722)'},
+          ];
+          const faTopShared=Object.keys(faSharedCauses).sort((a,b)=>faSharedCauses[b]-faSharedCauses[a]).slice(0,3)
+            .map(c=>((taxByKey[c]||{}).label||c)+' ('+faSharedCauses[c]+')').join(' · ');
+          const faSharedNote= faShared? ('Top causes among all-model failures: '+faTopShared) : 'No criterion fails across the whole ladder in this run.';
+          // Filterable table.
+          let faRows=faRowsAll;
+          if(this.state.faModelF) faRows=faRows.filter(r=>r.model===this.state.faModelF);
+          if(this.state.faCause)  faRows=faRows.filter(r=>r.root_cause===this.state.faCause);
+          const faMenuDefs=[
+            {key:'model', name:'Model', value:this.state.faModelF, opts:models, stateKey:'faModelF'},
+            {key:'cause', name:'Root cause', value:this.state.faCause, opts:faCauses, stateKey:'faCause'},
+          ];
+          const faFilterMenus=faMenuDefs.map(m=>{
+            const active=!!m.value, om=this.state.faMenu;
+            return { label: active?(m.name+': '+m.value):m.name, caret: om===m.key?'▴':'▾', isOpen: om===m.key, btnStyle: menuBtn(active),
+              onToggle: ()=>this.setState(s=>({faMenu: s.faMenu===m.key?null:m.key})),
+              options: [{label:'All', check:active?'':'✓', rowStyle:optRow(!active), onClick:()=>this.setState({[m.stateKey]:null, faMenu:null})}].concat(
+                m.opts.map(o=>({label:o, check:m.value===o?'✓':'', rowStyle:optRow(m.value===o), onClick:()=>this.setState({[m.stateKey]:o, faMenu:null})}))) };
+          });
+          const concStyle=(c)=> 'flex:none;font-size:10px;font-family:\'IBM Plex Mono\',monospace;padding:2px 7px;border-radius:5px;white-space:nowrap;'+(
+            c==='both_fail' ? 'color:var(--fail,#a8483b);background:var(--fail-bg,#f1e1d8)'
+            : c==='opus_only' ? 'color:var(--warn-dim,#977f3e);background:var(--warn-bg,#efe6d1)'
+            : 'color:var(--ink-3,#8c8678);background:var(--surface-2,#efece2)');
+          const faTableRows=faRows.map(r=>{
+            const p=promptById[r.id]||{};
+            const crit=((p.criteria||[])[r.criterion_index-1]||{});
+            return { id:r.id, model:prettyModel(r.model), idx:'#'+r.criterion_index,
+              cause:(taxByKey[r.root_cause]||{}).label||r.root_cause,
+              confidence:r.confidence,
+              conc: r.judge_concurrence==='both_fail'?'both judges':(r.judge_concurrence==='opus_only'?'opus only':(r.judge_concurrence==='fable_refused'?'2nd judge refused':'single judge')),
+              concCss: concStyle(r.judge_concurrence),
+              critText: crit.text||'', evidence:r.evidence||'', rationale:r.rationale||'',
+              onClick:()=>this.openPrompt(r.id) };
+          });
+          const faTableCount=faRows.length, faTableEmpty=faRows.length===0;
 
           return {
             ...this.runSelVals(),
@@ -3375,6 +3513,9 @@
             bcPromptsStyle: (screen==='drilldown'||screen==='detail')?'color:var(--ink,#2a2722);font-weight:600;cursor:pointer':'color:var(--ink-3,#8c8678);cursor:pointer',
             bcAnalysisStyle: screen==='analysis'?'color:var(--ink,#2a2722);font-weight:600;cursor:pointer':'color:var(--ink-3,#8c8678);cursor:pointer',
             faAvailable, faUnavailable: !faAvailable, faBlurb, faPareto, faLegend,
+            faMatrixCols, faMatrix, faMatrixUseCols, faMatrixUse,
+            faLadderCards, faSharedNote, faFilterMenus,
+            faTableRows, faTableCount, faTableEmpty,
             detailId:dPrompt.id||'',
             metricCards, instrBars, styleBars, useBars, verifBars, compareRows, compareLegend,
             gapCritNum:fmtPct(crate), gapFullNum:fmtPct(frate), gapCritBar, gapFullBar,
