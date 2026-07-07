@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 import config
 from config import CANDIDATE_TIMEOUT_S, PROGRESS_PATH
 from pipeline import (
-    aggregate, classify, connectivity, generate, grade, load, validate,
+    aggregate, classify, connectivity, diagnose, generate, grade, load, validate,
 )
 from pipeline.monitor import build_monitor, render_lines
 from pipeline.run_config import (
@@ -36,7 +36,7 @@ from pipeline.run_config import (
     validate_judge,
 )
 
-DATA_STEPS = ("generate", "grade", "classify", "validate", "aggregate", "all")
+DATA_STEPS = ("generate", "grade", "classify", "diagnose", "validate", "aggregate", "all")
 
 # A heartbeat only refreshes between items; a single in-flight model call can
 # legitimately freeze `updated_at` for up to the candidate timeout. Only warn
@@ -87,6 +87,14 @@ def _parser() -> argparse.ArgumentParser:
                         "the Anthropic Message Batches API (submit → poll → collect); "
                         "'sequential' keeps the one-streamed-call-per-cell path. "
                         "Grading params are identical either way.")
+    p.add_argument("--diagnose", choices=("on", "off"), default="on",
+                   dest="diagnose",
+                   help="For `all`: run the failure root-cause analysis stage "
+                        "after classify (default on). NOT frozen — analysis is "
+                        "post-hoc and re-runnable; skipping it costs nothing "
+                        "later (`main.py diagnose --experiment <slug>` backfills). "
+                        "'on' spends extra judge tokens (~1 batch call per "
+                        "failed response cell).")
     p.add_argument("--description", default=None,
                    help="One-liner describing what makes this experiment distinct (frozen).")
     p.add_argument("--run-report", default=None, dest="run_report",
@@ -126,7 +134,7 @@ def _overrides(args: argparse.Namespace) -> dict:
     return out
 
 
-def _run_all(cfg, run_report) -> None:
+def _run_all(cfg, run_report, diagnose_enabled: bool = True) -> None:
     with build_monitor("all", cfg.limit or 0, cfg.slug,
                        n_candidates=len(cfg.candidates)) as mon:
         connectivity.run(cfg, monitor=mon)
@@ -136,6 +144,8 @@ def _run_all(cfg, run_report) -> None:
         generate.run(cfg, monitor=mon)
         grade.run(cfg, monitor=mon)
         classify.run(cfg, monitor=mon)
+        if diagnose_enabled:
+            diagnose.run(cfg, monitor=mon)
         validate.run(cfg, mode="sample", monitor=mon)
         aggregate.run(cfg, run_report=run_report, monitor=mon)
 
@@ -211,7 +221,7 @@ def main(argv: list[str] | None = None) -> int:
                   "one. Run steps individually, or start a new slug with --limit.",
                   file=sys.stderr)
             return 2
-        _run_all(cfg, args.run_report)
+        _run_all(cfg, args.run_report, diagnose_enabled=args.diagnose == "on")
         return 0
 
     with build_monitor(args.step, cfg.limit or 0, cfg.slug,
@@ -222,6 +232,8 @@ def main(argv: list[str] | None = None) -> int:
             grade.run(cfg, monitor=mon)
         elif args.step == "classify":
             classify.run(cfg, monitor=mon)
+        elif args.step == "diagnose":
+            diagnose.run(cfg, monitor=mon)
         elif args.step == "validate":
             validate.run(cfg, mode=args.mode, monitor=mon)
         elif args.step == "aggregate":
