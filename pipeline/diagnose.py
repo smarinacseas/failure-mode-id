@@ -167,3 +167,115 @@ def _error_rows(failed_indices: list[int], reason: str) -> list[dict]:
     return [{"index": i, "evidence": "", "root_cause": "other",
              "secondary": None, "confidence": "low", "rationale": reason}
             for i in failed_indices]
+
+
+def _batch_request(cid: str, system: str, user_msg: str) -> dict:
+    return {
+        "custom_id": cid,
+        "params": {
+            "model": DIAGNOSE_JUDGE,
+            "max_tokens": DIAGNOSE_MAX_TOKENS,
+            "thinking": {"type": "adaptive"},
+            "system": system,
+            "messages": [{"role": "user", "content": user_msg}],
+        },
+    }
+
+
+def _write_cell(cfg: RunConfig, mon, cell: dict, trace_status: str,
+                rows: list[dict], error: str = "") -> None:
+    mon.item_start(model=cell["key"], prompt_id=cell["rid"])
+    append_jsonl(cfg.diagnosis_path(cell["key"]),
+                 {"id": cell["rid"], "trace_status": trace_status, "diagnoses": rows})
+    if error:
+        mon.record_error(f"diagnose {cell['key']} {cell['rid']}: {error.split(':', 1)[0]}")
+    mon.item_done(model=cell["key"], prompt_id=cell["rid"])
+
+
+def run(cfg: RunConfig, monitor: RunMonitor | None = None) -> None:
+    records = select_prompts(read_jsonl(DATA_JSONL), cfg.limit, cfg.sample_seed)
+    if not records:
+        raise RuntimeError(f"No records in {DATA_JSONL}. Run `load` first.")
+
+    with stage_ctx(monitor, "diagnose", len(records)) as mon:
+        cells = _failed_cells(cfg, records)
+        already = sum(len(read_jsonl(cfg.diagnosis_path(key))) for key in cfg.candidates)
+        mon.start_stage("diagnose", total=len(cells) + already, already_done=already)
+        if not cells:
+            mon.note("diagnose: no undiagnosed failed cells — nothing to do.")
+            mon.end_stage()
+            return
+
+        pending: dict[str, dict] = {}
+        for cell in cells:
+            if CUSTOM_ID_SEP in cell["key"]:
+                raise ValueError(f"candidate key {cell['key']!r} contains "
+                                 f"{CUSTOM_ID_SEP!r}; cannot build a unique custom_id")
+            user_msg, trace_status = _user_message(cell)
+            pending[f"{cell['key']}{CUSTOM_ID_SEP}{cell['rid']}"] = {
+                **cell, "user_msg": user_msg, "trace_status": trace_status,
+                "last_err": "",
+            }
+
+        # Two rounds mirror grade's batch transport: truncated/unparseable/
+        # batch-errored cells resubmit once; refusals are sticky-terminal.
+        for attempt in (1, 2):
+            if not pending:
+                break
+            requests = [
+                _batch_request(cid, _taxonomy.diagnose_system(c["trace_status"] != "absent"),
+                               c["user_msg"])
+                for cid, c in pending.items()
+            ]
+            batch = retry(
+                lambda requests=requests:
+                    anthropic.messages.batches.create(requests=requests),
+                label="anthropic:batches:create:diagnose",
+            )
+            mon.note(f"diagnose batch: submitted {len(requests)} cell(s) "
+                     f"(attempt {attempt}, batch {batch.id})")
+
+            while True:
+                b = retry(lambda: anthropic.messages.batches.retrieve(batch.id),
+                          label="anthropic:batches:retrieve:diagnose")
+                status = getattr(b, "processing_status", "unknown")
+                mon.note(f"diagnose batch: {status}")
+                if status == "ended":
+                    break
+                _sleep(POLL_INTERVAL_S)
+
+            results = retry(lambda: list(anthropic.messages.batches.results(batch.id)),
+                            label="anthropic:batches:results:diagnose")
+            for res in results:
+                cell = pending.get(res.custom_id)
+                if cell is None:
+                    continue
+                if res.result.type == "succeeded":
+                    msg = res.result.message
+                    raw = "".join(blk.text for blk in msg.content
+                                  if getattr(blk, "type", None) == "text")
+                    rows, err = _text_to_diagnoses(
+                        raw, getattr(msg, "stop_reason", None),
+                        cell["failed_indices"], cell["trace_status"] != "absent")
+                    if rows is not None:
+                        _write_cell(cfg, mon, cell, cell["trace_status"], rows)
+                        del pending[res.custom_id]
+                    elif err.startswith("diagnose_refusal"):
+                        _write_cell(cfg, mon, cell, cell["trace_status"],
+                                    _error_rows(cell["failed_indices"], err), error=err)
+                        del pending[res.custom_id]
+                    else:
+                        cell["last_err"] = err          # resubmit next round
+                else:
+                    err_obj = getattr(res.result, "error", None)
+                    etype = getattr(err_obj, "type", None) or ""
+                    cell["last_err"] = (f"diagnose_parse_error: batch result "
+                                        f"{res.result.type}"
+                                        + (f" ({etype})" if etype else ""))
+
+        for cid, cell in list(pending.items()):
+            reason = cell["last_err"] or "diagnose_parse_error: batch result missing after 2 attempts"
+            _write_cell(cfg, mon, cell, cell["trace_status"],
+                        _error_rows(cell["failed_indices"], reason), error=reason)
+            del pending[cid]
+        mon.end_stage()

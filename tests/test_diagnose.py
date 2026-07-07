@@ -221,3 +221,125 @@ def test_text_to_diagnoses_rejects_duplicate_indices():
     ])
     rows, err = diagnose._text_to_diagnoses(raw, "end_turn", [2], True)
     assert rows is None and err.startswith("diagnose_parse_error")
+
+
+def _succeeded(cid, text, stop_reason="end_turn"):
+    msg = SimpleNamespace(content=[SimpleNamespace(type="text", text=text)],
+                          stop_reason=stop_reason)
+    return SimpleNamespace(custom_id=cid,
+                           result=SimpleNamespace(type="succeeded", message=msg))
+
+
+def _errored(cid, etype="api_error"):
+    return SimpleNamespace(custom_id=cid,
+                           result=SimpleNamespace(type="errored",
+                                                  error=SimpleNamespace(type=etype)))
+
+
+class FakeBatches:
+    """Scripted Message Batches endpoint: submission N consumes script[N] =
+    {"polls": [status, ...], "results": callable(requests) -> [result]}."""
+
+    def __init__(self, script):
+        self.script = script
+        self.created: list[list[dict]] = []
+        self._by_id: dict[str, dict] = {}
+
+    def create(self, requests):
+        idx = len(self.created)
+        self.created.append(list(requests))
+        bid = f"batch_{idx}"
+        entry = dict(self.script[idx])
+        entry["polls"] = list(entry.get("polls") or ["ended"])
+        entry["requests"] = list(requests)
+        self._by_id[bid] = entry
+        return SimpleNamespace(id=bid, processing_status="in_progress")
+
+    def retrieve(self, bid):
+        entry = self._by_id[bid]
+        status = entry["polls"].pop(0) if len(entry["polls"]) > 1 else entry["polls"][0]
+        rc = SimpleNamespace(processing=0, succeeded=0, errored=0)
+        return SimpleNamespace(id=bid, processing_status=status, request_counts=rc)
+
+    def results(self, bid):
+        entry = self._by_id[bid]
+        return iter(entry["results"](entry["requests"]))
+
+
+def _batch_setup(tmp_path, monkeypatch, script, **seed_kw):
+    cfg = _seed_run(tmp_path, monkeypatch, **seed_kw)
+    fake = FakeBatches(script)
+    monkeypatch.setattr(diagnose, "anthropic",
+                        SimpleNamespace(messages=SimpleNamespace(batches=fake)))
+    monkeypatch.setattr(diagnose, "_sleep", lambda s: None)
+    return cfg, fake
+
+
+def _diag_monitor():
+    return RunMonitor(WorkPlan.for_step("diagnose", 1, 1), sinks=[RecordingSink()])
+
+
+def test_diagnose_batch_submit_collect_and_request_shape(tmp_path, monkeypatch):
+    script = [{"polls": ["in_progress", "ended"],
+               "results": lambda reqs: [_succeeded(reqs[0]["custom_id"], _diag_json())]}]
+    cfg, fake = _batch_setup(tmp_path, monkeypatch, script)
+
+    m = _diag_monitor()
+    with m:
+        diagnose.run(cfg, monitor=m)
+
+    (req,) = fake.created[0]
+    assert req["custom_id"] == "m1__p1"
+    p = req["params"]
+    assert p["model"] == config.DIAGNOSE_JUDGE
+    assert p["max_tokens"] == config.DIAGNOSE_MAX_TOKENS
+    assert p["thinking"] == {"type": "adaptive"}
+    assert "failure analyst" in p["system"]
+    assert "MARKER" not in p["messages"][0]["content"]      # blind end-to-end
+
+    (row,) = read_jsonl(cfg.diagnosis_path("m1"))
+    assert row["id"] == "p1" and row["trace_status"] == "present"
+    assert row["diagnoses"][0]["root_cause"] == "judge_suspect"
+    snap = m.snapshot()
+    assert snap["errors"] == 0 and snap["stages"][0]["done"] == 1
+
+
+def test_diagnose_refusal_is_terminal_without_resubmission(tmp_path, monkeypatch):
+    script = [{"polls": ["ended"],
+               "results": lambda reqs: [_succeeded(reqs[0]["custom_id"], "", "refusal")]}]
+    cfg, fake = _batch_setup(tmp_path, monkeypatch, script)
+    m = _diag_monitor()
+    with m:
+        diagnose.run(cfg, monitor=m)
+    assert len(fake.created) == 1                            # no second round
+    (row,) = read_jsonl(cfg.diagnosis_path("m1"))
+    assert row["diagnoses"][0]["rationale"].startswith("diagnose_refusal")
+
+
+def test_diagnose_parse_error_retries_once_then_error_rows(tmp_path, monkeypatch):
+    script = [
+        {"polls": ["ended"],
+         "results": lambda reqs: [_succeeded(reqs[0]["custom_id"], "not json")]},
+        {"polls": ["ended"],
+         "results": lambda reqs: [_errored(reqs[0]["custom_id"])]},
+    ]
+    cfg, fake = _batch_setup(tmp_path, monkeypatch, script)
+    m = _diag_monitor()
+    with m:
+        diagnose.run(cfg, monitor=m)
+    assert len(fake.created) == 2
+    (row,) = read_jsonl(cfg.diagnosis_path("m1"))
+    assert row["diagnoses"][0]["root_cause"] == "other"
+    assert m.snapshot()["errors"] == 1
+
+
+def test_diagnose_noop_when_no_failures(tmp_path, monkeypatch):
+    cfg, fake = _batch_setup(tmp_path, monkeypatch, [])
+    write_jsonl(cfg.grades_path(OPUS, "m1"), [{
+        "id": "p1", "verdicts": [{"index": i, "verdict": "PASS", "reason": ""}
+                                 for i in (1, 2, 3)],
+    }])
+    m = _diag_monitor()
+    with m:
+        diagnose.run(cfg, monitor=m)
+    assert fake.created == [] and not cfg.diagnosis_path("m1").exists()

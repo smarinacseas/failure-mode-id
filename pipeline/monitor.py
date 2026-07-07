@@ -27,7 +27,8 @@ from rich.text import Text
 from config import CANDIDATES, LOGS_DIR, PROGRESS_PATH
 
 # Stage order + how each stage's total is derived from (limit L, n_candidates M).
-_STEP_ORDER = ("connectivity", "load", "generate", "grade", "classify", "validate", "aggregate")
+_STEP_ORDER = ("connectivity", "load", "generate", "grade", "classify",
+               "diagnose", "validate", "aggregate")
 
 
 def _stage_total(name: str, limit: int, m: int) -> int:
@@ -37,6 +38,7 @@ def _stage_total(name: str, limit: int, m: int) -> int:
         "generate": limit * m,
         "grade": limit * m,
         "classify": limit,
+        "diagnose": limit * m,     # upper bound; start_stage() sets the real total
         "validate": 1,
         "aggregate": 1,
     }[name]
