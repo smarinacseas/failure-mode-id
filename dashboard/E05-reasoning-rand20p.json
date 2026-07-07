@@ -7,7 +7,7 @@
       "label": "reasoning-rand20p",
       "description": "Randomized-sample scale-up of E04: identical reasoning-on treatment (temp 0.6, 48k shared thinking+answer budget, throughput-sorted routing, dual judges Opus 4.8 + Fable 5) on 20 prompts drawn by seeded stratified sampling (seed 20260706) — all 7 use cases, all 4 instruction types, all 3 prompt styles represented.",
       "run_report": "meta/2026-07-06-reasoning-rand20p.md",
-      "run_date": "2026-07-07T18:36:13.216567+00:00"
+      "run_date": "2026-07-07T20:37:47.936985+00:00"
     },
     "dataset": {
       "name": "Complex Constraints Benchmark Set",
@@ -103,7 +103,7 @@
       "validate_response_excerpt_chars": 800
     },
     "git": {
-      "commit": "e1810f2",
+      "commit": "edbb746",
       "dirty": true
     },
     "validation": {
@@ -113,7 +113,7 @@
       "agreement_pct": null,
       "scored_at": null
     },
-    "run_date": "2026-07-07T18:36:13.216567+00:00",
+    "run_date": "2026-07-07T20:37:47.936985+00:00",
     "max_tokens": 48000,
     "reasoning_enabled": true,
     "run_notes": [
@@ -122,6 +122,7 @@
       "Zero overlap with the first-3 prompts of E01–E04 (CIF-001/002/003 not drawn), so cross-experiment comparisons are aggregate-level, not per-prompt.",
       "Balanced (not proportional) allocation across use cases: small use cases are deliberately over-represented relative to the full set — by-use-case cells are closer in size, but the aggregate pass rate is not weighted like the full 75.",
       "Candidate decoding and routing inherit E04's settings, which differ from E01–E03 (greedy, default routing): treatment vs those runs still folds together reasoning mode, sampling, and provider pool.",
+      "Failure-mode analysis report: meta/2026-07-07-failure-taxonomy-v1.md (root-cause taxonomy v1, Pareto, E03↔E04 reasoning effect, training recommendations).",
       "⚠ Judge claude-fable-5: 114 × judge_refusal — affected criteria count as FAIL.",
       "All judges graded the same candidate responses (single generation pass), so judge columns are directly comparable.",
       "Judges reason with adaptive thinking over a streamed 32000-token budget; candidate reasoning enabled at temperature 0.6."
@@ -26939,7 +26940,7 @@
     ],
     "diagnose_judge": "claude-opus-4-8",
     "verdict_basis": "claude-opus-4-8",
-    "diagnosed_at": "2026-07-07T18:36:13.262581+00:00",
+    "diagnosed_at": "2026-07-07T20:37:47.962898+00:00",
     "counts": {
       "failed_criteria": 219,
       "diagnosed": 219,
