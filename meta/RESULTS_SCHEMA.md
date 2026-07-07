@@ -274,7 +274,9 @@ Absent key means the diagnose stage has not run for this experiment. `rows[*]` j
 
 ```jsonc
 "failure_analysis": {
-  "taxonomy_version": 1,
+  "taxonomy_version": 1,          // provenance: stamped per artifact row at diagnose time;
+                                  // "taxonomy_versions_seen": [..] appears (only) when rows
+                                  // from mixed taxonomy versions are aggregated together
   "taxonomy": [ { "key": "constraint_dropped", "label": "…",
                   "description": "…", "training_implication": "…" } ],
   "diagnose_judge": "claude-opus-4-8",
