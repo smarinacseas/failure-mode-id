@@ -168,3 +168,42 @@ def test_user_message_truncated_and_absent_beats_truncation(tmp_path, monkeypatc
     payload, trace_status = diagnose._user_message(cell)
     assert trace_status == "absent"
     assert "TRUNCATED" in payload
+
+
+def _diag_json(index=2, root="judge_suspect"):
+    return json.dumps([{"index": index, "evidence": "quote", "root_cause": root,
+                        "secondary": None, "confidence": "high",
+                        "rationale": "because"}])
+
+
+def test_text_to_diagnoses_happy_path_and_unknown_label():
+    rows, err = diagnose._text_to_diagnoses(_diag_json(), "end_turn", [2], True)
+    assert err == "" and rows[0]["root_cause"] == "judge_suspect"
+
+    # Unknown label → parse error (spec §9), NOT silent coercion.
+    rows, err = diagnose._text_to_diagnoses(
+        _diag_json(root="not_a_category"), "end_turn", [2], True)
+    assert rows is None and err.startswith("diagnose_parse_error")
+
+    # A no-trace cell must reject trace-dependent keys it wasn't offered:
+    # constraint_unaddressed IS allowed, garbage is not.
+    rows, err = diagnose._text_to_diagnoses(
+        _diag_json(root="constraint_unaddressed"), "end_turn", [2], False)
+    assert err == "" and rows[0]["root_cause"] == "constraint_unaddressed"
+
+
+def test_text_to_diagnoses_refusal_truncation_and_missing_index():
+    rows, err = diagnose._text_to_diagnoses("", "refusal", [2], True)
+    assert rows is None and err.startswith("diagnose_refusal")
+    rows, err = diagnose._text_to_diagnoses("[{", "max_tokens", [2], True)
+    assert rows is None and err.startswith("diagnose_truncated")
+    # Missing an assigned index → parse error (the cell retries whole).
+    rows, err = diagnose._text_to_diagnoses(_diag_json(index=2), "end_turn", [2, 3], True)
+    assert rows is None and err.startswith("diagnose_parse_error")
+
+
+def test_error_rows_are_terminal_other_low():
+    rows = diagnose._error_rows([2, 3], "diagnose_parse_error: boom")
+    assert [r["index"] for r in rows] == [2, 3]
+    assert all(r["root_cause"] == "other" and r["confidence"] == "low"
+               and r["rationale"] == "diagnose_parse_error: boom" for r in rows)

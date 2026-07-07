@@ -107,3 +107,61 @@ def _user_message(cell: dict) -> tuple[str, str]:
         f"{response}"
     )
     return payload, trace_status
+
+
+_CONFIDENCES = {"high", "medium", "low"}
+
+
+def _text_to_diagnoses(raw: str, stop_reason: str | None,
+                       failed_indices: list[int],
+                       trace_present: bool) -> tuple[list[dict] | None, str]:
+    """Parse one analyst response. Mirrors grade._text_to_verdicts: refusal is
+    sticky-terminal, max_tokens and malformed/incomplete output are retriable
+    (one resubmission round), everything is validated against the exact
+    category set this cell was offered."""
+    if stop_reason == "refusal":
+        return None, ("diagnose_refusal: model declined to analyze this cell "
+                      "(stop_reason=refusal)")
+    if stop_reason == "max_tokens":
+        return None, "diagnose_truncated: stop_reason=max_tokens (raise DIAGNOSE_MAX_TOKENS)"
+    allowed = _taxonomy.allowed_keys(trace_present)
+    try:
+        parsed = extract_json_array(raw)
+        by_index: dict[int, dict] = {}
+        for item in parsed:
+            if not isinstance(item, dict):
+                continue
+            idx = int(item.get("index"))
+            root = str(item.get("root_cause", "")).strip()
+            if root not in allowed:
+                raise ValueError(f"root_cause {root!r} not in offered taxonomy")
+            secondary = item.get("secondary")
+            secondary = str(secondary).strip() if secondary else None
+            if secondary is not None and secondary not in allowed:
+                raise ValueError(f"secondary {secondary!r} not in offered taxonomy")
+            confidence = str(item.get("confidence", "")).lower().strip()
+            if confidence not in _CONFIDENCES:
+                confidence = "low"
+            by_index[idx] = {
+                "index": idx,
+                "evidence": str(item.get("evidence", "")).strip(),
+                "root_cause": root,
+                "secondary": secondary,
+                "confidence": confidence,
+                "rationale": str(item.get("rationale", "")).strip(),
+            }
+        missing = [i for i in failed_indices if i not in by_index]
+        if missing:
+            raise ValueError(f"missing diagnoses for unmet indices {missing}")
+        return [by_index[i] for i in failed_indices], ""
+    except Exception as e:  # noqa: BLE001
+        return None, f"diagnose_parse_error: {type(e).__name__}: {e}"
+
+
+def _error_rows(failed_indices: list[int], reason: str) -> list[dict]:
+    """Terminal rows after both rounds fail: honest 'other' at low confidence,
+    with the machine-readable reason preserved in rationale (the aggregate
+    fold-in and the dashboard can surface it)."""
+    return [{"index": i, "evidence": "", "root_cause": "other",
+             "secondary": None, "confidence": "low", "rationale": reason}
+            for i in failed_indices]
