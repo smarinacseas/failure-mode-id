@@ -681,37 +681,51 @@
                 min-width: 0;
               "
             >
+              <!-- Logo is "home": back to Overview without touching the rest
+             of the view state (run, model, filters all survive). -->
               <div
+                onclick="{{ goOverview }}"
+                title="Back to Overview"
                 style="
-                  width: 23px;
-                  height: 23px;
-                  border-radius: 6px;
-                  background: var(--ink, #161a22);
                   display: flex;
                   align-items: center;
-                  justify-content: center;
+                  gap: 11px;
                   flex: none;
+                  cursor: pointer;
                 "
               >
                 <div
                   style="
-                    width: 9px;
-                    height: 9px;
-                    border: 2px solid var(--surface, #fff);
-                    border-radius: 50%;
+                    width: 23px;
+                    height: 23px;
+                    border-radius: 6px;
+                    background: var(--ink, #161a22);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex: none;
                   "
-                ></div>
-              </div>
-              <div
-                style="
-                  font-family: &quot;Newsreader&quot;, Georgia, serif;
-                  font-weight: 500;
-                  font-size: 18px;
-                  letter-spacing: 0;
-                  flex: none;
-                "
-              >
-                FailureModeID
+                >
+                  <div
+                    style="
+                      width: 9px;
+                      height: 9px;
+                      border: 2px solid var(--surface, #fff);
+                      border-radius: 50%;
+                    "
+                  ></div>
+                </div>
+                <div
+                  style="
+                    font-family: &quot;Newsreader&quot;, Georgia, serif;
+                    font-weight: 500;
+                    font-size: 18px;
+                    letter-spacing: 0;
+                    flex: none;
+                  "
+                >
+                  FailureModeID
+                </div>
               </div>
               <div
                 style="
@@ -725,11 +739,18 @@
               >
                 <!-- every text span needs min-width:0 + its own ellipsis: nowrap spans
                refuse to shrink (min-width:auto) and paint past the button box. -->
-                <button onclick="{{ runOnToggle }}" style="{{ runBtnStyle }}">
+                <!-- Hover overrides need !important: style-hover compiles to a
+               class rule, which the inline style= would otherwise beat. -->
+                <button
+                  onclick="{{ runOnToggle }}"
+                  title="Switch evaluation run"
+                  style="{{ runBtnStyle }}"
+                  style-hover="background: var(--accent-bg, #efe2d4) !important; border-color: var(--accent-line, #e0cab2) !important"
+                >
                   <span
                     style="
                       font-size: 9px;
-                      color: var(--ink-4, #a8a294);
+                      color: var(--accent, #b06a3c);
                       text-transform: uppercase;
                       letter-spacing: 0.09em;
                       font-weight: 600;
@@ -767,8 +788,8 @@
                   >
                   <span
                     style="
-                      font-size: 9px;
-                      color: var(--ink-4, #a8a294);
+                      font-size: 10px;
+                      color: var(--ink-2, #6c6759);
                       flex: none;
                     "
                     >{{ runCaret }}</span
@@ -3200,14 +3221,36 @@
             self.loadRun(runs[0]);
           });
         }
+        // Switching runs swaps the data, not the viewer's place: screen, model,
+        // judge, filters and the open prompt survive whenever the new run can
+        // honor them; only the pieces the new run lacks fall back to defaults.
         loadRun(run){
           var self=this;
-          this.setState({data:null, dataRaw:null, judge:null, error:null, currentRun:run, model:null, selectedId:null, screen:'overview', fInstr:null, fUse:null, fStyle:null, openMenu:null, runOpen:false, notesOpen:false, faCause:null, faModelF:null, faMenu:null});
+          var prev={screen:this.state.screen, model:this.state.model, judge:this.state.judge,
+                    selectedId:this.state.selectedId, expanded:this.state.expanded,
+                    fInstr:this.state.fInstr, fUse:this.state.fUse, fStyle:this.state.fStyle,
+                    faCause:this.state.faCause, faModelF:this.state.faModelF};
+          this.setState({data:null, dataRaw:null, judge:null, error:null, currentRun:run, openMenu:null, runOpen:false, faMenu:null});
           __loadJson(run.path).then(function(d){
-            var judges=(d.meta&&d.meta.judges)||[];
-            var defJudge=judges[0]||(d.meta&&d.meta.judge)||null;
-            var proj=self.projectJudge(d, defJudge);
-            self.setState(Object.assign({dataRaw:d, model:(d.meta&&d.meta.models&&d.meta.models[0])||null}, proj));
+            var meta=d.meta||{}, models=meta.models||[], prompts=d.prompts||[];
+            var judges=meta.judges||[];
+            var judge= judges.indexOf(prev.judge)>=0 ? prev.judge : (judges[0]||meta.judge||null);
+            var proj=self.projectJudge(d, judge);
+            var has=function(key,val){ return val!=null && prompts.some(function(p){ return p[key]===val; }); };
+            var promptKept= prev.selectedId!=null && prompts.some(function(p){ return p.id===prev.selectedId; });
+            var faRows=(d.failure_analysis&&d.failure_analysis.rows)||[];
+            self.setState(Object.assign({
+              dataRaw:d,
+              model: models.indexOf(prev.model)>=0 ? prev.model : (models[0]||null),
+              screen: (prev.screen==='detail'&&!promptKept) ? 'drilldown' : prev.screen,
+              selectedId: promptKept ? prev.selectedId : null,
+              expanded: promptKept ? prev.expanded : {},
+              fInstr: has('instruction_type',prev.fInstr) ? prev.fInstr : null,
+              fUse: has('use_case',prev.fUse) ? prev.fUse : null,
+              fStyle: has('prompt_style',prev.fStyle) ? prev.fStyle : null,
+              faModelF: models.indexOf(prev.faModelF)>=0 ? prev.faModelF : null,
+              faCause: faRows.some(function(r){ return r.root_cause===prev.faCause; }) ? prev.faCause : null,
+            }, proj));
           }).catch(function(e){ self.setState({error:String((e&&e.message)||e)}); });
         }
         runSelVals(){
@@ -3219,7 +3262,7 @@
             runCaret: open?'▴':'▾', runOpen: open,
             runOnToggle: ()=> this.setState(s=>({runOpen:!s.runOpen})),
             closeRun: ()=> this.setState({runOpen:false}),
-            runBtnStyle: 'display:inline-flex;align-items:baseline;gap:8px;background:transparent;border:none;cursor:pointer;padding:0;max-width:100%;min-width:0;overflow:hidden;text-align:left',
+            runBtnStyle: 'display:inline-flex;align-items:baseline;gap:8px;background:var(--surface,#fbfaf5);border:1px solid var(--border,#e4dfd1);border-radius:8px;padding:6px 11px;box-shadow:0 1px 2px rgba(0,0,0,.05);cursor:pointer;max-width:100%;min-width:0;overflow:hidden;text-align:left',
             runOptions: runs.map(r=>({ label:r.label||r.id||r.path, date:r.date||'', rowStyle:optRowR(cur&&r.path===cur.path), checkStyle:(cur&&r.path===cur.path)?'color:var(--accent,#b06a3c);font-weight:700;font-size:12px;flex:none':'display:none', onClick:()=>self.loadRun(r) })),
           };
         }
