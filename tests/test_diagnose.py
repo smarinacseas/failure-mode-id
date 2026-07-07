@@ -106,6 +106,18 @@ def test_failed_cells_skip_already_diagnosed_and_all_pass(tmp_path, monkeypatch)
     assert diagnose._failed_cells(cfg, records) == []
 
 
+def test_failed_cells_include_diagnosed_ignores_resume(tmp_path, monkeypatch):
+    """Pass-1 open coding samples from ALL failed cells (spec §3) — the
+    diagnosed-cell resume filter is Pass-2 behavior only."""
+    cfg = _seed_run(tmp_path, monkeypatch)
+    write_jsonl(cfg.diagnosis_path("m1"),
+                [{"id": "p1", "trace_status": "present", "diagnoses": []}])
+    records = read_jsonl(diagnose.DATA_JSONL)
+    assert diagnose._failed_cells(cfg, records) == []              # resume default
+    cells = diagnose._failed_cells(cfg, records, include_diagnosed=True)
+    assert [c["rid"] for c in cells] == ["p1"]
+
+
 def test_payload_is_blind(tmp_path, monkeypatch):
     """Spec §4 rules 1–3: no judge reason text, no candidate model name, no
     judge names anywhere in the analyst payload. The MARKER_* strings the

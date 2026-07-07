@@ -24,13 +24,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from config import (  # noqa: E402
-    DATA_JSONL, DIAGNOSE_JUDGE, DIAGNOSE_MAX_TOKENS, OUTPUTS_DIR, anthropic,
-)
-from pipeline._io import read_jsonl  # noqa: E402
+from config import DATA_JSONL, OUTPUTS_DIR, anthropic  # noqa: E402
+from pipeline._io import read_jsonl, retry  # noqa: E402
 from pipeline._json_extract import extract_json_array  # noqa: E402
 from pipeline._select import select_prompts  # noqa: E402
-from pipeline.diagnose import _failed_cells, _user_message  # noqa: E402
+from pipeline.diagnose import _batch_request, _failed_cells, _user_message  # noqa: E402
 from pipeline.run_config import resolve  # noqa: E402
 
 OPENCODE_SEED = 20260707
@@ -59,8 +57,9 @@ def main() -> int:
 
     cfg = resolve(args.slug, {})
     records = select_prompts(read_jsonl(DATA_JSONL), cfg.limit, cfg.sample_seed)
-    # Ignore resume state: Pass 1 samples from ALL failed cells, diagnosed or not.
-    all_cells = _failed_cells(cfg, records)
+    # Pass 1 bypasses the Pass-2 resume filter by design (spec §3): it samples
+    # from ALL failed cells, whether or not they have already been diagnosed.
+    all_cells = _failed_cells(cfg, records, include_diagnosed=True)
 
     # Stratify (criterion, cell) pairs by (model, instruction_type) and draw
     # round-robin with a fixed seed so the sample is reproducible.
@@ -87,18 +86,19 @@ def main() -> int:
         user_msg, _trace = _user_message(single)
         cid = f"oc{n}"
         meta[cid] = (cell["key"], cell["rid"], idx)
-        requests.append({
-            "custom_id": cid,
-            "params": {"model": DIAGNOSE_JUDGE, "max_tokens": DIAGNOSE_MAX_TOKENS,
-                       "thinking": {"type": "adaptive"},
-                       "system": OPENCODE_SYSTEM,
-                       "messages": [{"role": "user", "content": user_msg}]},
-        })
+        requests.append(_batch_request(cid, OPENCODE_SYSTEM, user_msg))
+
+    if not requests:
+        print(f"no failed criteria to sample for {args.slug} — nothing to do.")
+        return 0
 
     print(f"open-coding {len(requests)} sampled failures from {args.slug} …")
-    batch = anthropic.messages.batches.create(requests=requests)
+    batch = retry(lambda: anthropic.messages.batches.create(requests=requests),
+                  label="anthropic:batches:create:opencode")
+    print(f"  batch {batch.id}")
     while True:
-        b = anthropic.messages.batches.retrieve(batch.id)
+        b = retry(lambda: anthropic.messages.batches.retrieve(batch.id),
+                  label="anthropic:batches:retrieve:opencode")
         print(f"  {b.processing_status}")
         if b.processing_status == "ended":
             break
@@ -107,9 +107,14 @@ def main() -> int:
     out = OUTPUTS_DIR / "opencode" / f"{args.slug}.jsonl"
     out.parent.mkdir(parents=True, exist_ok=True)
     n_ok = 0
+    results = retry(lambda: list(anthropic.messages.batches.results(batch.id)),
+                    label="anthropic:batches:results:opencode")
     with out.open("w", encoding="utf-8") as fh:
-        for res in anthropic.messages.batches.results(batch.id):
-            key, rid, idx = meta[res.custom_id]
+        for res in results:
+            ids = meta.get(res.custom_id)
+            if ids is None:
+                continue
+            key, rid, idx = ids
             if res.result.type != "succeeded":
                 print(f"  ! {key}/{rid}#{idx}: {res.result.type}")
                 continue

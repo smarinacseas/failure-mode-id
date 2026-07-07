@@ -39,15 +39,18 @@ _ARTIFACT_PREFIXES = ("judge_refusal", "judge_parse_error", "judge_truncated",
                       "missing_in_judge_output")
 
 
-def _failed_cells(cfg: RunConfig, records: list[dict]) -> list[dict]:
+def _failed_cells(cfg: RunConfig, records: list[dict],
+                  include_diagnosed: bool = False) -> list[dict]:
     """(candidate, prompt) cells with >=1 real FAIL under cfg.judge's grades,
-    minus cells already present in the diagnosis output (resume)."""
+    minus cells already present in the diagnosis output (resume) — unless
+    include_diagnosed is set (Pass-1 open coding samples from ALL failed
+    cells; the resume filter is Pass-2 behavior only)."""
     by_id = {r["id"]: r for r in records}
     cells: list[dict] = []
     for key in cfg.candidates:
         grades = {g["id"]: g["verdicts"] for g in read_jsonl(cfg.grades_path(cfg.judge, key))}
         responses = {r["id"]: r for r in read_jsonl(cfg.responses_path(key))}
-        done = {r["id"] for r in read_jsonl(cfg.diagnosis_path(key))}
+        done = set() if include_diagnosed else {r["id"] for r in read_jsonl(cfg.diagnosis_path(key))}
         for rid, verdicts in grades.items():
             if rid in done or rid not in by_id or rid not in responses:
                 continue
