@@ -272,6 +272,7 @@ def _batch_setup(tmp_path, monkeypatch, script, **seed_kw):
     monkeypatch.setattr(diagnose, "anthropic",
                         SimpleNamespace(messages=SimpleNamespace(batches=fake)))
     monkeypatch.setattr(diagnose, "_sleep", lambda s: None)
+    monkeypatch.setattr(diagnose, "_synthesize", lambda cfg, mon: None)
     return cfg, fake
 
 
@@ -456,3 +457,134 @@ def test_failure_analysis_absent_when_no_diagnosis_dir(tmp_path, monkeypatch):
     records = read_jsonl(diagnose.DATA_JSONL)
     grades_by_judge = {OPUS: {"m1": {}}}
     assert aggregate._failure_analysis_block(cfg, records, grades_by_judge) is None
+
+
+def _index_and_results(tmp_path, monkeypatch, entries):
+    """Fake outputs/experiments/: entries = [(slug, number, has_fa)]."""
+    exp_dir = tmp_path / "experiments"
+    exp_dir.mkdir(parents=True, exist_ok=True)
+    idx = {"schema_version": "3.1", "experiments": [
+        {"slug": s, "number": n, "results_path": f"experiments/{s}.json"}
+        for s, n, _ in entries]}
+    (exp_dir / "index.json").write_text(json.dumps(idx))
+    for s, _n, has_fa in entries:
+        doc = {"schema_version": "3.1"}
+        if has_fa:
+            doc["failure_analysis"] = {
+                "counts": {"failed_criteria": 9, "diagnosed": 9, "cells": 3},
+                "by_root_cause": {"other": {"total": 9, "by_model": {"m1": 9},
+                                            "by_instruction_type": {},
+                                            "by_use_case": {}}},
+                "synthesis": {"recommendations": [
+                    {"category": "coverage", "action": "run more prompts",
+                     "rationale": "small n", "expected_signal": "tighter cells"}]},
+            }
+        (exp_dir / f"{s}.json").write_text(json.dumps(doc))
+    monkeypatch.setattr(config, "EXPERIMENTS_DIR", exp_dir)
+    monkeypatch.setattr(config, "EXPERIMENT_INDEX_PATH", exp_dir / "index.json")
+
+
+def test_predecessor_skips_analysis_less_experiments(tmp_path, monkeypatch):
+    """E99 asks: E98 exists but has no failure_analysis (like E01/E02) → the
+    chain skips it transparently and lands on E97."""
+    _index_and_results(tmp_path, monkeypatch, [
+        ("E96-old", 96, False), ("E97-prior", 97, True), ("E98-skip", 98, False)])
+    slug, doc = diagnose._predecessor(make_cfg())          # E99-test → 99
+    assert slug == "E97-prior"
+    assert "failure_analysis" in doc
+
+    _index_and_results(tmp_path, monkeypatch, [])
+    assert diagnose._predecessor(make_cfg()) == (None, None)
+
+
+def test_synthesize_writes_validates_and_resumes(tmp_path, monkeypatch):
+    cfg = _seed_run(tmp_path, monkeypatch)
+    write_jsonl(cfg.diagnosis_path("m1"), [{
+        "id": "p1", "trace_status": "present",
+        "diagnoses": [{"index": 2, "evidence": "q", "root_cause": "other",
+                       "secondary": None, "confidence": "low", "rationale": "r"}],
+    }])
+    _index_and_results(tmp_path, monkeypatch, [("E97-prior", 97, True)])
+    calls = {"n": 0}
+
+    def fake_call_json(model, system, user_msg, label):
+        calls["n"] += 1
+        # Blind-side check of the INPUT: rollups only — no response text,
+        # no criterion text, and the predecessor's data made it in.
+        assert "A plan featuring cats." not in user_msg
+        assert "c2 text" not in user_msg
+        assert "E97-prior" in user_msg and "run more prompts" in user_msg
+        return json.dumps({
+            "comparison": ["other-rate flat vs E97"],
+            "prior_recommendations_review": ["coverage rec not yet addressed"],
+            "recommendations": [
+                {"category": "robustness", "action": "same config, limit 75",
+                 "rationale": "cells too small", "expected_signal": "stable Pareto"},
+                {"category": "bogus_category", "action": "x", "rationale": "y",
+                 "expected_signal": "z"},
+                {"category": "failure_mode_depth", "action": "hand-check 20 rows",
+                 "rationale": "judge_suspect present", "expected_signal": "validated labels"},
+                {"category": "coverage", "action": "4th rec", "rationale": "over cap",
+                 "expected_signal": "dropped"},
+            ],
+            "iteration_note": "one more eval round before training",
+        }), "end_turn"
+    monkeypatch.setattr(diagnose, "call_json", fake_call_json)
+
+    mon = SimpleNamespace(note=lambda *a, **k: None,
+                          record_error=lambda *a, **k: None)
+    diagnose._synthesize(cfg, mon)
+    out = json.loads(cfg.synthesis_path.read_text())
+    assert out["predecessor"] == "E97-prior"
+    cats = [r["category"] for r in out["recommendations"]]
+    assert cats == ["robustness", "failure_mode_depth", "coverage"]  # bogus dropped, capped later
+    assert len(out["recommendations"]) <= 3
+    assert out["iteration_note"]
+
+    diagnose._synthesize(cfg, mon)                    # file exists → skip
+    assert calls["n"] == 1
+
+
+def test_synthesize_nonfatal_on_failure_and_skips_without_rows(tmp_path, monkeypatch):
+    cfg = _seed_run(tmp_path, monkeypatch)
+    _index_and_results(tmp_path, monkeypatch, [])
+    errors = []
+    mon = SimpleNamespace(note=lambda *a, **k: None, record_error=errors.append)
+
+    # No diagnosis rows on disk → nothing to synthesize, no call attempted.
+    def boom(*a, **k):
+        raise AssertionError("must not be called")
+    monkeypatch.setattr(diagnose, "call_json", boom)
+    diagnose._synthesize(cfg, mon)
+    assert not cfg.synthesis_path.exists() and errors == []
+
+    # Rows exist but both attempts fail → recorded error, no file, no raise.
+    write_jsonl(cfg.diagnosis_path("m1"), [{
+        "id": "p1", "trace_status": "present",
+        "diagnoses": [{"index": 2, "evidence": "q", "root_cause": "other",
+                       "secondary": None, "confidence": "low", "rationale": "r"}],
+    }])
+    def raiser(*a, **k):
+        raise RuntimeError("api down")
+    monkeypatch.setattr(diagnose, "call_json", raiser)
+    diagnose._synthesize(cfg, mon)
+    assert not cfg.synthesis_path.exists()
+    assert errors and "synthesis" in errors[0]
+
+
+def test_aggregate_folds_synthesis_block(tmp_path, monkeypatch):
+    cfg = _seed_run(tmp_path, monkeypatch)
+    write_jsonl(cfg.diagnosis_path("m1"), [{
+        "id": "p1", "trace_status": "present",
+        "diagnoses": [{"index": 2, "evidence": "q", "root_cause": "other",
+                       "secondary": None, "confidence": "low", "rationale": "r"}],
+    }])
+    cfg.synthesis_path.write_text(json.dumps({
+        "predecessor": "E97-prior", "comparison": [],
+        "prior_recommendations_review": [], "recommendations": [],
+        "iteration_note": "n"}))
+    records = read_jsonl(diagnose.DATA_JSONL)
+    opus = {"m1": {g["id"]: g["verdicts"]
+                   for g in read_jsonl(cfg.grades_path(OPUS, "m1"))}}
+    block = aggregate._failure_analysis_block(cfg, records, {OPUS: opus})
+    assert block["synthesis"]["predecessor"] == "E97-prior"

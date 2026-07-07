@@ -9,8 +9,10 @@ to runs/<slug>/diagnosis/<candidate>.jsonl. Resumable. Batch-only transport.
 
 from __future__ import annotations
 
+import json
 import time
 
+import config
 from config import (
     DATA_JSONL,
     DIAGNOSE_JUDGE,
@@ -21,9 +23,10 @@ from config import (
 from pipeline import _taxonomy
 from pipeline._io import append_jsonl, read_jsonl, retry
 from pipeline._json_extract import extract_json_array
+from pipeline._judge_llm import call_json
 from pipeline._select import select_prompts
 from pipeline.monitor import RunMonitor, stage_ctx
-from pipeline.run_config import RunConfig
+from pipeline.run_config import RunConfig, parse_slug
 
 POLL_INTERVAL_S = 60.0
 CUSTOM_ID_SEP = "__"
@@ -192,6 +195,141 @@ def _write_cell(cfg: RunConfig, mon, cell: dict, trace_status: str,
     mon.item_done(model=cell["key"], prompt_id=cell["rid"])
 
 
+SYNTH_CATEGORIES = ("robustness", "discrepancy_drill", "failure_mode_depth",
+                    "coverage", "judge_reliability", "intervention_ready")
+
+SYNTHESIS_SYSTEM = (
+    "You are the analysis lead for an iterative LLM evaluation program. You "
+    "receive JSON: the current experiment's failure root-cause tallies and "
+    "config, and (when one exists) the predecessor experiment's analysis "
+    "including its recommendations. Produce the iteration synthesis.\n\n"
+    "Rules:\n"
+    "- Compare vs the predecessor ONLY at the level the data supports: if "
+    "limit/sample_seed differ, the samples differ — use directional language "
+    "and say so.\n"
+    "- Review each predecessor recommendation: addressed, partially, or not.\n"
+    "- Recommend 1 to 3 next steps, ordered by leverage, each with category "
+    "from EXACTLY this set: robustness (bigger sample, identical config), "
+    "discrepancy_drill (targeted ablation of one anomaly), failure_mode_depth "
+    "(human annotation/validation of one cause), coverage (unseen prompts/"
+    "categories), judge_reliability (census/human scoring of the judge), "
+    "intervention_ready (stop iterating; specify the training data to build).\n"
+    "- Exit rule: if the top causes and their ordering are stable across "
+    "consecutive experiments, prefer intervention_ready over another eval "
+    "round — eval iterations have diminishing returns once the Pareto is "
+    "stable.\n\n"
+    "Reply with ONLY a JSON object:\n"
+    '{"comparison": ["<bullet>", …], "prior_recommendations_review": '
+    '["<bullet>", …], "recommendations": [{"category": "<set above>", '
+    '"action": "<concrete command/experiment>", "rationale": "<why now>", '
+    '"expected_signal": "<what result would mean>"}], '
+    '"iteration_note": "<where this program sits on the iterate-vs-train curve>"}'
+)
+
+
+def _predecessor(cfg: RunConfig) -> tuple[str | None, dict | None]:
+    """Largest experiment number below ours whose results file carries
+    failure_analysis (spec §4b) — skipped experiments are transparent."""
+    number, _label = parse_slug(cfg.slug)
+    try:
+        idx = json.loads(config.EXPERIMENT_INDEX_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, None
+    entries = [e for e in idx.get("experiments", [])
+               if isinstance(e.get("number"), int) and e["number"] < number]
+    for e in sorted(entries, key=lambda e: -e["number"]):
+        try:
+            doc = json.loads(
+                (config.EXPERIMENTS_DIR / f"{e['slug']}.json").read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if "failure_analysis" in doc:
+            return e["slug"], doc
+    return None, None
+
+
+def _synthesis_payload(cfg: RunConfig) -> dict | None:
+    """Rollups-only view of the current run's diagnosis artifacts (the
+    firewall: no per-cell rows, no response/criterion text — spec §4b)."""
+    tally: dict[str, dict] = {}
+    n_rows = n_cells = 0
+    for key in cfg.candidates:
+        for art in read_jsonl(cfg.diagnosis_path(key)):
+            n_cells += 1
+            for d in art.get("diagnoses", []):
+                n_rows += 1
+                t = tally.setdefault(d["root_cause"], {"total": 0, "by_model": {}})
+                t["total"] += 1
+                t["by_model"][key] = t["by_model"].get(key, 0) + 1
+    if not n_rows:
+        return None
+    return {
+        "slug": cfg.slug,
+        "config": {"limit": cfg.limit, "sample_seed": cfg.sample_seed,
+                   "reasoning": cfg.reasoning, "temperature": cfg.temperature},
+        "counts": {"diagnosed": n_rows, "cells": n_cells},
+        "by_root_cause": tally,
+    }
+
+
+def _synthesize(cfg: RunConfig, mon) -> None:
+    """Idempotent, non-fatal final step of the stage (spec §4b)."""
+    if cfg.synthesis_path.exists():
+        return
+    current = _synthesis_payload(cfg)
+    if current is None:
+        return
+    pred_slug, pred_doc = _predecessor(cfg)
+    pred_fa = (pred_doc or {}).get("failure_analysis")
+    predecessor = None
+    if pred_fa is not None:
+        predecessor = {
+            "slug": pred_slug,
+            "config": ((pred_doc.get("meta") or {}).get("config")
+                       or {}),
+            "counts": pred_fa.get("counts"),
+            "by_root_cause": pred_fa.get("by_root_cause"),
+            "recommendations": (pred_fa.get("synthesis") or {}).get("recommendations", []),
+        }
+    user_msg = json.dumps({"current": current, "predecessor": predecessor},
+                          ensure_ascii=False, indent=2)
+
+    last_err = ""
+    for _attempt in (1, 2):
+        try:
+            raw, _stop = call_json(DIAGNOSE_JUDGE, SYNTHESIS_SYSTEM, user_msg,
+                                   label=f"anthropic:{DIAGNOSE_JUDGE}:synthesis")
+            parsed = json.loads(raw[raw.index("{"): raw.rindex("}") + 1])
+            recs = [
+                {"category": r["category"],
+                 "action": str(r.get("action", "")).strip(),
+                 "rationale": str(r.get("rationale", "")).strip(),
+                 "expected_signal": str(r.get("expected_signal", "")).strip()}
+                for r in parsed.get("recommendations", [])
+                if isinstance(r, dict) and r.get("category") in SYNTH_CATEGORIES
+            ][:3]
+            if not recs:
+                raise ValueError("no valid recommendations in synthesis output")
+            out = {
+                "predecessor": pred_slug,
+                "comparison": [str(x) for x in parsed.get("comparison", [])],
+                "prior_recommendations_review":
+                    [str(x) for x in parsed.get("prior_recommendations_review", [])],
+                "recommendations": recs,
+                "iteration_note": str(parsed.get("iteration_note", "")).strip(),
+            }
+            cfg.synthesis_path.parent.mkdir(parents=True, exist_ok=True)
+            cfg.synthesis_path.write_text(
+                json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+            mon.note(f"diagnose synthesis: {len(recs)} recommendation(s), "
+                     f"predecessor {pred_slug or 'none'}")
+            return
+        except Exception as e:  # noqa: BLE001
+            last_err = f"{type(e).__name__}: {e}"
+    mon.record_error(f"diagnose synthesis failed twice: {last_err} — "
+                     "continuing without a synthesis block.")
+
+
 def run(cfg: RunConfig, monitor: RunMonitor | None = None) -> None:
     records = select_prompts(read_jsonl(DATA_JSONL), cfg.limit, cfg.sample_seed)
     if not records:
@@ -203,6 +341,7 @@ def run(cfg: RunConfig, monitor: RunMonitor | None = None) -> None:
         mon.start_stage("diagnose", total=len(cells) + already, already_done=already)
         if not cells:
             mon.note("diagnose: no undiagnosed failed cells — nothing to do.")
+            _synthesize(cfg, mon)      # resume-after-complete still gets synthesis
             mon.end_stage()
             return
 
@@ -278,4 +417,5 @@ def run(cfg: RunConfig, monitor: RunMonitor | None = None) -> None:
             _write_cell(cfg, mon, cell, cell["trace_status"],
                         _error_rows(cell["failed_indices"], reason), error=reason)
             del pending[cid]
+        _synthesize(cfg, mon)
         mon.end_stage()

@@ -306,6 +306,13 @@ def _failure_analysis_block(cfg: RunConfig, records: list[dict],
         for c in (_taxonomy.DERIVED + [_taxonomy.COLLAPSED] + _taxonomy.RESERVED)
     ]
 
+    synthesis = None
+    if cfg.synthesis_path.exists():
+        try:
+            synthesis = json.loads(cfg.synthesis_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            synthesis = None
+
     return {
         "taxonomy_version": _taxonomy.TAXONOMY_VERSION,
         "taxonomy": taxonomy,
@@ -316,6 +323,7 @@ def _failure_analysis_block(cfg: RunConfig, records: list[dict],
                    "cells": cells},
         "rows": rows,
         "by_root_cause": by_root,
+        **({"synthesis": synthesis} if synthesis is not None else {}),
     }
 
 
