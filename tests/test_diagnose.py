@@ -207,3 +207,17 @@ def test_error_rows_are_terminal_other_low():
     assert [r["index"] for r in rows] == [2, 3]
     assert all(r["root_cause"] == "other" and r["confidence"] == "low"
                and r["rationale"] == "diagnose_parse_error: boom" for r in rows)
+
+
+def test_text_to_diagnoses_rejects_duplicate_indices():
+    """Two diagnoses for the same criterion index = internally inconsistent
+    analyst output -> parse error (whole cell retries), never a silent
+    last-one-wins overwrite."""
+    raw = json.dumps([
+        {"index": 2, "evidence": "a", "root_cause": "judge_suspect",
+         "secondary": None, "confidence": "high", "rationale": "r1"},
+        {"index": 2, "evidence": "b", "root_cause": "other",
+         "secondary": None, "confidence": "low", "rationale": "r2"},
+    ])
+    rows, err = diagnose._text_to_diagnoses(raw, "end_turn", [2], True)
+    assert rows is None and err.startswith("diagnose_parse_error")

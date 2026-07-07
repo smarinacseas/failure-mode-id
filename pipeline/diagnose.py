@@ -142,6 +142,8 @@ def _text_to_diagnoses(raw: str, stop_reason: str | None,
             confidence = str(item.get("confidence", "")).lower().strip()
             if confidence not in _CONFIDENCES:
                 confidence = "low"
+            if idx in by_index:
+                raise ValueError(f"duplicate diagnosis for index {idx}")
             by_index[idx] = {
                 "index": idx,
                 "evidence": str(item.get("evidence", "")).strip(),
