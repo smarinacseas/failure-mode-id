@@ -588,3 +588,23 @@ def test_aggregate_folds_synthesis_block(tmp_path, monkeypatch):
                    for g in read_jsonl(cfg.grades_path(OPUS, "m1"))}}
     block = aggregate._failure_analysis_block(cfg, records, {OPUS: opus})
     assert block["synthesis"]["predecessor"] == "E97-prior"
+
+
+def test_synthesize_nonfatal_on_malformed_artifacts(tmp_path, monkeypatch):
+    """Spec §4b: synthesis failure is NON-fatal, including while preparing
+    inputs — a corrupt-but-parseable diagnosis row (no root_cause) must
+    record an error and skip synthesis, never raise into run()."""
+    cfg = _seed_run(tmp_path, monkeypatch)
+    write_jsonl(cfg.diagnosis_path("m1"), [{
+        "id": "p1", "trace_status": "present",
+        "diagnoses": [{"index": 2, "evidence": "q",
+                       "confidence": "low", "rationale": "r"}],  # no root_cause
+    }])
+    _index_and_results(tmp_path, monkeypatch, [])
+    errors = []
+    mon = SimpleNamespace(note=lambda *a, **k: None, record_error=errors.append)
+    monkeypatch.setattr(diagnose, "call_json",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not be called")))
+    diagnose._synthesize(cfg, mon)          # must NOT raise
+    assert not cfg.synthesis_path.exists()
+    assert errors and "synthesis" in errors[0]

@@ -276,23 +276,32 @@ def _synthesize(cfg: RunConfig, mon) -> None:
     """Idempotent, non-fatal final step of the stage (spec §4b)."""
     if cfg.synthesis_path.exists():
         return
-    current = _synthesis_payload(cfg)
-    if current is None:
+    # Input preparation is guarded too: a corrupt-but-parseable artifact
+    # (e.g. a diagnosis row missing root_cause, an index entry missing slug)
+    # must record an error and skip synthesis, never raise into run().
+    # Skip-conditions (no rows) stay silent; only crashes are recorded.
+    try:
+        current = _synthesis_payload(cfg)
+        if current is None:
+            return
+        pred_slug, pred_doc = _predecessor(cfg)
+        pred_fa = (pred_doc or {}).get("failure_analysis")
+        predecessor = None
+        if pred_fa is not None:
+            predecessor = {
+                "slug": pred_slug,
+                "config": ((pred_doc.get("meta") or {}).get("config")
+                           or {}),
+                "counts": pred_fa.get("counts"),
+                "by_root_cause": pred_fa.get("by_root_cause"),
+                "recommendations": (pred_fa.get("synthesis") or {}).get("recommendations", []),
+            }
+        user_msg = json.dumps({"current": current, "predecessor": predecessor},
+                              ensure_ascii=False, indent=2)
+    except Exception as e:  # noqa: BLE001
+        mon.record_error(f"diagnose synthesis failed preparing inputs: "
+                         f"{type(e).__name__}: {e} — continuing without a synthesis block.")
         return
-    pred_slug, pred_doc = _predecessor(cfg)
-    pred_fa = (pred_doc or {}).get("failure_analysis")
-    predecessor = None
-    if pred_fa is not None:
-        predecessor = {
-            "slug": pred_slug,
-            "config": ((pred_doc.get("meta") or {}).get("config")
-                       or {}),
-            "counts": pred_fa.get("counts"),
-            "by_root_cause": pred_fa.get("by_root_cause"),
-            "recommendations": (pred_fa.get("synthesis") or {}).get("recommendations", []),
-        }
-    user_msg = json.dumps({"current": current, "predecessor": predecessor},
-                          ensure_ascii=False, indent=2)
 
     last_err = ""
     for _attempt in (1, 2):
