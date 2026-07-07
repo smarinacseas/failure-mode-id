@@ -2896,6 +2896,37 @@
                   </div>
                 </sc-for>
               </div>
+              <!-- Iteration synthesis -->
+              <sc-if value="{{ faSynthAvailable }}" hint-placeholder-val="{{ false }}">
+                <div style="background:var(--surface,#fff);border:1px solid var(--accent-line,#e0cab2);border-radius:12px;padding:16px 20px 18px;margin-bottom:14px">
+                  <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+                    <div style="font-family:'Newsreader',Georgia,serif;font-size:15px;font-weight:500">Iteration synthesis</div>
+                    <span style="font-size:11.5px;color:var(--ink-3,#8c8678)">{{ faSynthPred }}</span>
+                  </div>
+                  <sc-for list="{{ faSynthComparison }}" as="sc" hint-placeholder-count="3">
+                    <div style="font-size:12.5px;color:var(--ink-1,#46423a);padding:2px 0 2px 14px;text-indent:-10px">· {{ sc.text }}</div>
+                  </sc-for>
+                  <sc-if value="{{ faSynthHasPrior }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-size:11px;color:var(--ink-3,#8c8678);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin:12px 0 4px">Previous recommendations — status</div>
+                    <sc-for list="{{ faSynthPrior }}" as="sp" hint-placeholder-count="2">
+                      <div style="font-size:12px;color:var(--ink-2,#6c6759);padding:2px 0 2px 14px;text-indent:-10px">· {{ sp.text }}</div>
+                    </sc-for>
+                  </sc-if>
+                  <div style="font-size:11px;color:var(--ink-3,#8c8678);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin:12px 0 6px">Recommended next steps</div>
+                  <sc-for list="{{ faSynthRecs }}" as="sr" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:flex-start;gap:9px;padding:7px 0;border-top:1px solid var(--line,#e7e3d6)">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-4,#a8a294);flex:none">{{ sr.n }}</span>
+                      <span style="{{ sr.catCss }}">{{ sr.cat }}</span>
+                      <div style="min-width:0">
+                        <div style="font-size:12.5px;font-weight:600;color:var(--ink,#2a2722)">{{ sr.action }}</div>
+                        <div style="font-size:11.5px;color:var(--ink-2,#6c6759);margin-top:1px">{{ sr.rationale }}</div>
+                        <div style="font-size:11.5px;color:var(--ink-3,#8c8678);margin-top:1px">expected signal: {{ sr.signal }}</div>
+                      </div>
+                    </div>
+                  </sc-for>
+                  <div style="font-size:11.5px;color:var(--warn-dim,#977f3e);background:var(--warn-bg,#efe6d1);border-radius:7px;padding:7px 11px;margin-top:12px">{{ faSynthNote }}</div>
+                </div>
+              </sc-if>
               <!-- Taxonomy legend -->
               <div style="background:var(--surface,#fff);border:1px solid var(--border,#e2e6ec);border-radius:12px;padding:16px 20px 18px;margin-bottom:14px">
                 <div style="font-family:'Newsreader',Georgia,serif;font-size:15px;font-weight:500;margin-bottom:12px">Taxonomy — what each cause implies for training</div>
@@ -3448,15 +3479,15 @@
           if(this.state.faModelF) faRows=faRows.filter(r=>r.model===this.state.faModelF);
           if(this.state.faCause)  faRows=faRows.filter(r=>r.root_cause===this.state.faCause);
           const faMenuDefs=[
-            {key:'model', name:'Model', value:this.state.faModelF, opts:models, stateKey:'faModelF'},
+            {key:'model', name:'Model', value:this.state.faModelF, opts:models, stateKey:'faModelF', pretty:true},
             {key:'cause', name:'Root cause', value:this.state.faCause, opts:faCauses, stateKey:'faCause'},
           ];
           const faFilterMenus=faMenuDefs.map(m=>{
             const active=!!m.value, om=this.state.faMenu;
-            return { label: active?(m.name+': '+m.value):m.name, caret: om===m.key?'▴':'▾', isOpen: om===m.key, btnStyle: menuBtn(active),
+            return { label: active?(m.name+': '+(m.pretty?prettyModel(m.value):m.value)):m.name, caret: om===m.key?'▴':'▾', isOpen: om===m.key, btnStyle: menuBtn(active),
               onToggle: ()=>this.setState(s=>({faMenu: s.faMenu===m.key?null:m.key})),
               options: [{label:'All', check:active?'':'✓', rowStyle:optRow(!active), onClick:()=>this.setState({[m.stateKey]:null, faMenu:null})}].concat(
-                m.opts.map(o=>({label:o, check:m.value===o?'✓':'', rowStyle:optRow(m.value===o), onClick:()=>this.setState({[m.stateKey]:o, faMenu:null})}))) };
+                m.opts.map(o=>({label: m.pretty?prettyModel(o):o, check:m.value===o?'✓':'', rowStyle:optRow(m.value===o), onClick:()=>this.setState({[m.stateKey]:o, faMenu:null})}))) };
           });
           const concStyle=(c)=> 'flex:none;font-size:10px;font-family:\'IBM Plex Mono\',monospace;padding:2px 7px;border-radius:5px;white-space:nowrap;'+(
             c==='both_fail' ? 'color:var(--fail,#a8483b);background:var(--fail-bg,#f1e1d8)'
@@ -3474,6 +3505,18 @@
               onClick:()=>this.openPrompt(r.id) };
           });
           const faTableCount=faRows.length, faTableEmpty=faRows.length===0;
+          const faSynth=(fa&&fa.synthesis)||null;
+          const faSynthAvailable=!!faSynth;
+          const faSynthPred= faSynth ? (faSynth.predecessor ? ('vs '+faSynth.predecessor) : 'first analyzed experiment — no predecessor baseline') : '';
+          const faSynthComparison=((faSynth&&faSynth.comparison)||[]).map(t=>({text:String(t)}));
+          const faSynthPrior=((faSynth&&faSynth.prior_recommendations_review)||[]).map(t=>({text:String(t)}));
+          const faSynthHasPrior=faSynthPrior.length>0;
+          const synthChip=(c)=>'flex:none;font-size:10px;font-family:\'IBM Plex Mono\',monospace;font-weight:700;padding:2px 8px;border-radius:5px;letter-spacing:.03em;'+(c==='intervention_ready'?'color:var(--pass,#4f7a51);background:var(--pass-bg,#e7ebda)':'color:var(--accent,#b06a3c);background:var(--accent-bg,#efe2d4)');
+          const faSynthRecs=((faSynth&&faSynth.recommendations)||[]).map((r,i)=>({
+            n:String(i+1)+'.', cat:String(r.category||''), catCss:synthChip(r.category),
+            action:String(r.action||''), rationale:String(r.rationale||''),
+            signal:String(r.expected_signal||'') }));
+          const faSynthNote=String((faSynth&&faSynth.iteration_note)||'');
 
           return {
             ...this.runSelVals(),
@@ -3516,6 +3559,8 @@
             faMatrixCols, faMatrix, faMatrixUseCols, faMatrixUse,
             faLadderCards, faSharedNote, faFilterMenus,
             faTableRows, faTableCount, faTableEmpty,
+            faSynthAvailable, faSynthPred, faSynthComparison, faSynthPrior,
+            faSynthHasPrior, faSynthRecs, faSynthNote,
             detailId:dPrompt.id||'',
             metricCards, instrBars, styleBars, useBars, verifBars, compareRows, compareLegend,
             gapCritNum:fmtPct(crate), gapFullNum:fmtPct(frate), gapCritBar, gapFullBar,
