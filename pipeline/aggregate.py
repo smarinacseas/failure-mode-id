@@ -22,7 +22,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from config import DATA_JSONL, JUDGE_MAX_TOKENS, RESULTS_PATH, ROOT
+from config import DATA_JSONL, DIAGNOSE_JUDGE, JUDGE_MAX_TOKENS, RESULTS_PATH, ROOT
+from pipeline import _taxonomy
 from pipeline._experiment import (
     SCHEMA_VERSION,
     build_meta,
@@ -239,6 +240,85 @@ def _merge_manifest(cfg: RunConfig, update: dict) -> None:
     )
 
 
+def _failure_analysis_block(cfg: RunConfig, records: list[dict],
+                            grades_by_judge: dict) -> dict | None:
+    """Spec §5 contract. Source of truth is runs/<slug>/diagnosis/; returns
+    None when no diagnosis artifacts exist (dashboard shows the empty state).
+    judge_concurrence is joined HERE, post-hoc — never an input to diagnosis
+    (spec §4 blinding rule 3)."""
+    by_id = {r["id"]: r for r in records}
+    other_judges = [j for j in cfg.judges if j != cfg.judge]
+    second = other_judges[0] if other_judges else None
+
+    def _concurrence(key: str, rid: str, index: int) -> str:
+        if second is None:
+            return "no_second_judge"
+        verdicts = grades_by_judge.get(second, {}).get(key, {}).get(rid)
+        if verdicts is None:
+            return "no_second_judge"
+        v = next((x for x in verdicts if x.get("index") == index), None)
+        if v is None:
+            return "no_second_judge"
+        if str(v.get("reason", "")).startswith("judge_refusal"):
+            return "fable_refused"
+        return "both_fail" if v.get("verdict") == "FAIL" else "opus_only"
+
+    rows: list[dict] = []
+    cells = 0
+    for key in cfg.candidates:
+        for art in read_jsonl(cfg.diagnosis_path(key)):
+            rid = art["id"]
+            if rid not in by_id:
+                continue
+            cells += 1
+            for d in art.get("diagnoses", []):
+                rows.append({
+                    "id": rid,
+                    "model": key,
+                    "criterion_index": d["index"],
+                    "root_cause": d["root_cause"],
+                    "secondary": d.get("secondary"),
+                    "confidence": d.get("confidence", "low"),
+                    "evidence": d.get("evidence", ""),
+                    "rationale": d.get("rationale", ""),
+                    "trace_status": art.get("trace_status", "absent"),
+                    "judge_concurrence": _concurrence(key, rid, d["index"]),
+                })
+    if not rows:
+        return None
+
+    by_root: dict[str, dict] = {}
+    for r in rows:
+        rc = by_root.setdefault(r["root_cause"], {
+            "total": 0, "by_model": {}, "by_instruction_type": {}, "by_use_case": {},
+        })
+        rec = by_id[r["id"]]
+        rc["total"] += 1
+        for field_key, val in (("by_model", r["model"]),
+                               ("by_instruction_type", rec["instruction_type"]),
+                               ("by_use_case", rec["use_case"])):
+            rc[field_key][val] = rc[field_key].get(val, 0) + 1
+
+    # Every taxonomy key any row used must be in the echo (legend), plus the
+    # full current category set for context.
+    taxonomy = [
+        {k: c[k] for k in ("key", "label", "description", "training_implication")}
+        for c in (_taxonomy.DERIVED + [_taxonomy.COLLAPSED] + _taxonomy.RESERVED)
+    ]
+
+    return {
+        "taxonomy_version": _taxonomy.TAXONOMY_VERSION,
+        "taxonomy": taxonomy,
+        "diagnose_judge": DIAGNOSE_JUDGE,
+        "verdict_basis": cfg.judge,
+        "diagnosed_at": datetime.now(timezone.utc).isoformat(),
+        "counts": {"failed_criteria": len(rows), "diagnosed": len(rows),
+                   "cells": cells},
+        "rows": rows,
+        "by_root_cause": by_root,
+    }
+
+
 def run(cfg: RunConfig, run_report: str | None = None, monitor: RunMonitor | None = None) -> None:
     with stage_ctx(monitor, "aggregate", 1) as mon:
         mon.start_stage("aggregate", total=1)
@@ -319,6 +399,7 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
 
     meta = build_meta(cfg, run_report, run_date, prompts)
     meta["run_notes"] = _build_run_notes(cfg, responses, by_judge, skipped)
+    failure_analysis = _failure_analysis_block(cfg, eligible, grades_by_judge)
     results = {
         "schema_version": SCHEMA_VERSION,
         "meta": meta,
@@ -326,6 +407,10 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
         "prompts": prompts,
         "by_judge": by_judge,
     }
+    if failure_analysis is not None:
+        results["failure_analysis"] = failure_analysis
+        mon.note(f"aggregate: failure_analysis — {failure_analysis['counts']['diagnosed']} "
+                 f"diagnosed criteria over {failure_analysis['counts']['cells']} cells")
 
     RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     RESULTS_PATH.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")

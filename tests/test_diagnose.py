@@ -343,3 +343,88 @@ def test_diagnose_noop_when_no_failures(tmp_path, monkeypatch):
     with m:
         diagnose.run(cfg, monitor=m)
     assert fake.created == [] and not cfg.diagnosis_path("m1").exists()
+
+
+import pipeline.aggregate as aggregate
+
+
+def test_failure_analysis_block_joins_concurrence_and_rolls_up(tmp_path, monkeypatch):
+    cfg = _seed_run(tmp_path, monkeypatch)
+    # Fable disagrees on criterion 2 (PASS) → opus_only concurrence.
+    write_jsonl(cfg.grades_path("claude-fable-5", "m1"), [{
+        "id": "p1",
+        "verdicts": [
+            {"index": 1, "verdict": "PASS", "reason": ""},
+            {"index": 2, "verdict": "PASS", "reason": ""},
+            {"index": 3, "verdict": "FAIL", "reason": ""},
+        ],
+    }])
+    write_jsonl(cfg.diagnosis_path("m1"), [{
+        "id": "p1", "trace_status": "present",
+        "diagnoses": [{"index": 2, "evidence": "q", "root_cause": "judge_suspect",
+                       "secondary": None, "confidence": "high", "rationale": "r"}],
+    }])
+    records = read_jsonl(diagnose.DATA_JSONL)
+    grades_by_judge = {
+        j: {"m1": {g["id"]: g["verdicts"]
+                   for g in read_jsonl(cfg.grades_path(j, "m1"))}}
+        for j in cfg.judges
+    }
+    block = aggregate._failure_analysis_block(cfg, records, grades_by_judge)
+    assert block["taxonomy_version"] >= 1
+    assert block["diagnose_judge"] == config.DIAGNOSE_JUDGE
+    assert block["verdict_basis"] == OPUS
+    assert block["counts"] == {"failed_criteria": 1, "diagnosed": 1, "cells": 1}
+    (row,) = block["rows"]
+    assert row["id"] == "p1" and row["model"] == "m1" and row["criterion_index"] == 2
+    assert row["judge_concurrence"] == "opus_only"
+    assert row["trace_status"] == "present"
+    rc = block["by_root_cause"]["judge_suspect"]
+    assert rc["total"] == 1
+    assert rc["by_model"]["m1"] == 1
+    assert rc["by_instruction_type"]["Negative"] == 1
+    assert rc["by_use_case"]["A"] == 1
+    # judge_suspect appears in the taxonomy echo (dashboard legend).
+    assert any(c["key"] == "judge_suspect" for c in block["taxonomy"])
+
+
+def test_failure_analysis_concurrence_refused_and_single_judge(tmp_path, monkeypatch):
+    cfg = _seed_run(tmp_path, monkeypatch)
+    write_jsonl(cfg.diagnosis_path("m1"), [{
+        "id": "p1", "trace_status": "present",
+        "diagnoses": [{"index": 2, "evidence": "q", "root_cause": "other",
+                       "secondary": None, "confidence": "low", "rationale": "r"}],
+    }])
+    records = read_jsonl(diagnose.DATA_JSONL)
+    # Fable refused this cell → fable_refused.
+    fable = {"m1": {"p1": [
+        {"index": i, "verdict": "FAIL",
+         "reason": "judge_refusal: model declined to grade this cell"}
+        for i in (1, 2, 3)]}}
+    opus = {"m1": {g["id"]: g["verdicts"]
+                   for g in read_jsonl(cfg.grades_path(OPUS, "m1"))}}
+    block = aggregate._failure_analysis_block(
+        cfg, records, {OPUS: opus, "claude-fable-5": fable})
+    assert block["rows"][0]["judge_concurrence"] == "fable_refused"
+
+    # Single-judge cfg → no_second_judge. Distinct slug: E99-test's run dir
+    # already holds this test's dual-judge artifacts.
+    solo = make_cfg(slug="E98-solo", judges=(OPUS,))
+    write_jsonl(solo.diagnosis_path("m1"), [{
+        "id": "p1", "trace_status": "absent",
+        "diagnoses": [{"index": 2, "evidence": "", "root_cause": "other",
+                       "secondary": None, "confidence": "low", "rationale": "r"}],
+    }])
+    write_jsonl(solo.grades_path(OPUS, "m1"),
+                [{"id": "p1", "verdicts": [
+                    {"index": 2, "verdict": "FAIL", "reason": "x"}]}])
+    block = aggregate._failure_analysis_block(solo, records, {OPUS: {
+        "m1": {"p1": [{"index": 2, "verdict": "FAIL", "reason": "x"}]}}})
+    assert block["rows"][0]["judge_concurrence"] == "no_second_judge"
+
+
+def test_failure_analysis_absent_when_no_diagnosis_dir(tmp_path, monkeypatch):
+    cfg = _seed_run(tmp_path, monkeypatch)
+    records = read_jsonl(diagnose.DATA_JSONL)
+    grades_by_judge = {OPUS: {"m1": {}}}
+    assert aggregate._failure_analysis_block(cfg, records, grades_by_judge) is None

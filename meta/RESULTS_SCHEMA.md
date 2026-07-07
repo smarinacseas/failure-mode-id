@@ -248,6 +248,39 @@ Each `criteria[]` entry:
 
 ---
 
+## `failure_analysis` (schema 3.1, optional)
+
+Absent key means the diagnose stage has not run for this experiment. `rows[*]` join `prompts[]` by `id` for criterion text and category metadata.
+
+```jsonc
+"failure_analysis": {
+  "taxonomy_version": 1,
+  "taxonomy": [ { "key": "constraint_dropped", "label": "…",
+                  "description": "…", "training_implication": "…" } ],
+  "diagnose_judge": "claude-opus-4-8",
+  "verdict_basis": "claude-opus-4-8",       // whose FAILs were diagnosed
+  "diagnosed_at": "…",                       // ISO timestamp
+  "counts": { "failed_criteria": 219, "diagnosed": 219, "cells": 54 },
+  "synthesis": { /* §4b — predecessor, comparison[], prior_recommendations_review[],
+                    recommendations[1–3 of {category, action, rationale,
+                    expected_signal}], iteration_note. Optional: absent when
+                    synthesis was skipped or failed. */ },
+  "rows": [ {
+    "id": "CIF-012", "model": "qwen-9b", "criterion_index": 7,
+    "root_cause": "constraint_dropped",
+    "secondary": null,                       // optional second label (compound failures)
+    "confidence": "high|medium|low",
+    "evidence": "shortest quote from trace/answer that shows it",
+    "rationale": "1–2 sentences",
+    "trace_status": "present|absent|truncated",
+    "judge_concurrence": "both_fail|opus_only|fable_refused|no_second_judge"
+  } ],
+  "by_root_cause": { /* rollups: root_cause × model, × instruction_type, × use_case */ }
+}
+```
+
+---
+
 ## Dashboard dropdown files
 
 ### `dashboard/runs.json` — the ConstraintLens design's dropdown source
