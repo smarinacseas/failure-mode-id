@@ -259,18 +259,33 @@ def _failure_analysis_block(cfg: RunConfig, records: list[dict],
         v = next((x for x in verdicts if x.get("index") == index), None)
         if v is None:
             return "no_second_judge"
-        if str(v.get("reason", "")).startswith("judge_refusal"):
+        reason = str(v.get("reason", ""))
+        if reason.startswith("judge_refusal"):
             return "fable_refused"
+        # Grading-artifact FAILs (grade.py's vocabulary — see
+        # pipeline.diagnose._ARTIFACT_PREFIXES) carry no real second
+        # opinion about the candidate, same as a refusal — just not the
+        # refusal itself. Falling through to both_fail here would inflate
+        # judge-agreement with FAILs that are actually judge-pipeline
+        # noise, not independent verdicts.
+        if reason.startswith(("judge_parse_error", "judge_truncated", "missing_in_judge_output")):
+            return "no_second_judge"
         return "both_fail" if v.get("verdict") == "FAIL" else "opus_only"
 
     rows: list[dict] = []
     cells = 0
+    taxonomy_versions_seen: set[int] = set()
     for key in cfg.candidates:
         for art in read_jsonl(cfg.diagnosis_path(key)):
             rid = art["id"]
             if rid not in by_id:
                 continue
             cells += 1
+            # Pre-stamp artifacts (the E03-E05 backfill) carry no
+            # taxonomy_version field at all; missing means v1 (spec §2.8) —
+            # never the running code's CURRENT version, which would
+            # silently misattribute provenance after a v2 bump.
+            taxonomy_versions_seen.add(art.get("taxonomy_version", 1))
             for d in art.get("diagnoses", []):
                 rows.append({
                     "id": rid,
@@ -313,8 +328,18 @@ def _failure_analysis_block(cfg: RunConfig, records: list[dict],
         except json.JSONDecodeError:
             synthesis = None
 
+    # Block-level taxonomy_version is artifact provenance, not code-current
+    # (spec §2.8): when every artifact agrees, echo that value; when a v2
+    # relabel touched only some cells, report the max plus the full set so
+    # consumers can tell the block is provenance-mixed rather than silently
+    # picking one version.
+    taxonomy_version = (max(taxonomy_versions_seen) if taxonomy_versions_seen
+                        else _taxonomy.TAXONOMY_VERSION)
+
     return {
-        "taxonomy_version": _taxonomy.TAXONOMY_VERSION,
+        "taxonomy_version": taxonomy_version,
+        **({"taxonomy_versions_seen": sorted(taxonomy_versions_seen)}
+           if len(taxonomy_versions_seen) > 1 else {}),
         "taxonomy": taxonomy,
         "diagnose_judge": DIAGNOSE_JUDGE,
         "verdict_basis": cfg.judge,

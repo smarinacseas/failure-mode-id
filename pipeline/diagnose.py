@@ -192,7 +192,8 @@ def _write_cell(cfg: RunConfig, mon, cell: dict, trace_status: str,
                 rows: list[dict], error: str = "") -> None:
     mon.item_start(model=cell["key"], prompt_id=cell["rid"])
     append_jsonl(cfg.diagnosis_path(cell["key"]),
-                 {"id": cell["rid"], "trace_status": trace_status, "diagnoses": rows})
+                 {"id": cell["rid"], "trace_status": trace_status, "diagnoses": rows,
+                  "taxonomy_version": _taxonomy.TAXONOMY_VERSION})
     if error:
         mon.record_error(f"diagnose {cell['key']} {cell['rid']}: {error.split(':', 1)[0]}")
     mon.item_done(model=cell["key"], prompt_id=cell["rid"])

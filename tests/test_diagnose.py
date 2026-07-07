@@ -317,6 +317,21 @@ def test_diagnose_batch_submit_collect_and_request_shape(tmp_path, monkeypatch):
     assert snap["errors"] == 0 and snap["stages"][0]["done"] == 1
 
 
+def test_write_cell_stamps_taxonomy_version(tmp_path, monkeypatch):
+    """Item 2 (spec §2.8): every freshly written diagnosis artifact row
+    records the taxonomy version that labeled it, so a future v2 relabel
+    can't silently claim v2 provenance for rows a v1 prompt actually
+    produced."""
+    script = [{"polls": ["ended"],
+               "results": lambda reqs: [_succeeded(reqs[0]["custom_id"], _diag_json())]}]
+    cfg, fake = _batch_setup(tmp_path, monkeypatch, script)
+    m = _diag_monitor()
+    with m:
+        diagnose.run(cfg, monitor=m)
+    (row,) = read_jsonl(cfg.diagnosis_path("m1"))
+    assert row["taxonomy_version"] == taxonomy.TAXONOMY_VERSION == 1
+
+
 def test_diagnose_refusal_is_terminal_without_resubmission(tmp_path, monkeypatch):
     script = [{"polls": ["ended"],
                "results": lambda reqs: [_succeeded(reqs[0]["custom_id"], "", "refusal")]}]
@@ -344,6 +359,29 @@ def test_diagnose_parse_error_retries_once_then_error_rows(tmp_path, monkeypatch
     (row,) = read_jsonl(cfg.diagnosis_path("m1"))
     assert row["diagnoses"][0]["root_cause"] == "other"
     assert m.snapshot()["errors"] == 1
+
+
+def test_diagnose_parse_error_then_success_second_round(tmp_path, monkeypatch):
+    """Item 3 (characterization — existing behavior, previously untested):
+    the round-2 SUCCESS path of the resubmit loop. A round-1 parse failure
+    is retriable and resubmits the cell; a clean round-2 parse writes
+    normally, with no error residue carried over from round 1's failed
+    attempt (round 1 only sets cell["last_err"] in memory — it never calls
+    mon.record_error)."""
+    script = [
+        {"polls": ["ended"],
+         "results": lambda reqs: [_succeeded(reqs[0]["custom_id"], "not json")]},
+        {"polls": ["ended"],
+         "results": lambda reqs: [_succeeded(reqs[0]["custom_id"], _diag_json())]},
+    ]
+    cfg, fake = _batch_setup(tmp_path, monkeypatch, script)
+    m = _diag_monitor()
+    with m:
+        diagnose.run(cfg, monitor=m)
+    assert len(fake.created) == 2
+    (row,) = read_jsonl(cfg.diagnosis_path("m1"))
+    assert row["diagnoses"][0]["root_cause"] == "judge_suspect"
+    assert m.snapshot()["errors"] == 0
 
 
 def test_diagnose_noop_when_no_failures(tmp_path, monkeypatch):
@@ -429,6 +467,38 @@ def test_failure_analysis_concurrence_both_fail(tmp_path, monkeypatch):
     assert block["rows"][0]["judge_concurrence"] == "both_fail"
 
 
+def test_failure_analysis_concurrence_artifact_fails_are_not_both_fail(tmp_path, monkeypatch):
+    """Item 1: a second-judge FAIL whose reason is a grading-artifact prefix
+    (judge_parse_error/judge_truncated/missing_in_judge_output) carries no
+    information about the candidate — same spirit as judge_refusal — so it
+    must not inflate judge-agreement into both_fail. Only judge_refusal maps
+    to fable_refused; these three have no usable second verdict at all, so
+    they must map to no_second_judge instead."""
+    cfg = _seed_run(tmp_path, monkeypatch)
+    write_jsonl(cfg.grades_path("claude-fable-5", "m1"), [{
+        "id": "p1",
+        "verdicts": [
+            {"index": 1, "verdict": "PASS", "reason": ""},
+            {"index": 2, "verdict": "FAIL",
+             "reason": "judge_truncated: stop_reason=max_tokens"},
+            {"index": 3, "verdict": "FAIL", "reason": ""},
+        ],
+    }])
+    write_jsonl(cfg.diagnosis_path("m1"), [{
+        "id": "p1", "trace_status": "present",
+        "diagnoses": [{"index": 2, "evidence": "q", "root_cause": "other",
+                       "secondary": None, "confidence": "high", "rationale": "r"}],
+    }])
+    records = read_jsonl(diagnose.DATA_JSONL)
+    grades_by_judge = {
+        j: {"m1": {g["id"]: g["verdicts"]
+                   for g in read_jsonl(cfg.grades_path(j, "m1"))}}
+        for j in cfg.judges
+    }
+    block = aggregate._failure_analysis_block(cfg, records, grades_by_judge)
+    assert block["rows"][0]["judge_concurrence"] == "no_second_judge"
+
+
 def test_failure_analysis_concurrence_refused_and_single_judge(tmp_path, monkeypatch):
     cfg = _seed_run(tmp_path, monkeypatch)
     write_jsonl(cfg.diagnosis_path("m1"), [{
@@ -469,6 +539,53 @@ def test_failure_analysis_absent_when_no_diagnosis_dir(tmp_path, monkeypatch):
     records = read_jsonl(diagnose.DATA_JSONL)
     grades_by_judge = {OPUS: {"m1": {}}}
     assert aggregate._failure_analysis_block(cfg, records, grades_by_judge) is None
+
+
+def test_failure_analysis_taxonomy_version_missing_field_reads_as_v1(tmp_path, monkeypatch):
+    """Item 2: the three backfilled runs (E03-E05) predate the
+    taxonomy_version stamp — _failure_analysis_block must tolerate its
+    absence in the artifact and report v1 (not silently substitute the
+    code's CURRENT version, which happens to also be 1 today but would
+    drift after a v2 bump)."""
+    cfg = _seed_run(tmp_path, monkeypatch)
+    write_jsonl(cfg.diagnosis_path("m1"), [{
+        "id": "p1", "trace_status": "present",
+        "diagnoses": [{"index": 2, "evidence": "q", "root_cause": "other",
+                       "secondary": None, "confidence": "low", "rationale": "r"}],
+        # no "taxonomy_version" key — pre-stamp artifact shape.
+    }])
+    records = read_jsonl(diagnose.DATA_JSONL)
+    opus = {"m1": {g["id"]: g["verdicts"]
+                   for g in read_jsonl(cfg.grades_path(OPUS, "m1"))}}
+    block = aggregate._failure_analysis_block(cfg, records, {OPUS: opus})
+    assert block["taxonomy_version"] == 1
+    assert "taxonomy_versions_seen" not in block
+
+
+def test_failure_analysis_taxonomy_version_mixed_reports_max_and_seen(tmp_path, monkeypatch):
+    """Item 2: when artifacts disagree (e.g. a v2 relabel re-ran some cells
+    but not others), the block must not silently pick one — it reports the
+    max version seen plus the full sorted list, so the dashboard/consumers
+    can tell the block is provenance-mixed."""
+    monkeypatch.setattr(config, "RUNS_DIR", tmp_path / "runs")
+    cfg = _cfg_opus(candidates={"m1": "model-1", "m2": "model-2"})
+    records = [{"id": "p1", "use_case": "A", "instruction_type": "Negative",
+                "prompt_style": "Direct",
+                "criteria": ["c1 text", "c2 text", "c3 text"]}]
+    write_jsonl(cfg.diagnosis_path("m1"), [{
+        "id": "p1", "trace_status": "present", "taxonomy_version": 1,
+        "diagnoses": [{"index": 2, "evidence": "q1", "root_cause": "other",
+                       "secondary": None, "confidence": "low", "rationale": "r1"}],
+    }])
+    write_jsonl(cfg.diagnosis_path("m2"), [{
+        "id": "p1", "trace_status": "present", "taxonomy_version": 2,
+        "diagnoses": [{"index": 3, "evidence": "q2", "root_cause": "other",
+                       "secondary": None, "confidence": "low", "rationale": "r2"}],
+    }])
+    block = aggregate._failure_analysis_block(
+        cfg, records, {OPUS: {"m1": {}, "m2": {}}})
+    assert block["taxonomy_version"] == 2
+    assert block["taxonomy_versions_seen"] == [1, 2]
 
 
 def _index_and_results(tmp_path, monkeypatch, entries):
