@@ -86,6 +86,16 @@ GENERATION_DEADLINE_BASIS: str = (
 # streamed, so this can exceed the ~16k non-streaming SDK timeout guard.
 JUDGE_MAX_TOKENS: int = 32000
 
+# Diagnose stage (failure root-cause analysis; spec 2026-07-06). Opus-solo:
+# Fable demonstrably refuses on CIF-006-class content, which would leave
+# exactly the interesting cells undiagnosable. NOT a frozen param — diagnosis
+# is post-hoc, re-runnable measurement.
+DIAGNOSE_JUDGE: str = "claude-opus-4-8"
+DIAGNOSE_MAX_TOKENS: int = 32000
+# Head+tail clip threshold for response/trace fields in the analyst payload
+# (the E05 qwen-9b × CIF-012 runaway answer was 87.7k chars).
+DIAGNOSE_MAX_FIELD_CHARS: int = 60000
+
 # Validate sampler.
 VALIDATE_SEED: int = 20260101
 VALIDATE_SAMPLE_TARGET: int = 60

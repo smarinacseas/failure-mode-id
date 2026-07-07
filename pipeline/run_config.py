@@ -112,6 +112,11 @@ class RunConfig:
         Each judge scores the same responses, so its verdicts live in its own dir."""
         return self.run_dir / "grades" / judge / f"{key}.jsonl"
 
+    def diagnosis_path(self, key: str) -> Path:
+        """Root-cause diagnoses per candidate: diagnosis/<candidate>.jsonl.
+        Single analyst model (config.DIAGNOSE_JUDGE), so no judge subdir."""
+        return self.run_dir / "diagnosis" / f"{key}.jsonl"
+
     @property
     def criteria_tags_path(self) -> Path:
         return self.run_dir / "criteria_tags.jsonl"
