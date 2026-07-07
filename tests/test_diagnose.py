@@ -104,3 +104,40 @@ def test_failed_cells_skip_already_diagnosed_and_all_pass(tmp_path, monkeypatch)
                 [{"id": "p1", "trace_status": "present", "diagnoses": []}])
     records = read_jsonl(diagnose.DATA_JSONL)
     assert diagnose._failed_cells(cfg, records) == []
+
+
+def test_payload_is_blind(tmp_path, monkeypatch):
+    """Spec §4 rules 1–3: no judge reason text, no candidate model name, no
+    judge names anywhere in the analyst payload. The MARKER_* strings the
+    fixture plants in grade reasons must not leak."""
+    cfg = _seed_run(tmp_path, monkeypatch)
+    records = read_jsonl(diagnose.DATA_JSONL)
+    (cell,) = diagnose._failed_cells(cfg, records)
+    payload, trace_status = diagnose._user_message(cell)
+    for forbidden in ("MARKER_FAIL_REASON", "MARKER_PASS_REASON", "m1",
+                      "claude-opus-4-8", "claude-fable-5", "PASS", "FAIL"):
+        assert forbidden not in payload
+    assert trace_status == "present"
+    # What it MUST contain: prompt, every criterion, the unmet index, both texts.
+    assert "Never mention cats" in payload
+    for c in ("c1 text", "c2 text", "c3 text"):
+        assert c in payload
+    assert "2" in payload.split("UNMET")[1].splitlines()[0]
+    assert "A plan featuring cats." in payload
+    assert "I will check c2" in payload
+
+
+def test_payload_trace_absent_and_truncated(tmp_path, monkeypatch):
+    cfg = _seed_run(tmp_path, monkeypatch, reasoning_trace=None)
+    records = read_jsonl(diagnose.DATA_JSONL)
+    (cell,) = diagnose._failed_cells(cfg, records)
+    _, trace_status = diagnose._user_message(cell)
+    assert trace_status == "absent"
+
+    long = "x" * (config.DIAGNOSE_MAX_FIELD_CHARS + 5000)
+    clipped, was_clipped = diagnose._clip(long)
+    assert was_clipped and len(clipped) < len(long)
+    assert clipped.startswith("x" * 100) and clipped.endswith("x" * 100)
+    assert "TRUNCATED" in clipped
+    short, was_clipped = diagnose._clip("short")
+    assert short == "short" and not was_clipped

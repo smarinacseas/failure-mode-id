@@ -64,3 +64,46 @@ def _failed_cells(cfg: RunConfig, records: list[dict]) -> list[dict]:
                 "reasoning": responses[rid].get("reasoning") or "",
             })
     return cells
+
+
+def _clip(text: str) -> tuple[str, bool]:
+    """Head+tail clip for degenerate-length fields (spec §4): keeps the start
+    (where instructions get restated) and the end (where answers conclude)."""
+    if len(text) <= DIAGNOSE_MAX_FIELD_CHARS:
+        return text, False
+    head = DIAGNOSE_MAX_FIELD_CHARS * 2 // 3
+    tail = DIAGNOSE_MAX_FIELD_CHARS - head
+    return (text[:head]
+            + f"\n\n[… TRUNCATED: {len(text) - head - tail} chars removed …]\n\n"
+            + text[-tail:]), True
+
+
+def _user_message(cell: dict) -> tuple[str, str]:
+    """Blinded analyst payload (spec §4): prompt + ALL criteria (needed for
+    conflict-tradeoff diagnosis) + unmet indices + response + trace. Never
+    judge reasons, candidate identity, or verdict words."""
+    numbered = "\n".join(f"{i}. {c}" for i, c in enumerate(cell["criteria"], start=1))
+    unmet = ", ".join(str(i) for i in cell["failed_indices"])
+    response, resp_clipped = _clip(cell["response"])
+    reasoning = cell["reasoning"]
+    trace_clipped = False
+    if reasoning:
+        reasoning, trace_clipped = _clip(reasoning)
+        trace_status = "truncated" if (trace_clipped or resp_clipped) else "present"
+        trace_block = f"MODEL REASONING TRACE:\n{reasoning}\n\n"
+    else:
+        trace_status = "absent"
+        trace_block = "MODEL REASONING TRACE: (none recorded)\n\n"
+    if not cell["reasoning"] and resp_clipped:
+        trace_status = "absent"          # absence beats truncation in the flag
+    payload = (
+        "TASK PROMPT GIVEN TO A LANGUAGE MODEL:\n"
+        f"{cell['prompt']}\n\n"
+        "ALL CRITERIA THE RESPONSE WAS EVALUATED AGAINST:\n"
+        f"{numbered}\n\n"
+        f"CRITERIA JUDGED UNMET — diagnose exactly these indices: {unmet}\n\n"
+        f"{trace_block}"
+        "MODEL RESPONSE:\n"
+        f"{response}"
+    )
+    return payload, trace_status
