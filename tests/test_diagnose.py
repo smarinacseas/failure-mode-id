@@ -620,3 +620,20 @@ def test_synthesize_nonfatal_on_malformed_artifacts(tmp_path, monkeypatch):
     diagnose._synthesize(cfg, mon)          # must NOT raise
     assert not cfg.synthesis_path.exists()
     assert errors and "synthesis" in errors[0]
+
+
+def test_derived_taxonomy_is_populated_and_well_formed():
+    """RED until the Pass-1 consolidation lands. Guards: non-empty enum, all
+    required fields non-empty, keys unique + disjoint from reserved, at least
+    one trace-dependent category (the CoT-vs-answer split is the taxonomy's
+    reason to exist)."""
+    assert len(taxonomy.DERIVED) >= 4
+    seen = set()
+    for c in taxonomy.DERIVED:
+        for field in ("key", "label", "description", "training_implication"):
+            assert isinstance(c[field], str) and c[field].strip()
+        assert isinstance(c["requires_trace"], bool)
+        assert c["key"] not in seen
+        seen.add(c["key"])
+    assert seen.isdisjoint({"judge_suspect", "other", "constraint_unaddressed"})
+    assert any(c["requires_trace"] for c in taxonomy.DERIVED)
