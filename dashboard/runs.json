@@ -19,7 +19,7 @@
     {
       "id": "E03-judge-compare-3p",
       "label": "E03-judge-compare-3p — Judge comparison — Opus 4",
-      "date": "2026-07-02",
+      "date": "2026-07-07",
       "path": "./E03-judge-compare-3p.json",
       "n_prompts": 3,
       "n_models": 3
@@ -27,7 +27,7 @@
     {
       "id": "E04-reasoning-smoke-3p",
       "label": "E04-reasoning-smoke-3p — Reasoning-on ablation of E03: same 3 prompts, Qwen candidates think before answe",
-      "date": "2026-07-03",
+      "date": "2026-07-07",
       "path": "./E04-reasoning-smoke-3p.json",
       "n_prompts": 3,
       "n_models": 3
@@ -35,11 +35,11 @@
     {
       "id": "E05-reasoning-rand20p",
       "label": "E05-reasoning-rand20p — Randomized-sample scale-up of E04: identical reasoning-on treatment (temp 0",
-      "date": "2026-07-06",
+      "date": "2026-07-07",
       "path": "./E05-reasoning-rand20p.json",
       "n_prompts": 20,
       "n_models": 3
     }
   ],
-  "synced_at": "2026-07-06T23:54:58.194893+00:00"
+  "synced_at": "2026-07-07T18:36:13.328488+00:00"
 }

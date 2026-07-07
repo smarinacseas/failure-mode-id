@@ -1,5 +1,5 @@
 {
-  "schema_version": "3.0",
+  "schema_version": "3.1",
   "meta": {
     "experiment": {
       "slug": "E04-reasoning-smoke-3p",
@@ -7,7 +7,7 @@
       "label": "reasoning-smoke-3p",
       "description": "Reasoning-on ablation of E03: same 3 prompts, Qwen candidates think before answering. temp 0.6 per Qwen thinking-mode guidance (greedy+thinking loops endlessly); 48k shared thinking+answer budget after two 32k cap-outs; provider sort=throughput (default routing drew ~20 tok/s providers → 25-min calls); dual judges (Opus 4.8 + Fable 5).",
       "run_report": "meta/2026-07-03-reasoning-smoke.md",
-      "run_date": "2026-07-03T19:08:15.050277+00:00"
+      "run_date": "2026-07-07T18:18:31.282260+00:00"
     },
     "dataset": {
       "name": "Complex Constraints Benchmark Set",
@@ -82,6 +82,12 @@
         }
       },
       "candidate_timeout_s": 600.0,
+      "limit": 3,
+      "sample_seed": null,
+      "judge_mode": "batch",
+      "generation_workers": 4,
+      "generation_deadline_s": 2030.0,
+      "generation_deadline_basis": "2 x p99 (nearest-rank) of 69 frozen-treatment generation calls from E04/E05 logs (p99=1014.6s, qwen-9b/CIF-024), floor 900s -> 2030s",
       "judge_max_tokens": 32000,
       "judge_prompt_sha256_12": "c3ed3a2cefcb",
       "classifier_prompt_sha256_12": "88d130c223aa",
@@ -90,7 +96,7 @@
       "validate_response_excerpt_chars": 800
     },
     "git": {
-      "commit": "0a5aebc",
+      "commit": "e1810f2",
       "dirty": true
     },
     "validation": {
@@ -100,7 +106,7 @@
       "agreement_pct": null,
       "scored_at": null
     },
-    "run_date": "2026-07-03T19:08:15.050277+00:00",
+    "run_date": "2026-07-07T18:18:31.282260+00:00",
     "max_tokens": 48000,
     "reasoning_enabled": true,
     "run_notes": [
@@ -4883,6 +4889,591 @@
           ]
         }
       ]
+    }
+  },
+  "failure_analysis": {
+    "taxonomy_version": 1,
+    "taxonomy": [
+      {
+        "key": "constraint_never_surfaced",
+        "label": "Never surfaced in reasoning",
+        "description": "The requirement appears nowhere in the reasoning trace or the answer — it was never extracted from the prompt into the model's working plan (e.g., a formatting sub-rule the planning checklist skips entirely).",
+        "training_implication": "Constraint-extraction SFT: reward exhaustive requirement enumeration before drafting; checklist-style supervision."
+      },
+      {
+        "key": "constraint_dropped",
+        "label": "Tracked in reasoning, lost from answer",
+        "description": "The trace tracks or even verifies the requirement, but iterative replanning, patchwork corrections, or final transcription loses it — the answer omits or contradicts what the trace established.",
+        "training_implication": "CoT→answer faithfulness rewards: penalize final answers that drop or contradict constraints their own trace satisfied; long-horizon state tracking across plan revisions."
+      },
+      {
+        "key": "constraint_overridden",
+        "label": "Noticed, then overridden",
+        "description": "The trace names the constraint, then argues itself out of honoring it — habit, source-material conventions, helpfulness instincts, or a self-invented reinterpretation wins over the explicit instruction.",
+        "training_implication": "Instruction-priority preference data: explicit user constraints must outrank priors, source formatting, and the model's own style habits."
+      },
+      {
+        "key": "constraint_sacrificed",
+        "label": "Sacrificed to a competing constraint",
+        "description": "Under real or perceived conflict (coverage vs ceilings, word caps vs completeness, time budget vs task list), the model satisfies one requirement by violating another — often asserting compliance anyway instead of surfacing the tradeoff.",
+        "training_implication": "Preference data over constraint conflicts: teach surfacing and arbitrating conflicts — or flagging infeasibility — instead of silently sacrificing and overclaiming."
+      },
+      {
+        "key": "constraint_misread",
+        "label": "Constraint misread",
+        "description": "The requirement is engaged with but interpreted wrongly — scope, boundary semantics ('every week after', 'even if zero'), conditional triggers, or format words ('brackets', 'beside') resolved to the wrong reading.",
+        "training_implication": "Contrastive instruction-semantics SFT on scope/boundary/conditional phrasings with minimal pairs."
+      },
+      {
+        "key": "input_misread",
+        "label": "Source data misread",
+        "description": "The failure originates in parsing the prompt's source material: column misalignment, false equivalences between sections, ambiguity silently resolved in the wrong direction.",
+        "training_implication": "Structured-input robustness data (tables, rosters, misaligned columns) with explicit field re-derivation before use; largely auto-checkable, so RLVR-ready."
+      },
+      {
+        "key": "execution_slip",
+        "label": "Right intent, wrong execution",
+        "description": "The plan is right but the rendering fails: arithmetic/counting errors, format markup omitted, per-item rules replaced by one template, placeholders never resolved, output never cross-checked against its own derived values.",
+        "training_implication": "Verifier-based RL: these criteria are mostly auto-checkable (counts, formats, arithmetic) — reward outputs that pass mechanical validators plus a final self-check pass."
+      },
+      {
+        "key": "degenerate_output",
+        "label": "Degenerate generation",
+        "description": "The generation collapses — repetition loops, endless self-correction, no committed final answer — so whole constraint blocks go unmet at once.",
+        "training_implication": "Decoding/termination training: penalize non-terminating self-correction loops; reward committing to a finalized answer within budget."
+      },
+      {
+        "key": "constraint_unaddressed",
+        "label": "Constraint unaddressed (no trace)",
+        "description": "The answer neither satisfies nor engages the constraint; without a reasoning trace, extraction misses and synthesis drops cannot be told apart.",
+        "training_implication": "Coarse signal only — rerun with reasoning enabled to split extraction vs synthesis."
+      },
+      {
+        "key": "judge_suspect",
+        "label": "Judge suspect",
+        "description": "You cannot independently locate the asserted failure: reading the response (and trace, if present) the criterion appears satisfied. Use this instead of inventing a root cause.",
+        "training_implication": "None — candidate for judge error; feeds the human-validation priority queue."
+      },
+      {
+        "key": "other",
+        "label": "Other",
+        "description": "A real failure that fits none of the categories above. Describe it precisely in `rationale`.",
+        "training_implication": "Unclassified — a rising rate here means the taxonomy needs revision."
+      }
+    ],
+    "diagnose_judge": "claude-opus-4-8",
+    "verdict_basis": "claude-opus-4-8",
+    "diagnosed_at": "2026-07-07T18:18:31.308599+00:00",
+    "counts": {
+      "failed_criteria": 33,
+      "diagnosed": 33,
+      "cells": 8
+    },
+    "rows": [
+      {
+        "id": "CIF-001",
+        "model": "qwen-9b",
+        "criterion_index": 2,
+        "root_cause": "execution_slip",
+        "secondary": "constraint_dropped",
+        "confidence": "high",
+        "evidence": "Final Shift Allocation lists Maria only on Mon (17-23=6h), Thu (19-1=8h), Sun (16-22=6h) = 20h, yet payroll claims 'Maria ... Total Hours: 26 Hours' including a Sat shift she isn't assigned in the final table.",
+        "rationale": "The correction pass dropped Maria's Saturday but her hour total was never recomputed, leaving her actually scheduled at 20h — below the 26-hour FT floor.",
+        "trace_status": "truncated",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-001",
+        "model": "qwen-9b",
+        "criterion_index": 3,
+        "root_cause": "execution_slip",
+        "secondary": "constraint_dropped",
+        "confidence": "high",
+        "evidence": "Stated 'Maria ... Total Hours: 26' but final allocation gives 20h; 'Nate ... 27 Hours' but final allocation (Mon 6h, Tue 7h, Sat 7h) gives 20h.",
+        "rationale": "The final shift table and the stated hour totals diverge because the post-correction rota was never reconciled with the payroll figures.",
+        "trace_status": "truncated",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-001",
+        "model": "qwen-9b",
+        "criterion_index": 4,
+        "root_cause": "constraint_dropped",
+        "secondary": "constraint_sacrificed",
+        "confidence": "high",
+        "evidence": "Final allocation yields Jack 25h, Ben 27h, Finn 27h — all above the 24-hour PT ceiling stated in the plan ('PT: Nate, Jack, Ben, Finn (16-24 hrs/week)').",
+        "rationale": "The 16-24h PT range was noted at the outset but verification only ever checked the 4-day limit, so the hour ceiling was silently exceeded.",
+        "trace_status": "truncated",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-001",
+        "model": "qwen-9b",
+        "criterion_index": 6,
+        "root_cause": "execution_slip",
+        "secondary": "constraint_misread",
+        "confidence": "high",
+        "evidence": "Tue: Jack (16:00-21:00), Nate (16:00-23:00), Nuria (17:00-23:00) — from 16:00-17:00 only the two under-18s are present with no adult.",
+        "rationale": "The model verified adult presence per-day rather than per-hour and missed that both minors start at 16:00 while the only adult (Nuria) begins at 17:00.",
+        "trace_status": "truncated",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-001",
+        "model": "qwen-9b",
+        "criterion_index": 7,
+        "root_cause": "constraint_misread",
+        "secondary": null,
+        "confidence": "high",
+        "evidence": "Reasoning states 'Ben: No 16:00 starts Mon/Tue' and schedules 'Thu: Ben (16-22)'; Thursday is a weekday (Mon-Fri) so the 16:00 start violates the rule.",
+        "rationale": "The model narrowed 'weekdays' to Mon/Tue only, so it allowed Ben a 16:00 Thursday start that the criterion (Mon-Fri) forbids.",
+        "trace_status": "truncated",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-001",
+        "model": "qwen-9b",
+        "criterion_index": 8,
+        "root_cause": "constraint_dropped",
+        "secondary": null,
+        "confidence": "high",
+        "evidence": "Final allocation: Jack works Tue (16-21) and Thu (18-1), so his only off days are Mon, Wed, Sat — Wednesday is sandwiched between two working days with no 2 consecutive days off.",
+        "rationale": "An earlier verified plan gave Jack Tue/Fri/Sat/Sun (Wed+Thu off), but the final transcription placed Jack on both Tue and Thu, losing the consecutive-off arrangement.",
+        "trace_status": "truncated",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-001",
+        "model": "qwen-9b",
+        "criterion_index": 13,
+        "root_cause": "execution_slip",
+        "secondary": null,
+        "confidence": "high",
+        "evidence": "Rota table row '| Mon 15th | 16:00–22:00 | 6h | Nate |' — Monday uses the Thu-Sun time 16:00-22:00 instead of the required 16:00-21:00.",
+        "rationale": "The overview correctly lists Mon/Tue times as 16:00-21:00 etc., but the rendered Monday row substituted the weekend 16:00-22:00 slot, so the required 16:00-21:00 shift is absent.",
+        "trace_status": "truncated",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-003",
+        "model": "qwen-9b",
+        "criterion_index": 5,
+        "root_cause": "execution_slip",
+        "secondary": null,
+        "confidence": "high",
+        "evidence": "Lauren A.: '23, 19, 25, 22, 24, 20, 21. Sum = 174' — actual sum is 154; response shows '**174/175**'",
+        "rationale": "Correct scores were parsed but summed wrong (154 miscalculated as 174); a pure arithmetic slip breaks the all-totals-correct criterion.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-003",
+        "model": "qwen-9b",
+        "criterion_index": 8,
+        "root_cause": "execution_slip",
+        "secondary": null,
+        "confidence": "high",
+        "evidence": "'**99.4%**' for Lauren A. vs required 88%",
+        "rationale": "Percentage derives from the erroneous 174/175 total; downstream of the same summation slip.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-003",
+        "model": "qwen-9b",
+        "criterion_index": 25,
+        "root_cause": "execution_slip",
+        "secondary": null,
+        "confidence": "high",
+        "evidence": "Assignment #1 trace sums '...+23+24+22+21+22' (31 terms, extra 22) = 671→22.4; Assignment #6 = 615 instead of 596→20.5",
+        "rationale": "Averaging plan was correct but the long addition double-counted a value for A1 and A6, yielding wrong point averages.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-003",
+        "model": "qwen-9b",
+        "criterion_index": 26,
+        "root_cause": "execution_slip",
+        "secondary": null,
+        "confidence": "high",
+        "evidence": "'**assignment #1** — 89.5%' (should be 86.4%) and '**assignment #6** — 82.0%' (should be 79.6%)",
+        "rationale": "Percentage averages follow directly from the miscomputed A1 and A6 point sums.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-003",
+        "model": "qwen-9b",
+        "criterion_index": 27,
+        "root_cause": "execution_slip",
+        "secondary": null,
+        "confidence": "high",
+        "evidence": "A1 labeled '(B+)' at 89.5% vs correct B at 86.4%; A6 labeled '(B-)' at 82.0% vs correct C+ at 79.6%",
+        "rationale": "Letter grades were assigned correctly to the model's own (wrong) percentages; the error propagates from the summation slips, not the scale mapping.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-003",
+        "model": "qwen-9b",
+        "criterion_index": 34,
+        "root_cause": "execution_slip",
+        "secondary": null,
+        "confidence": "high",
+        "evidence": "'**LAUREN A.** — **174/175**, **99.4%** (**A+**)' vs required B+",
+        "rationale": "Lauren's letter grade is correct for the erroneous 99.4%; the fault traces to the miscomputed total, not the grading logic.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-002",
+        "model": "qwen-9b",
+        "criterion_index": 9,
+        "root_cause": "constraint_overridden",
+        "secondary": "constraint_dropped",
+        "confidence": "high",
+        "evidence": "Response lists \"Serve Open 3pm: **Erin/Tom**\" (and Kelly/**Erin/Tom**, Nat/**Erin/Tom**) — Tom appears as a primary option, never marked as backup, despite trace noting \"But I'd prefer not to use Tom\"",
+        "rationale": "The trace explicitly surfaced the 'prefer not to use Tom' preference but then mechanically kept writing Erin/Tom in every server gap, letting the completeness habit override the instruction.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-002",
+        "model": "qwen-9b",
+        "criterion_index": 13,
+        "root_cause": "constraint_misread",
+        "secondary": null,
+        "confidence": "high",
+        "evidence": "Shift labels like \"Serve Open 3pm:\" and \"Serve 6pm:\" are never bolded; instead only the names are bolded (\"Serve Open 3pm: **Erin/Tom**\"). The criterion example asks to bold the \"Serve 6pm:\" shift label.",
+        "rationale": "The trace debated 'bold the whole line or just the temp names' and resolved to bolding names, misreading 'bold shifts' as bolding the fill-in names rather than the shift labels.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-002",
+        "model": "qwen-9b",
+        "criterion_index": 17,
+        "root_cause": "constraint_misread",
+        "secondary": "execution_slip",
+        "confidence": "high",
+        "evidence": "Friday shows only single lines: \"Bar 8pm: Sarah/Ken\", \"Serve Open 3pm: Nat/Mary\", \"Serve 6pm: Kelly/**Erin/Tom**\" — the two 8pm, two Serve Open, and two Serve 6pm positions are collapsed into one slashed entry each.",
+        "rationale": "The model merged two co-scheduled staff into a single slash entry, conflating the 'two positions needed' with the slash notation reserved for alternative options, so the duplicate shift slots aren't distinctly present.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-002",
+        "model": "qwen-9b",
+        "criterion_index": 18,
+        "root_cause": "constraint_misread",
+        "secondary": "execution_slip",
+        "confidence": "high",
+        "evidence": "Saturday shows only single lines: \"Bar 8pm: Carrie/Ken\", \"Serve Open 3pm: Nat/**Erin/Tom**\", \"Serve 6pm: Kelly/Mary\" — the two 8pm, two Serve Open, and two Serve 6pm positions collapsed into single slashed entries.",
+        "rationale": "Same as Friday: distinct same-name shift slots were merged using slash notation meant for alternatives, so each doubled shift is not listed as two separate positions.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-001",
+        "model": "qwen-35b",
+        "criterion_index": 3,
+        "root_cause": "execution_slip",
+        "secondary": "constraint_dropped",
+        "confidence": "high",
+        "evidence": "Table states 'Nuria 28.0 hrs' but the rota lists Nuria on Friday twice (16:00-22:00 6h AND 18:00-01:00 7h) plus Thu/Sat/Sun = 34h; Ben stated '19h' yet only appears Mon (6h) + Thu (7h) = 13h; Finn stated '17h' yet only appears Tue (5h) + Sat (6h) = 11h.",
+        "rationale": "The trace derived per-employee totals, but the rendered rota table double-booked Nuria and dropped Ben's Tuesday and Finn's Sunday shifts; the stated totals were never cross-checked against the final table.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-001",
+        "model": "qwen-35b",
+        "criterion_index": 4,
+        "root_cause": "execution_slip",
+        "secondary": "constraint_dropped",
+        "confidence": "high",
+        "evidence": "Ben appears only on Monday (17:00-23:00, 6h) and Thursday (18:00-01:00, 7h) = 13h; Finn appears only on Tuesday (16:00-21:00, 5h) and Saturday (16:00-22:00, 6h) = 11h — both below the 16-24h floor.",
+        "rationale": "The trace verified Ben at 19h and Finn at 17h (in range), but the final table omitted Ben's Tuesday and Finn's Sunday shifts, dropping their actual scheduled hours below the minimum.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-001",
+        "model": "qwen-35b",
+        "criterion_index": 16,
+        "root_cause": "constraint_sacrificed",
+        "secondary": "constraint_overridden",
+        "confidence": "high",
+        "evidence": "Rota lines like 'Maria (FT) + Jack (PT)' and 'Nuria (FT) + Jack (PT)' assign two employees to the same shift slot, plus the note '(Note: Shifts listed on the same day are concurrent.)'",
+        "rationale": "The model explicitly recognized the 'one person per shift' rule but chose to double-staff slots to satisfy the underage-adult and cash-up rules, surfacing the tradeoff but still violating the one-per-shift requirement.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-003",
+        "model": "qwen-35b",
+        "criterion_index": 8,
+        "root_cause": "execution_slip",
+        "secondary": "constraint_misread",
+        "confidence": "high",
+        "evidence": "Trace: \"I will round to nearest whole number for consistency\"; response shows \"**HANNAH E.** ... **73%**\", \"**DANIEL J.** ... **73%**\", \"**JAMES U.** ... **73%**\" (expected 73.1%, 72.6%, 72.6%), also Lily 85% vs 84.6%, Madison 81% vs 80.6%",
+        "rationale": "The trace computed correct raw percentages (72.57%, 73.14%, etc.) but a self-imposed whole-number rounding rule dropped the required precision, yielding values that miss the expected one-decimal figures.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-003",
+        "model": "qwen-35b",
+        "criterion_index": 25,
+        "root_cause": "execution_slip",
+        "secondary": null,
+        "confidence": "high",
+        "evidence": "\"**assignment #3** Average Score: 21.33 points\" (correct is 20.67) and \"**assignment #7** ... 19.70 points\" (correct is 19.23); trace mis-summed #3 first ten as \"= 214\" (actually 194) and #7 middle ten as \"= 201\" (actually 187)",
+        "rationale": "Arithmetic addition errors in the assignment #3 and #7 column sums (off by 20 and 14) propagated to wrong point averages despite repeated self-checks.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-003",
+        "model": "qwen-35b",
+        "criterion_index": 26,
+        "root_cause": "execution_slip",
+        "secondary": "constraint_misread",
+        "confidence": "high",
+        "evidence": "\"**assignment #3** ... **85%**\" (expected 82.8%) and \"**assignment #7** ... **79%**\" (expected 76.8%); all others rounded to whole numbers (86%, 82%, 85%) instead of one decimal",
+        "rationale": "The bad #3/#7 sums plus whole-number rounding of every percentage prevent matching the expected one-decimal averages.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-003",
+        "model": "qwen-35b",
+        "criterion_index": 27,
+        "root_cause": "execution_slip",
+        "secondary": "constraint_misread",
+        "confidence": "high",
+        "evidence": "\"**assignment #1** ... **(B+)**\" (should be B), \"**assignment #3** ... **(B)**\" (should be B-), \"**assignment #7** ... **(C+)**\" (should be C)",
+        "rationale": "Grade for #1 flipped to B+ because 86.53% was rounded up to 87 before applying the scale, while #3/#7 grades are wrong because their underlying averages were mis-computed.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-003",
+        "model": "qwen-35b",
+        "criterion_index": 34,
+        "root_cause": "execution_slip",
+        "secondary": "constraint_misread",
+        "confidence": "high",
+        "evidence": "\"**DANIEL J.** ... **(C)**\" and \"**JAMES U.** ... **(C)**\" — both should be C- (72.6% falls in C- 70-72%)",
+        "rationale": "Rounding 72.57% up to 73% pushed both students across the C-/C boundary, producing C instead of the correct C-.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-002",
+        "model": "qwen-35b",
+        "criterion_index": 4,
+        "root_cause": "constraint_overridden",
+        "secondary": "input_misread",
+        "confidence": "high",
+        "evidence": "Friday **Serve 6pm:** Kelly, **Nat/Mary** (Ray is out; Nat and Mary are regular staff filling in) — trace: \"To avoid temp **Erin/Tom/Sally**, I will assign **Nat** to Serve 6pm... Let's put **Nat/Mary**.\"",
+        "rationale": "The trace explicitly identified Erin/Sally/Tom as options for Ray's Friday 6pm slot, then argued itself out via the 'priority to regulars' rule, double-booking Nat/Mary who are already assigned to Friday Serve Open 3pm, so the required temp replacement never appears.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-003",
+        "model": "qwen-397b",
+        "criterion_index": 8,
+        "root_cause": "constraint_misread",
+        "secondary": "execution_slip",
+        "confidence": "medium",
+        "evidence": "Trace: \"128/175 = 0.7314 -> 73%\" and \"127/175 = 0.7257 -> 73%\"; output shows whole-number percentages (**73%** for Daniel J. and James U.) where 72.6% (one decimal) was expected, and rounds all decimals (Lily 85% not 84.6%, Madison 81% not 80.6%).",
+        "rationale": "The model debated truncate vs round and chose to round to whole numbers, resolving the precision/boundary of 72.57% upward to 73% rather than reporting the expected 72.6%.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-003",
+        "model": "qwen-397b",
+        "criterion_index": 25,
+        "root_cause": "execution_slip",
+        "secondary": null,
+        "confidence": "high",
+        "evidence": "Trace: \"A7: ... = 595. (19.83)\" and \"A1: ... = 651. ... (21.7)\"; correct sums are 577 (19.23) and 649 (21.63). Nearly every column total is off (A2 646 vs 648, A3 627 vs 620, A6 614 vs 596).",
+        "rationale": "The per-assignment column additions contain arithmetic errors, so the displayed point averages diverge from the correct values.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-003",
+        "model": "qwen-397b",
+        "criterion_index": 26,
+        "root_cause": "execution_slip",
+        "secondary": null,
+        "confidence": "high",
+        "evidence": "Output: \"**Assignment #7** Average: 19.8 points, 79% (C+)\" where 76.8% was expected; A3 \"84%\" vs 82.8%, A6 \"82%\" vs 79.6%.",
+        "rationale": "The percentage averages are computed from the erroneous column sums and further rounded to whole numbers, producing wrong figures.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-003",
+        "model": "qwen-397b",
+        "criterion_index": 34,
+        "root_cause": "constraint_misread",
+        "secondary": "execution_slip",
+        "confidence": "high",
+        "evidence": "Output: \"**DANIEL J.** — **127/175** — **73%** **(C)**\" and \"**JAMES U.** — **127/175** — **73%** **(C)**\", where the correct grade is C- (72.6%).",
+        "rationale": "Because 72.57% was rounded up to 73% instead of mapped to the C- band (70-72%), Daniel J. and James U. were assigned C rather than the correct C-.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-001",
+        "model": "qwen-397b",
+        "criterion_index": 3,
+        "root_cause": "execution_slip",
+        "secondary": "constraint_dropped",
+        "confidence": "high",
+        "evidence": "Table gives Jack Tue(5)+Fri(7)+Sat(6)+Sun(6)=24h and Ben Mon(6)+Fri(7)=13h, but Payroll Summary states Jack 17.0 and Ben 19.0.",
+        "rationale": "The stated totals were carried over from an earlier draft plan and never re-derived from the final table, so Jack (actual 24) and Ben (actual 13) are misstated as 17 and 19.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-001",
+        "model": "qwen-397b",
+        "criterion_index": 4,
+        "root_cause": "constraint_dropped",
+        "secondary": "execution_slip",
+        "confidence": "high",
+        "evidence": "Ben appears only on Mon (17:00-23:00=6h) and Fri (16:00-23:00=7h) in the table = 13 hours, below the 16-hour PT minimum.",
+        "rationale": "The trace verified Ben at 19h across three days (Mon/Fri/Sat 19-01), but the final table dropped his Saturday shift (given to Jack instead), leaving him with only 13h.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      },
+      {
+        "id": "CIF-001",
+        "model": "qwen-397b",
+        "criterion_index": 7,
+        "root_cause": "constraint_misread",
+        "secondary": "constraint_overridden",
+        "confidence": "high",
+        "evidence": "\"Ben (16:00-23:00) ... Ben starts 16:00 (Weekend).\" and checklist: \"His Friday shift is permitted as it is the weekend.\"",
+        "rationale": "The trace even flagged \"If Friday counts, Ben cannot work 16:00 on Friday... Violation,\" but the final answer reinterprets Friday as weekend to permit a 16:00 start, contradicting the Mon-Fri weekday scope.",
+        "trace_status": "present",
+        "judge_concurrence": "both_fail"
+      }
+    ],
+    "by_root_cause": {
+      "execution_slip": {
+        "total": 20,
+        "by_model": {
+          "qwen-9b": 10,
+          "qwen-35b": 7,
+          "qwen-397b": 3
+        },
+        "by_instruction_type": {
+          "Negative": 7,
+          "Multistep": 13
+        },
+        "by_use_case": {
+          "Logistics, Scheduling & Event Planning": 7,
+          "Data Processing, Formatting & Math": 13
+        }
+      },
+      "constraint_dropped": {
+        "total": 3,
+        "by_model": {
+          "qwen-9b": 2,
+          "qwen-397b": 1
+        },
+        "by_instruction_type": {
+          "Negative": 3
+        },
+        "by_use_case": {
+          "Logistics, Scheduling & Event Planning": 3
+        }
+      },
+      "constraint_misread": {
+        "total": 7,
+        "by_model": {
+          "qwen-9b": 4,
+          "qwen-397b": 3
+        },
+        "by_instruction_type": {
+          "Negative": 5,
+          "Multistep": 2
+        },
+        "by_use_case": {
+          "Logistics, Scheduling & Event Planning": 5,
+          "Data Processing, Formatting & Math": 2
+        }
+      },
+      "constraint_overridden": {
+        "total": 2,
+        "by_model": {
+          "qwen-9b": 1,
+          "qwen-35b": 1
+        },
+        "by_instruction_type": {
+          "Negative": 2
+        },
+        "by_use_case": {
+          "Logistics, Scheduling & Event Planning": 2
+        }
+      },
+      "constraint_sacrificed": {
+        "total": 1,
+        "by_model": {
+          "qwen-35b": 1
+        },
+        "by_instruction_type": {
+          "Negative": 1
+        },
+        "by_use_case": {
+          "Logistics, Scheduling & Event Planning": 1
+        }
+      }
+    },
+    "synthesis": {
+      "predecessor": "E03-judge-compare-3p",
+      "comparison": [
+        "Config changed on two axes at once (E03: reasoning=false/temp=0.0 → E04: reasoning=true/temp=0.6), so E04 is not a clean successor of E03 — differences reflect prompting regime as much as anything; use directional language only.",
+        "Both runs share limit=3 with sample_seed=null, so the underlying items differ and neither tally is reproducible; all deltas below are suggestive, not measured.",
+        "execution_slip remains the dominant cause in both (E03 31/71 ≈44%; E04 20/33 ≈61%), so the #1 Pareto position is directionally stable across the regime change.",
+        "constraint_misread holds #2 in both (E03 13; E04 7), so the top-2 ordering is directionally consistent.",
+        "Three E03 causes vanished in E04: degenerate_output (8, all qwen-35b), input_misread (9, all qwen-9b), constraint_unaddressed (4, all qwen-9b) — but with reasoning newly enabled and only 3 items, absence is unresolvable between 'fixed by reasoning' and 'sampling noise'.",
+        "Model mix shifted directionally: in E04 qwen-9b now carries the plurality of execution_slip (10/20) whereas E03 execution_slip skewed to qwen-35b/397b — consistent with a different item set plus reasoning on."
+      ],
+      "prior_recommendations_review": [
+        "Rec 1 (robustness, raise limit to 50+ with fixed seed): NOT addressed — E04 kept limit=3 and sample_seed=null, and additionally changed reasoning/temperature, compounding rather than resolving the fragility.",
+        "Rec 2 (discrepancy_drill degenerate_output on qwen-35b): NOT properly addressed — degenerate_output is 0 in E04, but because reasoning was toggled and n=3, this does not isolate the endpoint/decoding hypothesis; the anomaly is masked, not diagnosed.",
+        "Rec 3 (judge_reliability, human/census scoring of root-cause labels): NOT addressed — no validation run present; execution_slip vs constraint_misread conflation risk remains untested and is now the largest bucket."
+      ],
+      "recommendations": [
+        {
+          "category": "robustness",
+          "action": "Run E05 at limit>=50 with a fixed sample_seed, holding ONE config fixed (pick reasoning=true/temp=0.6 to match E04, or reasoning=false/temp=0.0 to match E03) — do not change reasoning and temperature together again.",
+          "rationale": "Two consecutive 3-item runs with null seeds and a mid-stream config change mean the stable-looking Pareto could still be an artifact; you cannot exit to training on n=3.",
+          "expected_signal": "If execution_slip stays ~#1 with a comparable share at n>=50, the Pareto is trustworthy; if the ranking reshuffles, prior orderings were noise."
+        },
+        {
+          "category": "judge_reliability",
+          "action": "On the E05 diagnosed set, census/human-score a stratified subset of execution_slip and constraint_misread labels for judge agreement.",
+          "rationale": "execution_slip is now 61% of failures and may be a catch-all the judge overuses; every downstream training decision depends on this label being real, and it has never been validated across three experiments.",
+          "expected_signal": "High agreement validates the Pareto for intervention planning; low agreement means the taxonomy/judge prompt needs revision before any training data is built."
+        },
+        {
+          "category": "discrepancy_drill",
+          "action": "Isolate the E03 qwen-35b degenerate_output items and re-run them with reasoning=false vs reasoning=true, temp held constant, to test whether reasoning-on suppresses them or whether it's an endpoint/stop-token config quirk.",
+          "rationale": "The cause disappeared in E04 exactly when reasoning was enabled — a cheap targeted ablation resolves whether it's a mechanical config fix (remove from taxonomy) or a genuine mode.",
+          "expected_signal": "If degenerate_output returns under reasoning=false only, it's reasoning-sensitive; if it persists regardless, it's an endpoint/decoding issue to fix at config level."
+        }
+      ],
+      "iteration_note": "Early on the iterate-vs-train curve, not near exit. The top-2 causes are directionally stable, but every run so far is n=3 with a null seed and E04 changed two config axes at once — the Pareto is plausible but neither reproducible nor judge-validated. Do one clean high-n, single-variable run plus judge validation before considering intervention_ready."
     }
   }
 }
