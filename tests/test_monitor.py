@@ -51,8 +51,9 @@ def test_eta_none_before_data_then_exact():
         assert m.snapshot()["eta_s"] is None            # no duration recorded yet
         m.plan.get("generate").record_duration(10.0)    # 10s/item observed
         # remaining items across all not-done stages, all at the 10s fallback rate:
-        # connectivity2 + load1 + generate1 + grade1 + classify1 + validate1 + aggregate1 = 8 -> 80.0
-        assert m.snapshot()["eta_s"] == 80.0
+        # connectivity2 + load1 + generate1 + grade1 + classify1 + diagnose1 + validate1
+        # + aggregate1 = 9 -> 90.0
+        assert m.snapshot()["eta_s"] == 90.0
 
 
 def test_error_state_and_active_cleared_on_exception():

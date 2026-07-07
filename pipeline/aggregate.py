@@ -22,7 +22,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from config import DATA_JSONL, JUDGE_MAX_TOKENS, RESULTS_PATH, ROOT
+from config import DATA_JSONL, DIAGNOSE_JUDGE, JUDGE_MAX_TOKENS, RESULTS_PATH, ROOT
+from pipeline import _taxonomy
 from pipeline._experiment import (
     SCHEMA_VERSION,
     build_meta,
@@ -239,6 +240,118 @@ def _merge_manifest(cfg: RunConfig, update: dict) -> None:
     )
 
 
+def _failure_analysis_block(cfg: RunConfig, records: list[dict],
+                            grades_by_judge: dict) -> dict | None:
+    """Spec §5 contract. Source of truth is runs/<slug>/diagnosis/; returns
+    None when no diagnosis artifacts exist (dashboard shows the empty state).
+    judge_concurrence is joined HERE, post-hoc — never an input to diagnosis
+    (spec §4 blinding rule 3)."""
+    by_id = {r["id"]: r for r in records}
+    other_judges = [j for j in cfg.judges if j != cfg.judge]
+    second = other_judges[0] if other_judges else None
+
+    def _concurrence(key: str, rid: str, index: int) -> str:
+        if second is None:
+            return "no_second_judge"
+        verdicts = grades_by_judge.get(second, {}).get(key, {}).get(rid)
+        if verdicts is None:
+            return "no_second_judge"
+        v = next((x for x in verdicts if x.get("index") == index), None)
+        if v is None:
+            return "no_second_judge"
+        reason = str(v.get("reason", ""))
+        if reason.startswith("judge_refusal"):
+            return "fable_refused"
+        # Grading-artifact FAILs (grade.py's vocabulary — see
+        # pipeline.diagnose._ARTIFACT_PREFIXES) carry no real second
+        # opinion about the candidate, same as a refusal — just not the
+        # refusal itself. Falling through to both_fail here would inflate
+        # judge-agreement with FAILs that are actually judge-pipeline
+        # noise, not independent verdicts.
+        if reason.startswith(("judge_parse_error", "judge_truncated", "missing_in_judge_output")):
+            return "no_second_judge"
+        return "both_fail" if v.get("verdict") == "FAIL" else "opus_only"
+
+    rows: list[dict] = []
+    cells = 0
+    taxonomy_versions_seen: set[int] = set()
+    for key in cfg.candidates:
+        for art in read_jsonl(cfg.diagnosis_path(key)):
+            rid = art["id"]
+            if rid not in by_id:
+                continue
+            cells += 1
+            # Pre-stamp artifacts (the E03-E05 backfill) carry no
+            # taxonomy_version field at all; missing means v1 (spec §2.8) —
+            # never the running code's CURRENT version, which would
+            # silently misattribute provenance after a v2 bump.
+            taxonomy_versions_seen.add(art.get("taxonomy_version", 1))
+            for d in art.get("diagnoses", []):
+                rows.append({
+                    "id": rid,
+                    "model": key,
+                    "criterion_index": d["index"],
+                    "root_cause": d["root_cause"],
+                    "secondary": d.get("secondary"),
+                    "confidence": d.get("confidence", "low"),
+                    "evidence": d.get("evidence", ""),
+                    "rationale": d.get("rationale", ""),
+                    "trace_status": art.get("trace_status", "absent"),
+                    "judge_concurrence": _concurrence(key, rid, d["index"]),
+                })
+    if not rows:
+        return None
+
+    by_root: dict[str, dict] = {}
+    for r in rows:
+        rc = by_root.setdefault(r["root_cause"], {
+            "total": 0, "by_model": {}, "by_instruction_type": {}, "by_use_case": {},
+        })
+        rec = by_id[r["id"]]
+        rc["total"] += 1
+        for field_key, val in (("by_model", r["model"]),
+                               ("by_instruction_type", rec["instruction_type"]),
+                               ("by_use_case", rec["use_case"])):
+            rc[field_key][val] = rc[field_key].get(val, 0) + 1
+
+    # Every taxonomy key any row used must be in the echo (legend), plus the
+    # full current category set for context.
+    taxonomy = [
+        {k: c[k] for k in ("key", "label", "description", "training_implication")}
+        for c in (_taxonomy.DERIVED + [_taxonomy.COLLAPSED] + _taxonomy.RESERVED)
+    ]
+
+    synthesis = None
+    if cfg.synthesis_path.exists():
+        try:
+            synthesis = json.loads(cfg.synthesis_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            synthesis = None
+
+    # Block-level taxonomy_version is artifact provenance, not code-current
+    # (spec §2.8): when every artifact agrees, echo that value; when a v2
+    # relabel touched only some cells, report the max plus the full set so
+    # consumers can tell the block is provenance-mixed rather than silently
+    # picking one version.
+    taxonomy_version = (max(taxonomy_versions_seen) if taxonomy_versions_seen
+                        else _taxonomy.TAXONOMY_VERSION)
+
+    return {
+        "taxonomy_version": taxonomy_version,
+        **({"taxonomy_versions_seen": sorted(taxonomy_versions_seen)}
+           if len(taxonomy_versions_seen) > 1 else {}),
+        "taxonomy": taxonomy,
+        "diagnose_judge": DIAGNOSE_JUDGE,
+        "verdict_basis": cfg.judge,
+        "diagnosed_at": datetime.now(timezone.utc).isoformat(),
+        "counts": {"failed_criteria": len(rows), "diagnosed": len(rows),
+                   "cells": cells},
+        "rows": rows,
+        "by_root_cause": by_root,
+        **({"synthesis": synthesis} if synthesis is not None else {}),
+    }
+
+
 def run(cfg: RunConfig, run_report: str | None = None, monitor: RunMonitor | None = None) -> None:
     with stage_ctx(monitor, "aggregate", 1) as mon:
         mon.start_stage("aggregate", total=1)
@@ -319,6 +432,7 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
 
     meta = build_meta(cfg, run_report, run_date, prompts)
     meta["run_notes"] = _build_run_notes(cfg, responses, by_judge, skipped)
+    failure_analysis = _failure_analysis_block(cfg, eligible, grades_by_judge)
     results = {
         "schema_version": SCHEMA_VERSION,
         "meta": meta,
@@ -326,6 +440,10 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
         "prompts": prompts,
         "by_judge": by_judge,
     }
+    if failure_analysis is not None:
+        results["failure_analysis"] = failure_analysis
+        mon.note(f"aggregate: failure_analysis — {failure_analysis['counts']['diagnosed']} "
+                 f"diagnosed criteria over {failure_analysis['counts']['cells']} cells")
 
     RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     RESULTS_PATH.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")

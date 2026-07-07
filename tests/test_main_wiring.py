@@ -23,7 +23,7 @@ def test_all_requires_limit_for_new_experiment(tmp_path, monkeypatch, capsys):
 
     captured = {}
 
-    def fake_run_all(cfg, run_report):
+    def fake_run_all(cfg, run_report, diagnose_enabled=True):
         captured["cfg"] = cfg
     monkeypatch.setattr(main, "_run_all", fake_run_all)
     monkeypatch.setattr(main, "build_monitor", _noop_monitor_factory())
@@ -163,6 +163,45 @@ def test_status_survives_naive_updated_at(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(main, "PROGRESS_PATH", tmp_path / "progress.json")
     main._print_status()
     assert "E" in capsys.readouterr().out
+
+
+def test_diagnose_step_gets_cfg_and_monitor(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
+    captured = {}
+
+    def fake_diagnose_run(cfg, monitor=None):
+        captured["slug"] = cfg.slug
+        captured["has_monitor"] = monitor is not None
+    monkeypatch.setattr(main.diagnose, "run", fake_diagnose_run)
+    monkeypatch.setattr(main, "build_monitor", _noop_monitor_factory())
+
+    assert main.main(["diagnose", "--experiment", "E88-d", "--limit", "5"]) == 0
+    assert captured == {"slug": "E88-d", "has_monitor": True}
+
+
+def test_diagnose_toggle_is_not_frozen_and_gates_all(tmp_path, monkeypatch):
+    """--diagnose is post-hoc analysis config (spec §2.7): toggling it across
+    invocations must never raise ConfigConflictError, and `all --diagnose off`
+    must skip the stage while `all` (default on) runs it."""
+    monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
+    monkeypatch.setattr(main, "build_monitor", _noop_monitor_factory())
+    ran = []
+    for step in ("connectivity", "generate", "grade", "classify", "validate", "aggregate"):
+        mod = getattr(main, step)
+        monkeypatch.setattr(mod, "run",
+                            lambda *a, _s=step, **k: ran.append(_s))
+    monkeypatch.setattr(main.load, "run", lambda *a, **k: ran.append("load"))
+    monkeypatch.setattr(main.diagnose, "run", lambda *a, **k: ran.append("diagnose"))
+
+    assert main.main(["all", "--experiment", "E87-t", "--limit", "2",
+                      "--diagnose", "off"]) == 0
+    assert "diagnose" not in ran
+
+    ran.clear()
+    # Same slug, opposite toggle: must NOT conflict, and must run the stage
+    # between classify and validate.
+    assert main.main(["all", "--experiment", "E87-t"]) == 0
+    assert ran.index("classify") < ran.index("diagnose") < ran.index("validate")
 
 
 class _NoopMonitor:

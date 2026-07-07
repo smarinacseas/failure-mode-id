@@ -12,7 +12,23 @@ automatically for tagged runs.
 The compact registry at `outputs/experiments/index.json` is a legacy /
 back-compat index for consumers other than the dashboard.
 
-Current schema version: **`2.1`**.
+Current schema version: **`3.1`**.
+
+### Changes in `3.1` (additive)
+
+Optional top-level `failure_analysis` block — root-cause diagnosis rows,
+`by_root_cause` rollups, taxonomy echo, and post-hoc judge-concurrence
+labels produced by the `diagnose` stage. Absent when the diagnose stage
+has not run for the experiment. Documented in the `failure_analysis`
+section below.
+
+### Changes in `3.0` (multi-judge)
+
+Top-level `by_judge` map added — one self-contained `{judge, judge_details,
+validation, summary, prompts}` view per grader, all over the SAME candidate
+responses. The top-level `summary` / `prompts` became the DEFAULT (first)
+judge's view, kept for single-judge readers. `meta.judges` (ordered grader
+array; first entry is the default) and `meta.counts.n_judges` added.
 
 ### Changes in `2.1` (additive)
 
@@ -46,10 +62,12 @@ display-only aliases.
 
 ```json
 {
-  "schema_version": "2.1",
+  "schema_version": "3.1",
   "meta":    { … },
   "summary": { … },
-  "prompts": [ … ]
+  "prompts": [ … ],
+  "by_judge": { … },
+  "failure_analysis": { … }
 }
 ```
 
@@ -57,8 +75,10 @@ display-only aliases.
 | --- | --- | --- |
 | `schema_version` | str | Matches this document. Dashboards refuse to render mismatched majors. |
 | `meta` | object | Identity + configuration + validation status. |
-| `summary` | object | Six pre-computed aggregate breakdowns. |
-| `prompts` | array | One entry per included prompt, in benchmark_id order. |
+| `summary` | object | Six pre-computed aggregate breakdowns (default judge's view). |
+| `prompts` | array | One entry per included prompt, in benchmark_id order (default judge's view). |
+| `by_judge` | object | One self-contained `{judge, judge_details, validation, summary, prompts}` view per grader (schema 3.0). Top-level `summary`/`prompts` mirror the first judge's. |
+| `failure_analysis` | object | **Optional** (schema 3.1) — root-cause diagnosis; see its section below. The one exception to the never-absent principle: a missing key means the diagnose stage has not run. |
 
 ---
 
@@ -245,6 +265,41 @@ Each `criteria[]` entry:
 | `gameable` | bool | `true` if a response could satisfy the literal wording while violating intent. |
 | `reward_hack` | str | Short description of the shortcut if `gameable`; `""` otherwise. |
 | `results` | `{model_key → {"pass": bool, "reason": str}}` | Judge verdict + reason per candidate. |
+
+---
+
+## `failure_analysis` (schema 3.1, optional)
+
+Absent key means the diagnose stage has not run for this experiment. `rows[*]` join `prompts[]` by `id` for criterion text and category metadata.
+
+```jsonc
+"failure_analysis": {
+  "taxonomy_version": 1,          // provenance: stamped per artifact row at diagnose time;
+                                  // "taxonomy_versions_seen": [..] appears (only) when rows
+                                  // from mixed taxonomy versions are aggregated together
+  "taxonomy": [ { "key": "constraint_dropped", "label": "…",
+                  "description": "…", "training_implication": "…" } ],
+  "diagnose_judge": "claude-opus-4-8",
+  "verdict_basis": "claude-opus-4-8",       // whose FAILs were diagnosed
+  "diagnosed_at": "…",                       // ISO timestamp
+  "counts": { "failed_criteria": 219, "diagnosed": 219, "cells": 54 },
+  "synthesis": { /* §4b — predecessor, comparison[], prior_recommendations_review[],
+                    recommendations[1–3 of {category, action, rationale,
+                    expected_signal}], iteration_note. Optional: absent when
+                    synthesis was skipped or failed. */ },
+  "rows": [ {
+    "id": "CIF-012", "model": "qwen-9b", "criterion_index": 7,
+    "root_cause": "constraint_dropped",
+    "secondary": null,                       // optional second label (compound failures)
+    "confidence": "high|medium|low",
+    "evidence": "shortest quote from trace/answer that shows it",
+    "rationale": "1–2 sentences",
+    "trace_status": "present|absent|truncated",
+    "judge_concurrence": "both_fail|opus_only|fable_refused|no_second_judge"
+  } ],
+  "by_root_cause": { /* rollups: root_cause × model, × instruction_type, × use_case */ }
+}
+```
 
 ---
 

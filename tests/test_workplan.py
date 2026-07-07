@@ -33,9 +33,9 @@ def test_workplan_for_all_full_run():
     totals = {s.name: s.total for s in plan.stages}
     assert totals == {
         "connectivity": 4, "load": 75, "generate": 225, "grade": 225,
-        "classify": 75, "validate": 1, "aggregate": 1,
+        "classify": 75, "diagnose": 225, "validate": 1, "aggregate": 1,
     }
-    assert sum(totals.values()) == 606
+    assert sum(totals.values()) == 831
     assert [s.name for s in plan.stages][0] == "connectivity"
 
 
