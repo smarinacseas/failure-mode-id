@@ -3212,14 +3212,56 @@
           root.style.setProperty('--accent-line', a[2]);
           root.style.setProperty('color-scheme', t);
         }
+        // Deep links: the hash seeds the view before loadRun(), whose
+        // reconciliation then validates every piece against the loaded
+        // data — a stale or mistyped link degrades instead of breaking.
+        applyHash(runs){
+          var p=new URLSearchParams(location.hash.slice(1));
+          var run=runs.find(function(r){ return r.id===p.get('run'); })||runs[0];
+          var tab=p.get('tab'), prompt=p.get('prompt');
+          this.setState({
+            runs:runs, currentRun:run,
+            screen: prompt?'detail':(tab==='prompts'?'drilldown':(tab==='analysis'?'analysis':'overview')),
+            selectedId: prompt||null,
+            model: p.get('model'), judge: p.get('judge'),
+          });
+          this.loadRun(run);
+        }
         componentDidMount(){
           this.applyTheme(); this.setupGliders();
           var self=this;
           __loadJson('./runs.json').catch(function(){ return null; }).then(function(mf){
             var runs=(mf&&mf.runs&&mf.runs.length)?mf.runs:[{id:'results', label:'CIF pilot — results.json', path:'./results.json'}];
-            self.setState({runs:runs, currentRun:runs[0]});
-            self.loadRun(runs[0]);
+            self.applyHash(runs);
           });
+          // Pasting a link into an already-open tab only fires hashchange
+          // (same document) — honor it via the same seed-and-validate path.
+          // Our own writes use replaceState, which never fires this event.
+          window.addEventListener('hashchange', function(){
+            if(!self.state.runs.length) return;
+            if(location.hash.slice(1)===self.hashFromState()) return;
+            self.applyHash(self.state.runs);
+          });
+        }
+        // The hash always identifies the current view (run, tab, prompt,
+        // model, judge) so the address bar is shareable at any moment.
+        // replaceState keeps browser history clean of per-click entries.
+        hashFromState(){
+          var s=this.state; if(!s.currentRun) return '';
+          var p=new URLSearchParams();
+          p.set('run', s.currentRun.id||s.currentRun.path);
+          if(s.screen==='drilldown'||s.screen==='detail') p.set('tab','prompts');
+          else if(s.screen==='analysis') p.set('tab','analysis');
+          if(s.screen==='detail'&&s.selectedId) p.set('prompt', s.selectedId);
+          if(s.model) p.set('model', s.model);
+          // judge is only a *choice* on multi-judge runs; single-judge runs
+          // shouldn't pin their implicit judge into shared links.
+          if(s.judge&&((s.dataRaw&&s.dataRaw.meta&&s.dataRaw.meta.judges)||[]).length>1) p.set('judge', s.judge);
+          return p.toString();
+        }
+        syncHash(){
+          var h=this.hashFromState(); if(!h) return;
+          if(location.hash.slice(1)!==h) history.replaceState(null,'','#'+h);
         }
         // Switching runs swaps the data, not the viewer's place: screen, model,
         // judge, filters and the open prompt survive whenever the new run can
@@ -3266,7 +3308,7 @@
             runOptions: runs.map(r=>({ label:r.label||r.id||r.path, date:r.date||'', rowStyle:optRowR(cur&&r.path===cur.path), checkStyle:(cur&&r.path===cur.path)?'color:var(--accent,#b06a3c);font-weight:700;font-size:12px;flex:none':'display:none', onClick:()=>self.loadRun(r) })),
           };
         }
-        componentDidUpdate(){ this.applyTheme(); this.setupGliders(); }
+        componentDidUpdate(){ this.applyTheme(); this.setupGliders(); this.syncHash(); }
         setupGliders(){
           document.querySelectorAll('[data-glide-container]').forEach(cont=>{
             if(cont.__glideInit) return;
