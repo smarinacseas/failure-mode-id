@@ -1,6 +1,13 @@
 """Loop-detector and forensic-row unit tests for the E07 degenerate probe."""
+import json
 import random
 
+import pytest
+
+import config
+import scripts.probe_degenerate as probe
+from pipeline._io import append_jsonl, read_jsonl
+from pipeline.run_config import RunConfig
 from scripts.probe_degenerate import detect_repetition_loop, forensic_row
 
 
@@ -47,3 +54,68 @@ def test_forensic_row_shape():
     assert row["reasoning_chars"] == 0
     assert row["content_loop"]["looping"] is False
     assert row["reasoning_loop"]["looping"] is False
+
+
+def test_load_frozen_cfg_refuses_missing_experiment(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
+    with pytest.raises(SystemExit):
+        probe.load_frozen_cfg("E99-missing")
+
+
+def test_load_frozen_cfg_reads_frozen_params(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
+    run_dir = tmp_path / "E99-probe-test"
+    run_dir.mkdir(parents=True)
+    params = {
+        "candidates": {"qwen-9b": "prov/9b", "qwen-35b": "prov/35b"},
+        "judges": ["claude-opus-4-8"], "max_tokens": 64000, "temperature": 0.6,
+        "reasoning": True, "timeout_s": 600.0, "limit": 75,
+        "description": "t", "provider_sort": "throughput",
+        "sample_seed": None, "judge_mode": "batch",
+    }
+    (run_dir / "experiment.json").write_text(
+        json.dumps({"schema": 1, "params": params}), encoding="utf-8")
+    cfg = probe.load_frozen_cfg("E99-probe-test")
+    assert cfg.max_tokens == 64000 and cfg.reasoning is True
+
+
+def test_run_draws_resumes_and_skips_done(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_generate(cfg, model_id, prompt):
+        calls.append(model_id)
+        return {"response": "ok", "finish_reason": "stop"}
+
+    monkeypatch.setattr(probe, "_generate_one", fake_generate)
+    out = tmp_path / "draws.jsonl"
+    for d in range(1, 6):  # qwen-9b fully done
+        append_jsonl(out, {"model": "qwen-9b", "draw": d,
+                           "response": "x", "finish_reason": "stop"})
+    for d in range(1, 4):  # qwen-35b 3 of 5 done
+        append_jsonl(out, {"model": "qwen-35b", "draw": d,
+                           "response": "x", "finish_reason": "stop"})
+    cfg = RunConfig(slug="E99-probe-test",
+                    candidates={"qwen-9b": "prov/9b", "qwen-35b": "prov/35b"},
+                    judges=("claude-opus-4-8",), max_tokens=10, temperature=0.0,
+                    reasoning=False, timeout_s=1.0, limit=1, description="t")
+    made = probe.run_draws(cfg, "prompt text", out)
+    assert made == 2
+    assert calls == ["prov/35b", "prov/35b"]
+    assert len(read_jsonl(out)) == 10
+
+
+def test_run_draws_continues_past_per_draw_errors(tmp_path, monkeypatch):
+    def flaky(cfg, model_id, prompt):
+        if model_id == "prov/9b":
+            raise RuntimeError("boom")
+        return {"response": "ok", "finish_reason": "stop"}
+
+    monkeypatch.setattr(probe, "_generate_one", flaky)
+    out = tmp_path / "draws.jsonl"
+    cfg = RunConfig(slug="E99-probe-test",
+                    candidates={"qwen-9b": "prov/9b", "qwen-35b": "prov/35b"},
+                    judges=("claude-opus-4-8",), max_tokens=10, temperature=0.0,
+                    reasoning=False, timeout_s=1.0, limit=1, description="t")
+    made = probe.run_draws(cfg, "prompt text", out, k=2)
+    assert made == 2  # qwen-35b's two draws landed despite qwen-9b failing
+    assert {r["model"] for r in read_jsonl(out)} == {"qwen-35b"}
