@@ -12,7 +12,16 @@ automatically for tagged runs.
 The compact registry at `outputs/experiments/index.json` is a legacy /
 back-compat index for consumers other than the dashboard.
 
-Current schema version: **`3.1`**.
+Current schema version: **`3.2`**.
+
+### Changes in `3.2` (additive)
+
+Top-level `decode_health` block — mechanical repetition-loop census over
+stored responses and captured rejected generation attempts, per candidate
+model. Always present (pure computation, no judge cost). Records the
+standing ruling (2026-07-09) that ANY loop — reasoning or content, escaped
+or not — counts as a failure and is training signal. Documented in the
+`decode_health` section below.
 
 ### Changes in `3.1` (additive)
 
@@ -62,12 +71,13 @@ display-only aliases.
 
 ```json
 {
-  "schema_version": "3.1",
+  "schema_version": "3.2",
   "meta":    { … },
   "summary": { … },
   "prompts": [ … ],
   "by_judge": { … },
-  "failure_analysis": { … }
+  "failure_analysis": { … },
+  "decode_health": { … }
 }
 ```
 
@@ -79,6 +89,7 @@ display-only aliases.
 | `prompts` | array | One entry per included prompt, in benchmark_id order (default judge's view). |
 | `by_judge` | object | One self-contained `{judge, judge_details, validation, summary, prompts}` view per grader (schema 3.0). Top-level `summary`/`prompts` mirror the first judge's. |
 | `failure_analysis` | object | **Optional** (schema 3.1) — root-cause diagnosis; see its section below. The one exception to the never-absent principle: a missing key means the diagnose stage has not run. |
+| `decode_health` | object | Mechanical loop census (schema 3.2) — always present; see its section below. |
 
 ---
 
@@ -300,6 +311,49 @@ Absent key means the diagnose stage has not run for this experiment. `rows[*]` j
   "by_root_cause": { /* rollups: root_cause × model, × instruction_type, × use_case */ }
 }
 ```
+
+---
+
+## `decode_health` (schema 3.2)
+
+Mechanical repetition-loop census computed by `pipeline/_decode_health.py`
+at aggregate time — pure computation over `runs/<slug>/responses/*.jsonl`
+and the `runs/<slug>/rejected/*.jsonl` sidecars that `generate` writes for
+doomed attempts (empty completion, deadline abort). No judge involvement,
+so it is auto-verifiable and always present.
+
+Standing ruling (2026-07-09): any loop counts as a failure, including loops
+the model escaped before finishing (`n_loop_escaped`) — escaped loops waste
+tokens and escaping is unreliable; looping is trainable behavior.
+
+```json
+{
+  "detector": { "window": 4000, "ngram": 40, "min_repeats": 20 },
+  "verdict_note": "any repetition loop counts as a failure …",
+  "by_model": {
+    "qwen-9b": {
+      "n_responses": 75,
+      "n_loop_reasoning": 6,          // loop detected in the thinking channel
+      "n_loop_content": 1,            // loop detected in the visible answer
+      "n_loop_any": 6,
+      "n_loop_escaped": 5,            // looped but finish_reason == "stop" — still failures
+      "n_loop_died": 1,               // looped and never finished cleanly
+      "n_nonstop_finish": 4,          // finish_reason != "stop" (length/error/null)
+      "rejected_attempts": { "n_captured": 12, "n_looping": 9 }
+    }
+  },
+  "rows": [ {                          // FLAGGED responses only (loop or non-stop finish)
+    "model": "qwen-9b", "id": "CIF-055", "finish_reason": "stop",
+    "reasoning_chars": 149330, "content_chars": 4703,
+    "reasoning_loop": { "looping": true, "period": 113, "onset": 31330 },
+    "content_loop":   { "looping": false, "period": null, "onset": null }
+  } ]
+}
+```
+
+Caveat: `rejected_attempts` counts only attempts made after the capture
+hook landed (2026-07-09, mid-E07) — earlier retries were discarded before
+storage, so historical runs show `n_captured: 0`.
 
 ---
 

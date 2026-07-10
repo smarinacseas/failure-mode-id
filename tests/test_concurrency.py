@@ -144,7 +144,7 @@ def test_generate_workers_write_whole_records(tmp_path, monkeypatch):
     cfg = _gen_setup(tmp_path, monkeypatch, prompts)
     barrier = threading.Barrier(4)
 
-    def fake_one(cfg_, model_id, prompt):
+    def fake_one(cfg_, model_id, prompt, **kw):
         barrier.wait(timeout=10)                    # 8 items / 4 workers → 2 waves
         return {"response": f"RESP-{prompt}-" + "y" * 20_000}
 
@@ -239,7 +239,7 @@ def test_one_erroring_worker_does_not_affect_siblings(tmp_path, monkeypatch):
     prompts = ["p1", "p2", "p3", "p4"]
     cfg = _gen_setup(tmp_path, monkeypatch, prompts)
 
-    def fake_one(cfg_, model_id, prompt):
+    def fake_one(cfg_, model_id, prompt, **kw):
         if prompt == "p2":
             raise RuntimeError("boom after retries")
         return {"response": f"RESP-{prompt}"}
@@ -265,7 +265,7 @@ def test_abrupt_kill_then_resume_completes_missing_without_duplicates(tmp_path, 
     prompts = [f"p{i}" for i in range(6)]
     cfg = _gen_setup(tmp_path, monkeypatch, prompts)
 
-    def dying(cfg_, model_id, prompt):
+    def dying(cfg_, model_id, prompt, **kw):
         if prompt == "p3":
             raise KeyboardInterrupt                 # abrupt termination mid-stage
         return {"response": f"RESP-{prompt}"}
@@ -283,7 +283,7 @@ def test_abrupt_kill_then_resume_completes_missing_without_duplicates(tmp_path, 
 
     resumed_calls: list[str] = []
 
-    def healthy(cfg_, model_id, prompt):
+    def healthy(cfg_, model_id, prompt, **kw):
         resumed_calls.append(prompt)
         return {"response": f"RESP-{prompt}"}
 

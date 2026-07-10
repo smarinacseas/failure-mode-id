@@ -24,6 +24,7 @@ from pathlib import Path
 
 from config import DATA_JSONL, DIAGNOSE_JUDGE, JUDGE_MAX_TOKENS, RESULTS_PATH, ROOT
 from pipeline import _taxonomy
+from pipeline._decode_health import decode_health_block
 from pipeline._experiment import (
     SCHEMA_VERSION,
     build_meta,
@@ -444,6 +445,14 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
         results["failure_analysis"] = failure_analysis
         mon.note(f"aggregate: failure_analysis — {failure_analysis['counts']['diagnosed']} "
                  f"diagnosed criteria over {failure_analysis['counts']['cells']} cells")
+
+    # Mechanical loop census (schema 3.2) — always present; loops count as
+    # failures even when escaped (user ruling 2026-07-09).
+    decode_health = decode_health_block(cfg)
+    results["decode_health"] = decode_health
+    loops = {k: v["n_loop_any"] for k, v in decode_health["by_model"].items()
+             if v["n_loop_any"]}
+    mon.note(f"aggregate: decode_health — loops by model: {loops or 'none'}")
 
     RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     RESULTS_PATH.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")

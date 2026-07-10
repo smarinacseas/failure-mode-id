@@ -39,7 +39,7 @@ from config import (
 from pipeline.run_config import RunConfig
 from pipeline.run_config import InvalidSlugError, SLUG_RE, parse_slug  # noqa: F401 — re-export
 
-SCHEMA_VERSION = "3.1"
+SCHEMA_VERSION = "3.2"
 
 DATASET = {
     "name": "Complex Constraints Benchmark Set",

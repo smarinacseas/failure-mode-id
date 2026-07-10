@@ -21,6 +21,7 @@ from config import (
     anthropic,
 )
 from pipeline import _taxonomy
+from pipeline._batch_guard import BatchStaleGuard
 from pipeline._io import append_jsonl, read_jsonl, retry
 from pipeline._json_extract import extract_json_array
 from pipeline._judge_llm import call_json
@@ -387,11 +388,20 @@ def run(cfg: RunConfig, monitor: RunMonitor | None = None) -> None:
             mon.note(f"diagnose batch: submitted {len(requests)} cell(s) "
                      f"(attempt {attempt}, batch {batch.id})")
 
+            guard = BatchStaleGuard(anthropic, batch.id, "diagnose batch",
+                                    note=mon.note)
             while True:
                 b = retry(lambda: anthropic.messages.batches.retrieve(batch.id),
                           label="anthropic:batches:retrieve:diagnose")
                 status = getattr(b, "processing_status", "unknown")
-                mon.note(f"diagnose batch: {status}")
+                rc = getattr(b, "request_counts", None)
+                detail = ""
+                if rc is not None:
+                    detail = (f" — processing={getattr(rc, 'processing', '?')}, "
+                              f"succeeded={getattr(rc, 'succeeded', '?')}, "
+                              f"errored={getattr(rc, 'errored', '?')}")
+                mon.note(f"diagnose batch: {status}{detail}")
+                guard.observe(b)
                 if status == "ended":
                     break
                 _sleep(POLL_INTERVAL_S)
