@@ -986,6 +986,9 @@
             <span onclick="{{ goAnalysis }}" style="{{ bcAnalysisStyle }}"
               >Analysis</span
             >
+            <span onclick="{{ goReference }}" style="{{ bcReferenceStyle }}"
+              >Reference</span
+            >
             <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
               <span style="color: var(--ink-5, #c4c9d2)">/</span>
               <span
@@ -3040,6 +3043,87 @@
           </div>
         </sc-if>
 
+        <!-- ============ REFERENCE ============ -->
+        <sc-if value="{{ isReference }}" hint-placeholder-val="{{ false }}">
+          <div style="max-width:1320px;margin:0 auto;padding:26px 30px 64px">
+            <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+              <h1 style="margin:0;font-family:'Newsreader',Georgia,serif;font-size:25px;font-weight:500;letter-spacing:-0.005em">Failure-mode reference</h1>
+              <span style="font-size:12.5px;color:var(--ink-3,#8c8678)">{{ refBlurb }}</span>
+            </div>
+            <sc-if value="{{ refStale }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:11.5px;color:var(--warn-dim,#977f3e);background:var(--warn-bg,#efe6d1);border-radius:7px;padding:7px 11px;margin-bottom:14px">This run was diagnosed with a newer taxonomy version than this reference covers — entries may be missing or stale.</div>
+            </sc-if>
+            <sc-if value="{{ refLoading }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:80px 0;text-align:center;color:var(--ink-3,#8c8678);font-family:'IBM Plex Mono',monospace;font-size:12.5px">Loading reference…</div>
+            </sc-if>
+            <sc-if value="{{ refUnavailable }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:80px 0;text-align:center;color:var(--ink-3,#8c8678);font-family:'IBM Plex Mono',monospace;font-size:12.5px">Reference content not available (reference.json failed to load).</div>
+            </sc-if>
+            <sc-if value="{{ refLoaded }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:18px">
+                <sc-for list="{{ refJump }}" as="rj" hint-placeholder-count="11">
+                  <button onclick="{{ rj.onClick }}" style="{{ rj.btnStyle }}">{{ rj.label }}</button>
+                </sc-for>
+              </div>
+              <sc-for list="{{ refTrainable }}" as="rm" hint-placeholder-count="8">
+                <div id="{{ rm.domId }}" style="background:var(--surface,#fff);border:1px solid var(--border,#e2e6ec);border-radius:12px;padding:18px 22px 20px;margin-bottom:14px">
+                  <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:var(--accent,#b06a3c)">{{ rm.key }}</span>
+                    <span style="font-family:'Newsreader',Georgia,serif;font-size:17px;font-weight:500">{{ rm.label }}</span>
+                  </div>
+                  <div style="font-size:12.5px;color:var(--ink-2,#6c6759);margin:6px 0 12px">{{ rm.desc }}</div>
+                  <div style="font-size:11px;color:var(--ink-3,#8c8678);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:5px">Training strategy</div>
+                  <sc-for list="{{ rm.strategy }}" as="sp" hint-placeholder-count="2">
+                    <div style="font-size:12.5px;line-height:1.6;color:var(--ink-1,#46423a);margin-bottom:8px">{{ sp.text }}</div>
+                  </sc-for>
+                  <div style="font-size:11px;color:var(--ink-3,#8c8678);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin:12px 0 6px">Dataset taxonomy</div>
+                  <sc-for list="{{ rm.datasets }}" as="ds" hint-placeholder-count="1">
+                    <div style="border:1px solid var(--line,#e7e3d6);border-radius:9px;padding:10px 13px;margin-bottom:8px">
+                      <div style="font-size:12.5px;font-weight:600;color:var(--ink,#2a2722);margin-bottom:4px">{{ ds.name }}</div>
+                      <div style="display:grid;grid-template-columns:110px 1fr;gap:3px 12px;font-size:12px">
+                        <span style="color:var(--ink-3,#8c8678)">structure</span><span style="color:var(--ink-1,#46423a)">{{ ds.structure }}</span>
+                        <span style="color:var(--ink-3,#8c8678)">annotation</span><span style="color:var(--ink-1,#46423a)">{{ ds.annotation }}</span>
+                        <span style="color:var(--ink-3,#8c8678)">scale</span><span style="color:var(--ink-1,#46423a)">{{ ds.scale }}</span>
+                        <span style="color:var(--ink-3,#8c8678)">verifiability</span><span style="color:var(--ink-1,#46423a)">{{ ds.verifiability }}</span>
+                      </div>
+                    </div>
+                  </sc-for>
+                  <sc-if value="{{ rm.hasAq }}" hint-placeholder-val="{{ false }}">
+                    <div style="background:var(--accent-bg,#efe2d4);border:1px solid var(--accent-line,#e0cab2);border-radius:9px;padding:9px 13px;margin:12px 0;font-size:12px">
+                      <span style="font-weight:700;color:var(--accent,#b06a3c)">AfterQuery — {{ rm.aqProduct }}</span>
+                      <span style="color:var(--ink-1,#46423a)"> · {{ rm.aqCommission }}</span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ rm.hasCitations }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-size:11px;color:var(--ink-3,#8c8678);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:5px">Citations</div>
+                    <sc-for list="{{ rm.citations }}" as="ct" hint-placeholder-count="3">
+                      <div style="font-size:12px;padding:3px 0">
+                        <a href="{{ ct.url }}" target="_blank" rel="noopener" style="color:var(--ink,#2a2722);border-bottom:1px dotted currentColor;text-decoration:none">{{ ct.title }}</a>
+                        <span style="color:var(--ink-4,#a8a294)"> — {{ ct.meta }}</span>
+                        <div style="color:var(--ink-3,#8c8678);font-size:11.5px">{{ ct.relevance }}</div>
+                      </div>
+                    </sc-for>
+                  </sc-if>
+                </div>
+              </sc-for>
+              <div style="font-family:'Newsreader',Georgia,serif;font-size:15px;font-weight:500;margin:22px 0 4px">Diagnostic categories</div>
+              <div style="font-size:11.5px;color:var(--ink-3,#8c8678);margin-bottom:12px">Measurement artifacts, not training targets — no dataset maps to these.</div>
+              <sc-for list="{{ refDiagnostic }}" as="rd" hint-placeholder-count="3">
+                <div id="{{ rd.domId }}" style="background:var(--surface,#fff);border:1px solid var(--border,#e2e6ec);border-radius:12px;padding:14px 22px 15px;margin-bottom:10px">
+                  <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:var(--ink,#2a2722)">{{ rd.key }}</span>
+                    <span style="font-size:13px;font-weight:600;color:var(--ink-1,#46423a)">{{ rd.label }}</span>
+                  </div>
+                  <div style="font-size:12px;color:var(--ink-2,#6c6759);margin-top:4px">{{ rd.desc }}</div>
+                  <sc-for list="{{ rd.strategy }}" as="dp" hint-placeholder-count="1">
+                    <div style="font-size:12px;line-height:1.55;color:var(--ink-3,#8c8678);margin-top:6px">{{ dp.text }}</div>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </sc-if>
+          </div>
+        </sc-if>
+
         <div
           style="
             max-width: 1320px;
@@ -3122,7 +3206,7 @@
       // --- Standalone asset resolution: fetch()'d JSON is inlined as blob URLs by the bundler ---
       function __assetUrl(path){
         var R=(typeof window!=='undefined'&&window.__resources)||{};
-        var MAP={'./runs.json':'runsJson','runs.json':'runsJson','./results.json':'resultsJson','results.json':'resultsJson'};
+        var MAP={'./runs.json':'runsJson','runs.json':'runsJson','./results.json':'resultsJson','results.json':'resultsJson','./reference.json':'referenceJson','reference.json':'referenceJson'};
         var id=MAP[path];
         return (id&&R[id])?R[id]:path;
       }
@@ -3173,6 +3257,7 @@
           data:null, dataRaw:null, judge:null, error:null,
           runs:[], currentRun:null, runOpen:false, notesOpen:false,
           faCause:null, faModelF:null, faMenu:null,
+          reference:null, refError:null, refMode:null,
         };
 
         passCount(p,model){ let n=0; (p.criteria||[]).forEach(function(c){ var r=c.results&&c.results[model]; if(r&&r.pass) n++; }); return n; }
@@ -3195,6 +3280,30 @@
           return {data:data, judge:judge};
         }
         setJudge(j){ this.setState(this.projectJudge(this.state.dataRaw, j)); }
+        goReference(){ this.setState({screen:'reference'}); this.ensureReference(); }
+        goRefMode(key){ this.__refScrolled=null; this.setState({screen:'reference', refMode:key}); this.ensureReference(); }
+        ensureReference(){
+          var self=this;
+          if(this.__refLoading||this.state.reference||this.state.refError) return;
+          this.__refLoading=true;
+          __loadJson('./reference.json')
+            .then(function(r){ self.setState({reference:r}); })
+            .catch(function(e){ self.setState({refError:String((e&&e.message)||e)}); });
+        }
+        // Deep-link scroll: runs after every render; fires once per refMode
+        // value, only when the target card exists in the DOM.
+        scrollRef(){
+          var k=this.state.refMode;
+          if(this.state.screen!=='reference'||!k||!this.state.reference) return;
+          if(this.__refScrolled===k) return;
+          var el=document.getElementById('ref-'+k);
+          if(!el) return;
+          this.__refScrolled=k;
+          el.scrollIntoView({behavior:'smooth',block:'start'});
+          el.style.transition='none';
+          el.style.boxShadow='0 0 0 2px var(--accent,#b06a3c)';
+          setTimeout(function(){ el.style.transition='box-shadow 1.2s ease'; el.style.boxShadow=''; }, 900);
+        }
         drillTo(dim,key){const patch={screen:'drilldown',fInstr:null,fUse:null,fStyle:null,openMenu:null};patch['f'+dim]=key;this.setState(patch);}
         openPrompt(id){this.setState({screen:'detail',selectedId:id,critFilter:'all',expanded:{}});}
         toggleCrit(idx){this.setState(s=>({expanded:Object.assign({},s.expanded,{[idx]:!s.expanded[idx]})}));}
@@ -3221,10 +3330,13 @@
           var tab=p.get('tab'), prompt=p.get('prompt');
           this.setState({
             runs:runs, currentRun:run,
-            screen: prompt?'detail':(tab==='prompts'?'drilldown':(tab==='analysis'?'analysis':'overview')),
+            screen: prompt?'detail':(tab==='prompts'?'drilldown':(tab==='analysis'?'analysis':(tab==='reference'?'reference':'overview'))),
             selectedId: prompt||null,
             model: p.get('model'), judge: p.get('judge'),
+            refMode: tab==='reference' ? (p.get('mode')||null) : null,
           });
+          this.__refScrolled=null;
+          if(tab==='reference') this.ensureReference();
           this.loadRun(run);
         }
         componentDidMount(){
@@ -3252,6 +3364,7 @@
           p.set('run', s.currentRun.id||s.currentRun.path);
           if(s.screen==='drilldown'||s.screen==='detail') p.set('tab','prompts');
           else if(s.screen==='analysis') p.set('tab','analysis');
+          else if(s.screen==='reference'){ p.set('tab','reference'); if(s.refMode) p.set('mode', s.refMode); }
           if(s.screen==='detail'&&s.selectedId) p.set('prompt', s.selectedId);
           if(s.model) p.set('model', s.model);
           // judge is only a *choice* on multi-judge runs; single-judge runs
@@ -3308,7 +3421,7 @@
             runOptions: runs.map(r=>({ label:r.label||r.id||r.path, date:r.date||'', rowStyle:optRowR(cur&&r.path===cur.path), checkStyle:(cur&&r.path===cur.path)?'color:var(--accent,#b06a3c);font-weight:700;font-size:12px;flex:none':'display:none', onClick:()=>self.loadRun(r) })),
           };
         }
-        componentDidUpdate(){ this.applyTheme(); this.setupGliders(); this.syncHash(); }
+        componentDidUpdate(){ this.applyTheme(); this.setupGliders(); this.syncHash(); this.scrollRef(); }
         setupGliders(){
           document.querySelectorAll('[data-glide-container]').forEach(cont=>{
             if(cont.__glideInit) return;
@@ -3367,6 +3480,9 @@
               bcOverviewStyle:'color:var(--ink,#2a2722);font-weight:600;cursor:pointer',
               bcPromptsStyle:'color:var(--ink-3,#8c8678);cursor:pointer',
               bcAnalysisStyle:'color:var(--ink-3,#8c8678);cursor:pointer',
+              isReference:false,
+              goReference:()=>this.goReference(),
+              bcReferenceStyle:'color:var(--ink-3,#8c8678);cursor:pointer',
             };
           }
           const meta=data.meta||{}, summary=data.summary||{}, prompts=data.prompts||[];
@@ -3602,6 +3718,31 @@
             action:String(r.action||''), rationale:String(r.rationale||''),
             signal:String(r.expected_signal||'') }));
           const faSynthNote=String((faSynth&&faSynth.iteration_note)||'');
+          // ---- REFERENCE (reference.json; spec 2026-07-09) ----
+          const ref=this.state.reference;
+          const refLoaded=!!ref;
+          const refUnavailable=!ref&&!!this.state.refError;
+          const refLoading=!ref&&!this.state.refError;
+          const refModes=(ref&&ref.modes)||[];
+          const refMk=(m)=>({
+            domId:'ref-'+m.key, key:m.key, label:m.label, desc:m.description,
+            strategy:(m.strategy||[]).map(t=>({text:String(t)})),
+            datasets:(m.dataset_taxonomy||[]).map(d=>({name:d.name,structure:d.structure,annotation:d.annotation,scale:d.scale,verifiability:d.verifiability})),
+            hasAq:!!(m.afterquery&&m.afterquery.product),
+            aqProduct:(m.afterquery&&m.afterquery.product)||'',
+            aqCommission:(m.afterquery&&m.afterquery.commission)||'',
+            hasCitations:((m.citations||[]).length>0),
+            citations:(m.citations||[]).map(c=>({title:c.title,url:c.url,meta:[c.venue,c.year].filter(Boolean).join(' · '),relevance:c.relevance||''})),
+          });
+          const refTrainable=refModes.filter(m=>m.kind==='trainable').map(refMk);
+          const refDiagnostic=refModes.filter(m=>m.kind==='diagnostic').map(refMk);
+          const refJumpBtn='display:inline-flex;align-items:center;border:1px solid var(--border,#e4dfd1);background:var(--surface,#fbfaf5);color:var(--ink-1,#46423a);font-size:12px;font-weight:500;padding:5px 10px;border-radius:8px;cursor:pointer;white-space:nowrap';
+          const refJump=refModes.map(m=>({label:m.label, btnStyle:refJumpBtn,
+            onClick:()=>{ this.__refScrolled=null; this.setState({refMode:m.key}); }}));
+          const refBlurb= ref
+            ? ('Training strategies & dataset taxonomies per failure mode · taxonomy v'+ref.taxonomy_version+' · updated '+ref.updated_at)
+            : 'Training strategies & dataset taxonomies per failure mode';
+          const refStale=!!(ref&&fa&&(fa.taxonomy_version||1)>ref.taxonomy_version);
 
           return {
             ...this.runSelVals(),
@@ -3623,6 +3764,11 @@
             footBenchLabel:(meta.dataset&&meta.dataset.name)||'Complex Constraints Benchmark Set',
             isOverview:screen==='overview', isDrill:screen==='drilldown', isDetail:screen==='detail',
             isAnalysis:screen==='analysis',
+            isReference:screen==='reference',
+            goReference:()=>this.goReference(),
+            bcReferenceStyle: screen==='reference'?'color:var(--ink,#2a2722);font-weight:600;cursor:pointer':'color:var(--ink-3,#8c8678);cursor:pointer',
+            refBlurb, refLoading, refUnavailable, refLoaded, refStale,
+            refJump, refTrainable, refDiagnostic,
             modelLabel,
             modelTabs: models.map(m=>({ label:prettyModel(m), onClick:()=>this.setModel(m), btnStyle:this.btn(m===model) })),
             hasJudgeToggle: !!(meta.judges && meta.judges.length>1),
