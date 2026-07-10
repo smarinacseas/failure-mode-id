@@ -138,12 +138,29 @@ def _write_cell(cfg: RunConfig, mon, judge: str, key: str, rid: str,
 
 def _skip_empty(cfg: RunConfig, mon, judge: str, key: str, rid: str) -> None:
     # Defense-in-depth: an empty stored response has nothing to grade.
-    # generate.py should never persist one, but if it does, skip it
+    # generate.py should never persist one UNFLAGGED, but if it does, skip it
     # (no grade record → prompt excluded at aggregate) rather than
     # spending judge calls to produce a misleading 0/N.
     mon.item_start(model=f"{key}@{judge}", prompt_id=rid)
     mon.record_error(f"grade {judge}/{key} {rid}: empty response — skipped (regenerate)")
     mon.item_done(model=f"{key}@{judge}", prompt_id=rid)
+
+
+def _write_loop_failure(cfg: RunConfig, mon, judge: str, key: str, rid: str,
+                        n_criteria: int, loop: dict) -> None:
+    """Mechanical all-FAIL for a stored loop-failure record — no judge call.
+
+    The model produced no answer: a runaway repetition loop consumed the
+    budget (generate stores these flagged instead of retrying; ruling
+    2026-07-09 — loops count as failures). Grading emptiness would waste
+    judge tokens to reach the same verdict, and skipping would silently
+    EXCLUDE the prompt from the aggregate; the explicit 0/N keeps it in
+    the results as the failure it is. Diagnose targets these cells like
+    any other FAILs (the reason prefix is not a grading artifact)."""
+    reason = (f"loop_failure: no answer — runaway repetition loop in "
+              f"{loop.get('channel', 'reasoning')} "
+              f"(period={loop.get('period')}, onset={loop.get('onset')})")
+    _write_cell(cfg, mon, judge, key, rid, _all_fail(n_criteria, reason))
 
 
 # --------------------------------------------------------------------------- #
@@ -155,6 +172,10 @@ def _run_sequential(cfg: RunConfig, mon, by_id: dict,
         for resp_rec in todo:
             rid = resp_rec["id"]
             rec = by_id[rid]
+            if resp_rec.get("loop_failure"):
+                _write_loop_failure(cfg, mon, judge, key, rid,
+                                    len(rec["criteria"]), resp_rec["loop_failure"])
+                continue
             if not (resp_rec.get("response") or "").strip():
                 _skip_empty(cfg, mon, judge, key, rid)
                 continue
@@ -203,6 +224,10 @@ def _run_batch(cfg: RunConfig, mon, by_id: dict,
         for resp_rec in todo:
             rid = resp_rec["id"]
             rec = by_id[rid]
+            if resp_rec.get("loop_failure"):
+                _write_loop_failure(cfg, mon, judge, key, rid,
+                                    len(rec["criteria"]), resp_rec["loop_failure"])
+                continue
             if not (resp_rec.get("response") or "").strip():
                 _skip_empty(cfg, mon, judge, key, rid)
                 continue

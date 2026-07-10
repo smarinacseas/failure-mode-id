@@ -29,6 +29,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from config import DATA_JSONL, GENERATION_DEADLINE_S, GENERATION_WORKERS, router
+from pipeline._decode_health import detect_repetition_loop
 from pipeline._io import append_jsonl, read_jsonl, retry
 from pipeline._select import select_prompts
 from pipeline.monitor import RunMonitor, stage_ctx
@@ -172,12 +173,32 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
 
         text = "".join(content_parts)
         reasoning = "".join(reasoning_parts)
-        # Two zero-content cases, both retriable: a transient empty body from
-        # a provider, and a thinking model exhausting max_tokens mid-CoT
-        # (finish_reason=length with large reasoning_chars). Stored as-is
-        # either would silently grade 0/N downstream; the error text says
-        # which case it was.
+        # Zero-content cases split on the loop detector (ruling 2026-07-09):
+        #   LOOPING empty — a runaway repetition loop ate the budget and never
+        #     yielded an answer. That IS the result: return it as a stored,
+        #     flagged loop-failure record (grade converts it to a mechanical
+        #     all-FAIL, so the prompt stays in the aggregate as a failure
+        #     instead of being retried ~5x15min hoping for a lucky escape,
+        #     or silently excluded). E07: 5 items burned ~25 runaway streams
+        #     this way before the policy changed.
+        #   NON-LOOPING empty — transient provider blip (empty body, mid-CoT
+        #     provider error): retriable exactly as before.
         if not text.strip():
+            r_loop = detect_repetition_loop(reasoning)
+            c_loop = detect_repetition_loop(text)
+            if r_loop["looping"] or c_loop["looping"]:
+                loop = r_loop if r_loop["looping"] else c_loop
+                channel = "reasoning" if r_loop["looping"] else "content"
+                fields = {
+                    "response": text,
+                    "finish_reason": finish,
+                    "loop_failure": {"channel": channel,
+                                     "period": loop["period"],
+                                     "onset": loop["onset"]},
+                }
+                if reasoning:
+                    fields["reasoning"] = reasoning
+                return fields
             _reject("empty_completion", finish, content_parts, reasoning_parts)
             raise RuntimeError(
                 f"empty completion content from {model_id} "
