@@ -2892,6 +2892,7 @@
             <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:20px;flex-wrap:wrap">
               <h1 style="margin:0;font-family:'Newsreader',Georgia,serif;font-size:25px;font-weight:500;letter-spacing:-0.005em">Failure analysis</h1>
               <span style="font-size:12.5px;color:var(--ink-3,#878d99)">{{ faBlurb }}</span>
+              <span onclick="{{ goReference }}" style="font-size:12px;color:var(--accent,#b06a3c);cursor:pointer;font-weight:600">Failure-mode reference →</span>
             </div>
             <sc-if value="{{ faUnavailable }}" hint-placeholder-val="{{ false }}">
               <div style="padding:80px 0;text-align:center;color:var(--ink-3,#8c8678);font-family:'IBM Plex Mono',monospace;font-size:12.5px">
@@ -2906,7 +2907,7 @@
                 <sc-for list="{{ faPareto }}" as="pc" hint-placeholder-count="6">
                   <div style="display:grid;grid-template-columns:260px 1fr 46px;gap:12px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line,#e7e3d6)">
                     <div>
-                      <div style="font-size:12.5px;font-weight:600;color:var(--ink,#2a2722)">{{ pc.label }}</div>
+                      <div onclick="{{ pc.onRef }}" title="Open in failure-mode reference" style="font-size:12.5px;font-weight:600;color:var(--ink,#2a2722);cursor:pointer;text-decoration:underline dotted var(--ink-4,#a8a294);text-underline-offset:3px;display:inline-block">{{ pc.label }}</div>
                       <div style="font-size:11px;color:var(--ink-3,#8c8678)">{{ pc.note }}</div>
                     </div>
                     <div>
@@ -2951,17 +2952,6 @@
                   <div style="font-size:11.5px;color:var(--warn-dim,#977f3e);background:var(--warn-bg,#efe6d1);border-radius:7px;padding:7px 11px;margin-top:12px">{{ faSynthNote }}</div>
                 </div>
               </sc-if>
-              <!-- Taxonomy legend -->
-              <div style="background:var(--surface,#fff);border:1px solid var(--border,#e2e6ec);border-radius:12px;padding:16px 20px 18px;margin-bottom:14px">
-                <div style="font-family:'Newsreader',Georgia,serif;font-size:15px;font-weight:500;margin-bottom:12px">Taxonomy — what each cause implies for training</div>
-                <sc-for list="{{ faLegend }}" as="lg" hint-placeholder-count="8">
-                  <div style="padding:8px 0;border-bottom:1px solid var(--line,#e7e3d6)">
-                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:var(--ink,#2a2722)">{{ lg.key }}</span> <span style="font-size:12px;font-weight:600;color:var(--ink-1,#46423a)">{{ lg.label }}</span>
-                    <span style="font-size:12px;color:var(--ink-2,#6c6759)"> — {{ lg.desc }}</span>
-                    <div style="font-size:11.5px;color:var(--accent,#b06a3c);margin-top:2px">↳ {{ lg.imp }}</div>
-                  </div>
-                </sc-for>
-              </div>
               <!-- Ladder persistence -->
               <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:14px">
                 <sc-for list="{{ faLadderCards }}" as="lc" hint-placeholder-count="3">
@@ -2983,7 +2973,7 @@
                   </tr></thead>
                   <tbody><sc-for list="{{ faMatrix }}" as="mr" hint-placeholder-count="6">
                     <tr style="border-top:1px solid var(--line,#e7e3d6)">
-                      <td style="font-size:12.5px;padding:6px 10px 6px 0;white-space:nowrap">{{ mr.label }}</td>
+                      <td onclick="{{ mr.onRef }}" title="Open in failure-mode reference" style="font-size:12.5px;padding:6px 10px 6px 0;white-space:nowrap;cursor:pointer;text-decoration:underline dotted var(--ink-4,#a8a294);text-underline-offset:3px">{{ mr.label }}</td>
                       <sc-for list="{{ mr.cells }}" as="mv" hint-placeholder-count="4"><td style="{{ mv.css }};padding:6px 10px">{{ mv.v }}</td></sc-for>
                     </tr>
                   </sc-for></tbody>
@@ -2996,7 +2986,7 @@
                   </tr></thead>
                   <tbody><sc-for list="{{ faMatrixUse }}" as="ur" hint-placeholder-count="6">
                     <tr style="border-top:1px solid var(--line,#e7e3d6)">
-                      <td style="font-size:12.5px;padding:6px 10px 6px 0;white-space:nowrap">{{ ur.label }}</td>
+                      <td onclick="{{ ur.onRef }}" title="Open in failure-mode reference" style="font-size:12.5px;padding:6px 10px 6px 0;white-space:nowrap;cursor:pointer;text-decoration:underline dotted var(--ink-4,#a8a294);text-underline-offset:3px">{{ ur.label }}</td>
                       <sc-for list="{{ ur.cells }}" as="uv" hint-placeholder-count="7"><td style="{{ uv.css }};padding:6px 10px">{{ uv.v }}</td></sc-for>
                     </tr>
                   </sc-for></tbody>
@@ -3029,7 +3019,7 @@
                       <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:700">{{ fr.id }}</span>
                       <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-3,#8c8678)">{{ fr.idx }}</span>
                       <span style="font-size:11.5px;color:var(--ink-2,#6c6759)">{{ fr.model }}</span>
-                      <span style="font-size:11.5px;font-weight:600;color:var(--accent,#b06a3c)">{{ fr.cause }}</span>
+                      <span onclick="{{ fr.onRefCause }}" title="Open in failure-mode reference" style="font-size:11.5px;font-weight:600;color:var(--accent,#b06a3c);cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">{{ fr.cause }}</span>
                       <span style="font-size:10.5px;color:var(--ink-4,#a8a294)">conf: {{ fr.confidence }}</span>
                       <span style="{{ fr.concCss }}">{{ fr.conc }}</span>
                     </div>
@@ -3635,12 +3625,12 @@
             const b=faByCause[c], t=taxByKey[c]||{}, dim=(c==='judge_suspect');
             const solid=b.total-b.disputed;
             return { key:c, label:(t.label||c), count:String(b.total),
+              onRef:()=>this.goRefMode(c),
               perModel: models.map(m=>prettyModel(m)+' '+(b.byModel[m]||0)).join(' · '),
               solidStyle:'height:100%;width:'+(100*solid/faMax)+'%;background:'+(dim?'var(--ink-4,#a8a294)':'var(--bar-strong,#3a362e)')+';border-radius:5px 0 0 5px;flex:none',
               dimStyle:'height:100%;width:'+(100*b.disputed/faMax)+'%;background:var(--ink-5,#cec8b8);border-radius:0 5px 5px 0;flex:none',
               note: dim?'judge-noise candidate — excluded from the training read':(t.training_implication||'') };
           });
-          const faLegend=faTax.map(t=>({key:t.key,label:t.label,desc:t.description,imp:t.training_implication}));
           const faBlurb= fa
             ? ('Root causes for '+(fa.counts&&fa.counts.diagnosed)+' failed criteria across '+(fa.counts&&fa.counts.cells)+' response cells · diagnosed on '+(fa.verdict_basis||'')+' verdicts by '+(fa.diagnose_judge||'')+' · taxonomy v'+fa.taxonomy_version)
             : 'Root-cause diagnosis of failed criteria';
@@ -3648,6 +3638,7 @@
           const faMatrix=faCauses.map(c=>{
             const bit=((fa&&fa.by_root_cause&&fa.by_root_cause[c])||{}).by_instruction_type||{};
             return { label:(taxByKey[c]||{}).label||c,
+              onRef:()=>this.goRefMode(c),
               cells:instrTypes.map(t=>({ v:String(bit[t]||0),
                 css:'text-align:center;font-family:\'IBM Plex Mono\',monospace;font-size:12px;'+(bit[t]?'color:var(--ink,#2a2722);font-weight:600':'color:var(--ink-5,#cec8b8)') })) };
           });
@@ -3655,6 +3646,7 @@
           const faMatrixUse=faCauses.map(c=>{
             const buc=((fa&&fa.by_root_cause&&fa.by_root_cause[c])||{}).by_use_case||{};
             return { label:(taxByKey[c]||{}).label||c,
+              onRef:()=>this.goRefMode(c),
               cells:useCases.map(u=>({ v:String(buc[u]||0),
                 css:'text-align:center;font-family:\'IBM Plex Mono\',monospace;font-size:12px;'+(buc[u]?'color:var(--ink,#2a2722);font-weight:600':'color:var(--ink-5,#cec8b8)') })) };
           });
@@ -3699,6 +3691,7 @@
             const crit=((p.criteria||[])[r.criterion_index-1]||{});
             return { id:r.id, model:prettyModel(r.model), idx:'#'+r.criterion_index,
               cause:(taxByKey[r.root_cause]||{}).label||r.root_cause,
+              onRefCause:(e)=>{ if(e&&e.stopPropagation) e.stopPropagation(); this.goRefMode(r.root_cause); },
               confidence:r.confidence,
               conc: r.judge_concurrence==='both_fail'?'both judges':(r.judge_concurrence==='opus_only'?'opus only':(r.judge_concurrence==='fable_refused'?'2nd judge refused':'single judge')),
               concCss: concStyle(r.judge_concurrence),
@@ -3786,7 +3779,7 @@
             bcOverviewStyle: screen==='overview'?'color:var(--ink,#2a2722);font-weight:600;cursor:pointer':'color:var(--ink-3,#8c8678);cursor:pointer',
             bcPromptsStyle: (screen==='drilldown'||screen==='detail')?'color:var(--ink,#2a2722);font-weight:600;cursor:pointer':'color:var(--ink-3,#8c8678);cursor:pointer',
             bcAnalysisStyle: screen==='analysis'?'color:var(--ink,#2a2722);font-weight:600;cursor:pointer':'color:var(--ink-3,#8c8678);cursor:pointer',
-            faAvailable, faUnavailable: !faAvailable, faBlurb, faPareto, faLegend,
+            faAvailable, faUnavailable: !faAvailable, faBlurb, faPareto,
             faMatrixCols, faMatrix, faMatrixUseCols, faMatrixUse,
             faLadderCards, faSharedNote, faFilterMenus,
             faTableRows, faTableCount, faTableEmpty,
