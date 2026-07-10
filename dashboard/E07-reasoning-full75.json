@@ -103678,41 +103678,51 @@
       }
     },
     "synthesis": {
-      "predecessor": "E06-temp06-3p",
+      "predecessor": "E05-reasoning-rand20p",
       "comparison": [
-        "Samples are NOT comparable: E07 flips reasoning to true (E06 was false) AND scales limit 3→75. Any movement is directional at best — treat E06's n=3 as anecdote against E07's n=75.",
-        "execution_slip is #1 in both runs (E06: 38/72; E07: 187/783 ~24% of diagnoses), the one stable signal across the pair despite the config change.",
-        "E07's full ranking (execution_slip > constraint_dropped > constraint_misread > input_misread > constraint_overridden) is far richer than E06's Negative/Multistep-only slice; E06 cannot corroborate ranks 2+.",
-        "Consistent model gradient in E07: qwen-9b highest on nearly every cause, qwen-397b lowest — scale monotonically reduces failures. constraint_dropped is the steepest (81/53/26), suggesting a small-model capacity floor rather than a prompt artifact.",
-        "degenerate_output shifted host again: E06 was qwen-35b (14/15) under reasoning=false; E07 is qwen-9b (13/16) under reasoning=true — the model that emits it tracks the config, reinforcing the unresolved config-artifact hypothesis.",
-        "judge_suspect is negligible (6/783) in E07, but the classifier has still never been human-validated."
+        "Predecessor corrected to E05 (this is a manual override; see analysis_override). E07 is a full-population replication of E05's reasoning-on treatment, so E05 — not the numerically-adjacent E06 — is the protocol predecessor its recommendations must be scored against.",
+        "Treatment is HELD identical to E05: reasoning=true, temperature=0.6, provider sort=throughput, dual judges (Opus 4.8 + Fable 5). The only change is max_tokens 48000->64000, which the run notes document as behaviorally inert (the 48k cap never bound on a healthy E05 response; max healthy draw ~27k tokens). Unlike the E06 auto-predecessor, which differed on three axes at once, this is a genuine same-treatment comparison.",
+        "E07 is a census, not a sample: it ran all 75 benchmark prompts (sample_seed=null because there is nothing left to sample). E05's 20 seeded prompts are a verified nested subset of E07's 75 (sampler prefix-stability checked). So the E07 shares are population parameters, and E05 is literally a stratified subsample of them — the adequately-powered replication every synthesis since E04 has asked for.",
+        "The top-3 SET is identical across both runs — {execution_slip, constraint_dropped, constraint_misread} — and its combined mass rose from 54.3% (119/219) in E05 to 62.1% (468/754) at the E07 population. For the first time two same-treatment runs agree on the head of the Pareto.",
+        "Internal ordering shifted within that stable head: constraint_dropped led at n=20 (54/219, 24.7%) but execution_slip leads at full population (185/754, 24.5%; constraint_dropped 152, 20.2%; constraint_misread 131, 17.4%). Reading the census as authoritative, execution_slip is the #1 failure mode and the n=20 top rank was subsample noise inside a stable set.",
+        "Model gradient is now clean and monotone at population scale: qwen-9b highest on nearly every cause, qwen-397b lowest — larger models fail less. constraint_dropped is the steepest (qwen-9b 81 / qwen-35b 49 / qwen-397b 22), consistent with a small-model capacity floor rather than a prompt artifact. This sharpens E05's 'emerging model signatures' into a monotone scale effect.",
+        "degenerate_output resolved directionally: 6.8% (15/219, 100% qwen-9b) in E05 -> 1.5% (11/754, 10/11 qwen-9b) in E07. Under the held reasoning-on treatment it stays qwen-9b-localized and shrinks; its earlier apparent host-migration to qwen-35b is now attributable to E06's reasoning=false flip, not a genuine moving anomaly.",
+        "judge_suspect stays negligible (3/219 in E05, 4/754 in E07), but the root-cause classifier has still never been human-validated."
       ],
       "prior_recommendations_review": [
-        "Rec1 (robustness, frozen config reasoning=false/temp=0.6/fixed seed, limit>=60): PARTIALLY addressed — sample size was raised to 75, but reasoning was flipped to true and sample_seed is still null, so it is neither the requested config nor reproducible. The core goal — two adequately-sized runs at ONE identical, reproducible config — remains unmet.",
-        "Rec2 (discrepancy_drill, degenerate A/B across reasoning flag, fixed seed): NOT addressed as a controlled test — E07 only ran reasoning=true. The host-model shift with the flag is now observed twice but never isolated.",
-        "Rec3 (judge_reliability, human-score ~40 items on top causes with classifier sha 88d130c223aa): NOT addressed — no human/census validation appears in E07."
+        "E05 Rec1 (robustness — re-run identical config at limit>=60 with a fresh fixed seed and CI vs E05): ADDRESSED in substance, one artifact outstanding. E07 held the reasoning-on treatment and ran the entire 75-prompt benchmark — a full-population census supersedes a second seeded sample, and E05's 20 are nested inside it. Outstanding: the requested CI-vs-E05 comparison (stability_analysis.json) was never committed, though the nested-subsample data to compute it is on disk.",
+        "E05 Rec2 (judge_reliability — human/census-score ~40 items on constraint_dropped / constraint_misread / execution_slip labels): NOT addressed. A 60-item validation scaffold (judge_validation.json) exists but every `human` field is empty, and it targets upstream PASS/FAIL grade verdicts, not the root-cause labels the rec named. The three dominant causes remain human-unvalidated — the same gap open since E04.",
+        "E05 Rec3 (discrepancy_drill — isolate the 15 qwen-9b degenerate_output items, re-run reasoning on/off): DELIBERATELY DECLINED, partially superseded by evidence. The run notes record the decision to skip the on/off A/B (Qwen3.5 is a thinking family; reasoning-on is the deployment-relevant mode), with a sidecar degenerate probe as the intended substitute — but no probe output is committed. Empirically degenerate_output fell to 1.5% and stayed qwen-9b-localized under the held treatment, so the anomaly is largely characterized; the controlled A/B itself was not run."
       ],
       "recommendations": [
         {
-          "category": "robustness",
-          "action": "Re-run E07's exact config (reasoning=true, temp=0.6, limit=75) with a FIXED sample_seed, then repeat once more at the same seed vs a second seed; report by_root_cause shares with confidence intervals across the pair.",
-          "rationale": "The program still has zero reproducible same-config replications (seed=null every time). execution_slip is the only stable rank; before trusting the rest of the Pareto we need one clean identical-config replication.",
-          "expected_signal": "If execution_slip stays #1 and constraint_dropped/constraint_misread hold ranks 2-3 across seeds, the Pareto is real and the next round should be intervention_ready; if ranks reshuffle, failures are still sampling-limited."
+          "category": "judge_reliability",
+          "action": "Census/human-score a stratified ~50-item subset spanning execution_slip, constraint_dropped, and constraint_misread (the ~62% mass) at the frozen classifier_prompt_sha256 88d130c223aa, and report per-cause agreement.",
+          "rationale": "These three causes now define a stable population Pareto and drive every training decision, yet have never been human-validated across five experiments. execution_slip's rise to #1 at scale could reflect the classifier absorbing adjacent categories once reasoning traces are present — the boundary must be checked before any intervention.",
+          "expected_signal": "High per-cause agreement clears the top-3 for training-data design; low agreement (especially at the execution_slip/constraint_dropped boundary) means the taxonomy must be tightened before iterating further."
         },
         {
-          "category": "judge_reliability",
-          "action": "Human/census-score a stratified ~50-item subset from E07 covering execution_slip, constraint_dropped, and constraint_misread (the ~62% mass) using frozen classifier_prompt_sha256 88d130c223aa; report agreement per cause.",
-          "rationale": "These three causes now drive the ranking and have never been validated. execution_slip's dominance could reflect the classifier absorbing adjacent categories, especially now that reasoning traces are present and change what the classifier sees.",
-          "expected_signal": "High agreement clears the top-3 for training-data design; low agreement means the execution_slip/constraint_dropped boundary must be tightened before any intervention."
+          "category": "robustness",
+          "action": "Because E07 is already the full population, do rank-stability rather than a bigger sample: (i) run scripts/stability_analysis.py on the nested E05-in-E07 A/A cut (shared-20 repeat-draw vs disjoint-55) to emit the CI + Kendall-tau comparison E05 Rec1 asked for; and (ii) repeat the 75-prompt census once at the identical frozen config (temp=0.6 is stochastic, so a fresh draw over the same population tests whether execution_slip holds #1).",
+          "rationale": "The head of the Pareto is stable but the internal #1 rank flipped between the n=20 subsample and the n=75 population, and the CI/rank artifact — computable from data already on disk — was never committed. This is the last robustness question standing between the program and an exit.",
+          "expected_signal": "If execution_slip stays #1 with overlapping CIs and high tau, the population ordering is locked and E09 is intervention_ready; if #1 reshuffles again, the head is stable but the internal order is not, and training should target the top-3 as a set rather than a ranked list."
         },
         {
           "category": "discrepancy_drill",
-          "action": "On a fixed prompt set with fixed seed, generate degenerate_output candidates under reasoning=true vs reasoning=false at temp=0.6, holding model constant, tracking the producing model.",
-          "rationale": "degenerate_output has now switched host model in lockstep with the reasoning flag across two runs — the still-open question from E06. This is a small, cheap ablation that either removes a mechanical artifact from the taxonomy or confirms a per-model failure mode.",
-          "expected_signal": "If degenerate_output follows the flag, it is a decoding/config artifact to exclude; if it persists per-model regardless, it is a genuine qwen-9b capability-floor mode."
+          "action": "Close the degenerate_output question open since E03: either commit the sidecar probe results the notes reference, or run the qwen-9b reasoning-on/off A/B at temp=0.6 on the 10 qwen-9b degenerate items, tracking finish_reason and stop tokens.",
+          "rationale": "degenerate_output is now low-prevalence (1.5%) and qwen-9b-localized, but it is the one taxonomy-hygiene item still unresolved before building training data — a mechanical decoding artifact should be excluded, a genuine capability-floor mode should be kept.",
+          "expected_signal": "If it vanishes under one setting it is a decoding/config artifact to drop from the taxonomy; if it persists per-model it is a genuine qwen-9b capability-floor mode to characterize."
         }
       ],
-      "iteration_note": "Mid-curve, not yet ready to stop. execution_slip is a stable #1 across both runs, but every experiment so far has used a different config and a null seed, so no true same-config Pareto exists and ranks 2+ are unconfirmed. One reproducible replication plus a top-cause judge check should settle whether the next move is intervention_ready; do not build training data until the Pareto survives an identical-config repeat."
+      "iteration_note": "Mid-to-late on the iterate-vs-train curve — closer than any prior synthesis. Against its true predecessor E05, E07 delivers the first same-treatment agreement on the top-3 SET {execution_slip, constraint_dropped, constraint_misread}, now ~62% of all failures at the authoritative full-population census; the head of the Pareto is established. Two gates remain before intervention_ready: (1) the internal #1 rank flipped between the E05 subsample and the E07 population (constraint_dropped->execution_slip), and the CI/rank-stability comparison to settle it — computable from data already on disk — was never committed; (2) the top-3 classifier labels have still never been human-validated. Clear both and E09 should stop iterating and specify training data targeting execution_slip / constraint_dropped / constraint_misread, with the monotone model gradient (qwen-9b worst, improving with scale) guiding where interventions land. Do not build training data until the internal ordering survives a repeat census and the top-3 labels pass a human check.",
+      "analysis_override": {
+        "corrected_by": "manual override via Claude Code (not the diagnose-judge API)",
+        "date": "2026-07-10",
+        "predecessor_was": "E06-temp06-3p",
+        "predecessor_now": "E05-reasoning-rand20p",
+        "reason": "pipeline/diagnose.py:_predecessor() selects the highest experiment number below the current run, which picked E06. E06 was a separate temp=0.6 / reasoning=false, n=3 probe tied to another implementation, not E05's successor. E07 is by design a full-population replication of E05's reasoning-on treatment (runs/E07-reasoning-full75/experiment.json description and NOTES.md), so E05 is the protocol-correct predecessor whose recommendations E07 must be scored against.",
+        "supersedes_machine_synthesis": true
+      }
     }
   }
 }
