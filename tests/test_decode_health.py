@@ -69,3 +69,50 @@ def test_decode_health_block_empty_run(tmp_path, monkeypatch):
     block = decode_health_block(cfg)
     assert block["by_model"]["m1"]["n_responses"] == 0
     assert block["rows"] == []
+
+
+def test_aggregate_folds_decode_health(tmp_path, monkeypatch):
+    """results.json must carry the decode_health block (schema 3.2)."""
+    import json
+    from types import SimpleNamespace
+
+    import pipeline.aggregate as aggregate
+    from pipeline._io import write_jsonl
+
+    data = tmp_path / "prompts.jsonl"
+    write_jsonl(data, [{"id": "p1", "prompt": "p1", "use_case": "A",
+                        "instruction_type": "Negative", "prompt_style": "Direct",
+                        "criteria": ["does the thing"]}])
+    monkeypatch.setattr(aggregate, "DATA_JSONL", data)
+    monkeypatch.setattr(config, "RUNS_DIR", tmp_path / "runs")
+    cfg = make_cfg()
+
+    append_jsonl(cfg.responses_path("m1"),
+                 {"id": "p1", "response": LOOP, "finish_reason": "stop"})
+    append_jsonl(cfg.grades_path("claude-fable-5", "m1"),
+                 {"id": "p1", "verdicts": [{"index": 1, "verdict": "PASS", "reason": ""}]})
+    append_jsonl(cfg.criteria_tags_path,
+                 {"id": "p1", "tags": [{"index": 1, "verifiability": "auto",
+                                        "gameable": False, "reward_hack": "",
+                                        "ambiguous": False}]})
+
+    results_path = tmp_path / "results.json"
+    monkeypatch.setattr(aggregate, "RESULTS_PATH", results_path)
+    monkeypatch.setattr(aggregate, "write_experiment_copy",
+                        lambda slug, results: tmp_path / "e.json")
+    monkeypatch.setattr(aggregate, "update_index", lambda slug, meta: tmp_path / "i.json")
+    monkeypatch.setattr(aggregate, "_sync_dashboard", lambda mon: None)
+    monkeypatch.setattr(aggregate, "_merge_manifest", lambda cfg, update: None)
+    monkeypatch.setattr(aggregate, "build_meta", lambda cfg, rr, rd, prompts: {
+        "counts": {"n_prompts": len(prompts), "n_criteria": 1},
+        "experiment": {}, "models": [], "judges": [], "judge": "",
+        "git": {}, "config": {}, "validation": {},
+    })
+
+    aggregate._run(cfg, None, SimpleNamespace(note=lambda *a, **k: None))
+
+    results = json.loads(results_path.read_text())
+    dh = results["decode_health"]
+    assert dh["by_model"]["m1"]["n_loop_content"] == 1
+    assert dh["by_model"]["m1"]["n_loop_escaped"] == 1
+    assert dh["rows"][0]["id"] == "p1"
