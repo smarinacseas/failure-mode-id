@@ -39,7 +39,23 @@
       "path": "./E05-reasoning-rand20p.json",
       "n_prompts": 20,
       "n_models": 3
+    },
+    {
+      "id": "E06-temp06-3p",
+      "label": "E06-temp06-3p — Temp-only ablation of E03: same 3 prompts, reasoning off, temperature 0",
+      "date": "2026-07-09",
+      "path": "./E06-temp06-3p.json",
+      "n_prompts": 3,
+      "n_models": 3
+    },
+    {
+      "id": "E07-reasoning-full75",
+      "label": "E07-reasoning-full75 — Full-benchmark replication of E05 reasoning-on treatment (population Pareto; CI ",
+      "date": "2026-07-10",
+      "path": "./E07-reasoning-full75.json",
+      "n_prompts": 70,
+      "n_models": 3
     }
   ],
-  "synced_at": "2026-07-07T20:37:48.034272+00:00"
+  "synced_at": "2026-07-10T17:04:51.550560+00:00"
 }
