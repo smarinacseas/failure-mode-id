@@ -80,6 +80,17 @@ GENERATION_WORKERS: int = 4
 # should be STORED (finish_reason=length, diagnosable) rather than
 # deadline-aborted into an error.
 GENERATION_DEADLINE_S: float = 2700.0
+
+# Cancel-to-collect backstop for Message Batches (grade + diagnose).
+# E07 (2026-07-10): a 187-request diagnose batch showed processing=187/
+# succeeded=0 for 15.5h; canceling revealed 184 had already succeeded
+# server-side — the counts endpoint was stale, and the poll loop's only
+# exit was `ended`. After this many seconds of in_progress with frozen
+# request_counts, pipeline/_batch_guard.py cancels the batch: completed
+# requests are collected (only they are billed), the remainder resubmits
+# via the existing two-attempt loop. Sized ~2.4x the largest healthy drain
+# observed (50 min, 220-request Opus grade batch). None disables.
+BATCH_CANCEL_COLLECT_AFTER_S: float = 7200.0
 GENERATION_DEADLINE_BASIS: str = (
     "2 x p99 (nearest-rank) of 69 frozen-treatment generation calls from "
     "E04/E05 logs (p99=1014.6s, qwen-9b/CIF-024), floor 900s -> 2030s; "

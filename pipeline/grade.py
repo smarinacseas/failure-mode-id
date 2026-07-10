@@ -32,6 +32,7 @@ from __future__ import annotations
 import time
 
 from config import DATA_JSONL, JUDGE_MAX_TOKENS, PROMPTS_DIR, anthropic
+from pipeline._batch_guard import BatchStaleGuard
 from pipeline._io import append_jsonl, read_jsonl, retry
 from pipeline._judge_llm import call_json
 from pipeline._select import select_prompts
@@ -244,6 +245,9 @@ def _run_batch(cfg: RunConfig, mon, by_id: dict,
             submitted += len(requests)
             mon.note(f"grade batch {judge}: submitted {len(requests)} request(s) "
                      f"(attempt {attempt}, batch {batch.id})")
+        guards = {judge: BatchStaleGuard(anthropic, batch_id,
+                                         f"grade batch {judge}", note=mon.note)
+                  for judge, batch_id in open_batches.items()}
         _counts()
 
         # Poll every POLL_INTERVAL_S with logged status; collect each judge's
@@ -263,6 +267,7 @@ def _run_batch(cfg: RunConfig, mon, by_id: dict,
                               f"succeeded={getattr(rc, 'succeeded', '?')}, "
                               f"errored={getattr(rc, 'errored', '?')}")
                 mon.note(f"grade batch {judge}: {status}{detail}")
+                guards[judge].observe(b)
                 if status != "ended":
                     continue
                 del open_batches[judge]
