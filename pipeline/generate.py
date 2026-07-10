@@ -56,7 +56,8 @@ class GenerationDeadlineExceeded(TimeoutError):
 # All live on the per-experiment RunConfig so every run's snapshot records
 # what was actually used.
 def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
-                  deadline_s: float | None = None) -> dict:
+                  deadline_s: float | None = None,
+                  on_reject=None) -> dict:
     """Return response-record fields: the visible answer, finish_reason, and
     (when the provider returns one) the chain-of-thought — kept out of the
     judge's view but stored for post-hoc failure-mode analysis.
@@ -65,8 +66,28 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
     transport: `stream=True` so the wall-clock deadline can be enforced
     per chunk. Model params, extra_body (reasoning + provider routing), and
     timeout_s are unchanged — the frozen treatment is untouched.
+
+    `on_reject` (optional callable) receives {"error", "finish_reason",
+    "response", "reasoning"} for every doomed ATTEMPT — empty completion or
+    deadline abort — immediately before the raise that hands control to
+    retry(). Rejected drafts are training signal (runaway/looping CoT; see
+    pipeline/_decode_health.py), not garbage: without the hook every retry
+    silently discards the very text the failure analysis wants.
     """
     deadline = GENERATION_DEADLINE_S if deadline_s is None else deadline_s
+
+    def _reject(error: str, finish, content_parts, reasoning_parts) -> None:
+        if on_reject is None:
+            return
+        try:
+            on_reject({
+                "error": error,
+                "finish_reason": finish,
+                "response": "".join(content_parts),
+                "reasoning": "".join(reasoning_parts),
+            })
+        except Exception:  # noqa: BLE001 — capture must never mask the abort
+            pass
 
     def _call():
         started = time.monotonic()
@@ -109,6 +130,7 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
             for chunk in stream:
                 elapsed = time.monotonic() - started
                 if deadline_hit.is_set() or elapsed > deadline:
+                    _reject("deadline", finish, content_parts, reasoning_parts)
                     raise GenerationDeadlineExceeded(
                         f"wall-clock deadline exceeded for {model_id}: "
                         f"{elapsed:.0f}s > {deadline:.0f}s (stream aborted; "
@@ -137,6 +159,7 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
         except Exception as e:  # noqa: BLE001 — translate watchdog-induced teardown
             if deadline_hit.is_set():
                 elapsed = time.monotonic() - started
+                _reject("deadline", finish, content_parts, reasoning_parts)
                 raise GenerationDeadlineExceeded(
                     f"wall-clock deadline exceeded for {model_id}: "
                     f"{elapsed:.0f}s > {deadline:.0f}s (stream closed by watchdog "
@@ -155,6 +178,7 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
         # either would silently grade 0/N downstream; the error text says
         # which case it was.
         if not text.strip():
+            _reject("empty_completion", finish, content_parts, reasoning_parts)
             raise RuntimeError(
                 f"empty completion content from {model_id} "
                 f"(finish_reason={finish}, reasoning_chars={len(reasoning)})"
@@ -170,9 +194,15 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
 def _run_item(cfg: RunConfig, mon: RunMonitor, key: str, model_id: str, rec: dict) -> None:
     """One (candidate × prompt) work item; continue-on-error, as before."""
     rid = rec["id"]
+    rejected_path = cfg.run_dir / "rejected" / f"{key}.jsonl"
+
+    def _capture_reject(fields: dict) -> None:
+        append_jsonl(rejected_path, {"id": rid, **fields})
+
     mon.item_start(model=key, prompt_id=rid)
     try:
-        fields = _generate_one(cfg, model_id, rec["prompt"])
+        fields = _generate_one(cfg, model_id, rec["prompt"],
+                               on_reject=_capture_reject)
     except Exception as e:  # noqa: BLE001 — post-retry failure
         mon.record_error(f"generate {key} {rid}: {type(e).__name__}: {e}")
         mon.item_done(model=key, prompt_id=rid)

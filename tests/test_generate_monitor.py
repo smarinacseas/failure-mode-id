@@ -17,7 +17,7 @@ def _setup(tmp_path, monkeypatch):
 def test_generate_continue_on_error(tmp_path, monkeypatch):
     cfg = _setup(tmp_path, monkeypatch)
 
-    def fake_one(cfg_, model_id, prompt):
+    def fake_one(cfg_, model_id, prompt, **kw):
         if prompt == "b":
             raise RuntimeError("boom after retries")
         return {"response": "RESP"}
@@ -37,7 +37,7 @@ def test_generate_continue_on_error(tmp_path, monkeypatch):
 def test_generate_seeds_already_done(tmp_path, monkeypatch):
     cfg = _setup(tmp_path, monkeypatch)
     write_jsonl(cfg.responses_path("m1"), [{"id": "p1", "response": "done earlier"}])
-    monkeypatch.setattr(generate, "_generate_one", lambda c, m, p: {"response": "RESP"})
+    monkeypatch.setattr(generate, "_generate_one", lambda c, m, p, **kw: {"response": "RESP"})
 
     m = RunMonitor(WorkPlan.for_step("generate", 2, 1), sinks=[RecordingSink()])
     with m:
@@ -49,7 +49,7 @@ def test_generate_seeds_already_done(tmp_path, monkeypatch):
 def test_generate_respects_cfg_limit(tmp_path, monkeypatch):
     cfg = _setup(tmp_path, monkeypatch)
     cfg = make_cfg(limit=1)
-    monkeypatch.setattr(generate, "_generate_one", lambda c, m, p: {"response": "RESP"})
+    monkeypatch.setattr(generate, "_generate_one", lambda c, m, p, **kw: {"response": "RESP"})
     m = RunMonitor(WorkPlan.for_step("generate", 1, 1), sinks=[RecordingSink()])
     with m:
         generate.run(cfg, monitor=m)
@@ -74,7 +74,7 @@ def test_generate_uses_seeded_stratified_sample(tmp_path, monkeypatch):
     monkeypatch.setattr(generate, "DATA_JSONL", data)
     monkeypatch.setattr(config, "RUNS_DIR", tmp_path / "runs")
     cfg = make_cfg(limit=2, sample_seed=1)
-    monkeypatch.setattr(generate, "_generate_one", lambda c, m, p: {"response": "RESP"})
+    monkeypatch.setattr(generate, "_generate_one", lambda c, m, p, **kw: {"response": "RESP"})
 
     m = RunMonitor(WorkPlan.for_step("generate", 2, 1), sinks=[RecordingSink()])
     with m:

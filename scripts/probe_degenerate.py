@@ -67,14 +67,21 @@ def run_draws(cfg: RunConfig, prompt: str, out_path: Path,
     """k same-config draws per model; resume-safe on (model, draw);
     continue-on-error per draw, mirroring the pipeline's item semantics."""
     done = {(r["model"], r["draw"]) for r in read_jsonl(out_path)}
+    rejected_path = out_path.parent / "rejected.jsonl"
     made = 0
     for key in models:
         model_id = cfg.candidates[key]
         for draw in range(1, k + 1):
             if (key, draw) in done:
                 continue
+
+            def _capture(fields: dict, key=key, draw=draw) -> None:
+                append_jsonl(rejected_path,
+                             {"model": key, "draw": draw, **fields})
+
             try:
-                fields = _generate_one(cfg, model_id, prompt)
+                fields = _generate_one(cfg, model_id, prompt,
+                                       on_reject=_capture)
             except Exception as e:  # noqa: BLE001 — per-draw continue-on-error
                 print(f"probe draw {key}#{draw} failed: {type(e).__name__}: {e}")
                 continue

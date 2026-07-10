@@ -82,7 +82,7 @@ def test_load_frozen_cfg_reads_frozen_params(tmp_path, monkeypatch):
 def test_run_draws_resumes_and_skips_done(tmp_path, monkeypatch):
     calls = []
 
-    def fake_generate(cfg, model_id, prompt):
+    def fake_generate(cfg, model_id, prompt, **kw):
         calls.append(model_id)
         return {"response": "ok", "finish_reason": "stop"}
 
@@ -105,7 +105,7 @@ def test_run_draws_resumes_and_skips_done(tmp_path, monkeypatch):
 
 
 def test_run_draws_continues_past_per_draw_errors(tmp_path, monkeypatch):
-    def flaky(cfg, model_id, prompt):
+    def flaky(cfg, model_id, prompt, **kw):
         if model_id == "prov/9b":
             raise RuntimeError("boom")
         return {"response": "ok", "finish_reason": "stop"}
