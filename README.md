@@ -41,7 +41,8 @@ command, only missing work executes).
 | Knob | Flag | Notes |
 | --- | --- | --- |
 | Candidate models | `--candidates qwen-9b,mymodel=vendor/model-id` | registry keys and/or any OpenRouter id |
-| Judges | `--judges claude-opus-4-8,claude-fable-5` | Anthropic ids; each grades the same responses |
+| Judges | `--judges claude-opus-4-8,claude-fable-5,gpt-5,kimi=moonshotai/kimi-k3` | registry keys, key=OpenRouter-id pairs, or bare claude-* ids; Claude judges grade via Message Batches, others via a streamed pool |
+| Classifier | `--classifier claude-fable-5,claude-opus-4-8` | criterion-classifier fallback chain (frozen), same syntax as `--judges`, walked per prompt; default: the first judge |
 | Reasoning mode | `--reasoning on --max-tokens 48000 --temperature 0.6` | thinking + answer share the budget |
 | Prompt sampling | `--limit 20 --sample-seed 42` | seeded stratified spread across use cases/types/styles |
 | Provider routing | `--provider-sort throughput` | reasoning runs want the fast end of the pool |
@@ -66,7 +67,7 @@ Artifacts live under `runs/<slug>/`; deliverables land in
 `outputs/experiments/<slug>.json` and auto-sync to `dashboard/`.
 
 - **generate** — streamed candidate calls, 4-worker pool, wall-clock deadline guard
-- **grade** — one blind judge call per (judge, model, prompt); refusal/truncation/parse failures recorded distinctly, never silently dropped
+- **grade** — one blind judge call per (judge, model, prompt); mixed Anthropic/OpenRouter panels supported; ≥2 judges produce consensus verdicts + agreement stats; refusal/truncation/parse failures recorded distinctly, never silently dropped
 - **classify** — criterion verifiability (auto vs judge) + gameability tags
 - **diagnose** — blinded root-cause labels for every failed criterion (Opus-solo, batch; the analyst never sees judge reasons, model identity, or the second judge's verdicts; a reserved `judge_suspect` label licenses disagreement), plus an iteration synthesis comparing against the previous experiment and recommending the next one
 - **validate** — human-validation sampling of judge verdicts
