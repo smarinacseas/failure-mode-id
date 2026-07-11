@@ -4,8 +4,8 @@ import pytest
 
 import config
 from pipeline.run_config import (
-    ConfigConflictError, InvalidSlugError, RunConfig, parse_candidates,
-    parse_judges, parse_slug, resolve,
+    ConfigConflictError, InvalidSlugError, JudgeSpec, RunConfig, family_overlaps,
+    parse_candidates, parse_judges, parse_slug, resolve, resolve_judge,
 )
 
 
@@ -41,7 +41,7 @@ def test_paths_derive_from_runs_dir_and_slug(tmp_path, monkeypatch):
     assert cfg.grades_path("claude-fable-5", "m1") == (
         tmp_path / "E99-test" / "grades" / "claude-fable-5" / "m1.jsonl"
     )
-    assert cfg.judge == "claude-fable-5"  # first judge is canonical
+    assert cfg.judge.key == "claude-fable-5"  # first judge is canonical
     assert cfg.criteria_tags_path == tmp_path / "E99-test" / "criteria_tags.jsonl"
     assert cfg.judge_validation_path == tmp_path / "E99-test" / "judge_validation.json"
     assert cfg.run_manifest_path == tmp_path / "E99-test" / "run_manifest.json"
@@ -72,10 +72,11 @@ def test_parse_judges_dedups():
 def test_judges_default_filled_and_json_round_trip(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
     cfg = resolve("E14-judges", {"limit": 3})
-    assert cfg.judges == tuple(config.JUDGES)
+    default = tuple(resolve_judge(k) for k in config.JUDGES)
+    assert cfg.judges == default            # default panel resolved to specs
     # re-passing the same judges must NOT trip the frozen-conflict guard
-    cfg2 = resolve("E14-judges", {"judges": tuple(config.JUDGES)})
-    assert cfg2.judges == tuple(config.JUDGES)
+    cfg2 = resolve("E14-judges", {"judges": default})
+    assert cfg2.judges == default
 
 
 def test_parse_candidates_registry_keys_and_pairs(monkeypatch):
@@ -97,7 +98,7 @@ def test_resolve_freezes_on_first_run(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
     cfg = resolve("E10-frozen", {"max_tokens": 1234, "limit": 5})
     assert cfg.max_tokens == 1234 and cfg.limit == 5
-    assert cfg.judges == tuple(config.JUDGES)            # default filled in
+    assert cfg.judges == tuple(resolve_judge(k) for k in config.JUDGES)  # default filled in
     frozen = json.loads((tmp_path / "E10-frozen" / "experiment.json").read_text())
     assert frozen["params"]["max_tokens"] == 1234
     assert "created_at" in frozen
@@ -164,3 +165,57 @@ def test_from_json_dict_missing_field_raises_readable_value_error():
     del d["judges"]
     with pytest.raises(ValueError, match=r"missing field 'judges'.*hand-edited.*runs/E99-test/"):
         RunConfig.from_json_dict("E99-test", d)
+
+
+def test_judges_hydrate_from_strings_and_dicts():
+    cfg = _cfg(judges=("claude-fable-5",
+                       {"key": "gpt-5", "client": "openrouter", "model": "openai/gpt-5.2"}))
+    assert cfg.judges[0] == JudgeSpec("claude-fable-5", "anthropic", "claude-fable-5")
+    assert cfg.judges[1].client == "openrouter"
+    assert cfg.judge == cfg.judges[0]
+    assert cfg.judge_keys == ("claude-fable-5", "gpt-5")
+
+
+def test_classifier_chain_defaults_to_first_judge():
+    cfg = _cfg(judges=("claude-fable-5", "claude-opus-4-8"))
+    assert cfg.classifier_chain == (cfg.judges[0],)
+    cfg2 = _cfg(classifier_chain=("claude-opus-4-8",))
+    assert cfg2.classifier_chain[0].key == "claude-opus-4-8"
+
+
+def test_freeze_round_trip_with_specs():
+    cfg = _cfg(judges=("claude-fable-5",
+                       {"key": "gpt-5", "client": "openrouter", "model": "openai/gpt-5.2"}))
+    d = json.loads(json.dumps(cfg.to_json_dict()))
+    assert d["judges"][1] == {"key": "gpt-5", "client": "openrouter", "model": "openai/gpt-5.2"}
+    assert RunConfig.from_json_dict("E99-test", d) == cfg
+
+
+def test_old_freeze_hydrates_byte_identical():
+    # pre-panel freeze: judges as plain strings, no classifier_chain
+    d = _cfg(judges=("claude-opus-4-8", "claude-fable-5")).to_json_dict()
+    d["judges"] = ["claude-opus-4-8", "claude-fable-5"]
+    del d["classifier_chain"]
+    cfg = RunConfig.from_json_dict("E99-test", d)
+    assert all(s.client == "anthropic" and s.key == s.model for s in cfg.judges)
+    assert cfg.classifier_chain == (cfg.judges[0],)
+    # pre-multi-judge freeze: scalar judge
+    d2 = dict(d); del d2["judges"]; d2["judge"] = "claude-fable-5"
+    assert RunConfig.from_json_dict("E99-test", d2).judge.key == "claude-fable-5"
+
+
+def test_refreezing_same_judges_not_a_conflict(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
+    judges = parse_judges("claude-fable-5,gpt-5")
+    resolve("E97-panel", {"limit": 2, "judges": judges})
+    cfg = resolve("E97-panel", {"judges": judges})   # must NOT raise
+    assert cfg.judges == judges
+    with pytest.raises(ConfigConflictError):
+        resolve("E97-panel", {"judges": parse_judges("claude-fable-5")})
+
+
+def test_family_overlap_detection():
+    cfg = _cfg(candidates={"qwen-9b": "qwen/qwen3.5-9b"},
+               judges=("claude-fable-5", {"key": "qwen-judge", "client": "openrouter",
+                                          "model": "qwen/qwen3.5-397b-a17b"}))
+    assert family_overlaps(cfg) == [("qwen-judge", "qwen")]

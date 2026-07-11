@@ -22,17 +22,26 @@ def _ping_candidate(key: str, model_id: str) -> str:
     return (resp.choices[0].message.content or "").strip()
 
 
-def _ping_judge(judge: str) -> str:
+def _ping_judge(spec) -> str:
+    if spec.client == "openrouter":
+        resp = router.chat.completions.create(
+            model=spec.model, max_tokens=4,
+            messages=[{"role": "user", "content": "Say 'ok'."}],
+        )
+        return (resp.choices[0].message.content or "").strip()
     resp = anthropic.messages.create(
-        model=judge, max_tokens=4,
+        model=spec.model, max_tokens=4,
         messages=[{"role": "user", "content": "Say 'ok'."}],
     )
     return "".join(b.text for b in resp.content if hasattr(b, "text")).strip()
 
 
 def run(cfg: RunConfig | None = None, monitor: RunMonitor | None = None) -> None:
+    from pipeline.run_config import resolve_judge
     candidates = cfg.candidates if cfg is not None else dict(config.CANDIDATES)
-    judges = list(cfg.judges) if cfg is not None else list(config.JUDGES)
+    # Bare-invocation defaults resolve registry keys to specs so each judge is
+    # pinged against its OWN provider, never blindly against Anthropic.
+    judges = list(cfg.judges) if cfg is not None else [resolve_judge(k) for k in config.JUDGES]
     ctx = nullcontext(monitor) if monitor is not None else build_monitor("connectivity", 0)
     with ctx as mon:
         mon.start_stage("connectivity", total=len(candidates) + len(judges))
@@ -47,14 +56,14 @@ def run(cfg: RunConfig | None = None, monitor: RunMonitor | None = None) -> None
                 failures.append((key, model_id, f"{type(e).__name__}: {e}"))
             mon.item_done()
 
-        for judge in judges:
-            mon.item_start(model="judge", prompt_id=judge)
+        for spec in judges:
+            mon.item_start(model="judge", prompt_id=f"{spec.key} ({spec.model})")
             try:
-                txt = _ping_judge(judge)
-                mon.note(f"judge ({judge}) ok ({txt[:40]!r})")
+                txt = _ping_judge(spec)
+                mon.note(f"judge {spec.key} ({spec.model}) ok ({txt[:40]!r})")
             except Exception as e:  # noqa: BLE001
-                mon.record_error(f"judge ({judge}): {type(e).__name__}: {e}")
-                failures.append(("judge", judge, f"{type(e).__name__}: {e}"))
+                mon.record_error(f"judge {spec.key} ({spec.model}): {type(e).__name__}: {e}")
+                failures.append(("judge", spec.key, f"{type(e).__name__}: {e}"))
             mon.item_done()
         mon.end_stage()
 

@@ -23,8 +23,11 @@ def _user_message(criteria: list[str]) -> str:
 
 
 def _classifier_call(cfg: RunConfig, user_msg: str) -> str:
-    # Criterion tagging is model-independent; the first (canonical) judge does it.
-    text, _stop = call_json(cfg.judge, CLASSIFIER_SYSTEM, user_msg, label=f"anthropic:{cfg.judge}:classify")
+    # Criterion tagging is model-independent; the classifier chain's head does
+    # it for now (the full per-prompt fallback walker lands in Task 8).
+    spec = cfg.classifier_chain[0]
+    text, _stop = call_json(spec, CLASSIFIER_SYSTEM, user_msg,
+                            label=f"{spec.client}:{spec.key}:classify")
     return text
 
 

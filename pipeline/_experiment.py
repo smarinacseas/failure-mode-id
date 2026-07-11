@@ -29,7 +29,9 @@ from config import (
     GENERATION_DEADLINE_BASIS,
     GENERATION_DEADLINE_S,
     GENERATION_WORKERS,
+    JUDGE_DEADLINE_S,
     JUDGE_MAX_TOKENS,
+    JUDGE_WORKERS,
     PROMPTS_DIR,
     ROOT,
     VALIDATE_RESPONSE_EXCERPT_CHARS,
@@ -48,12 +50,11 @@ DATASET = {
     "publisher": "Surge AI",
 }
 
-JUDGE_PROVIDER = "Anthropic"
-JUDGE_ROLE = "grader + classifier"
-JUDGE_FAMILY_NOTE = (
-    "Non-candidate family (Anthropic judge, non-Anthropic candidates) → "
-    "self-preference bias is structurally absent by v1 design."
-)
+JUDGE_ROLE = "grader"
+FAMILY_NOTE_CLEAN = ("Non-candidate family -> self-preference bias structurally absent "
+                     "for this judge.")
+FAMILY_NOTE_OVERLAP = ("Judge family matches a candidate family -> self-preference "
+                       "bias possible; interpret this judge's column with care.")
 
 
 def _sha256_prefix(path: Path, n: int = 12) -> str:
@@ -117,33 +118,46 @@ def model_details_block(cfg: RunConfig) -> list[dict]:
 
 
 def judges_block(cfg: RunConfig) -> list[str]:
-    """`meta.judges` — every grader model ID, in order. The dashboard builds its
+    """`meta.judges` — every grader KEY, in order. The dashboard builds its
     judge toggle from this; the first entry is the default view."""
-    return list(cfg.judges)
+    return list(cfg.judge_keys)
 
 
 def judge_block(cfg: RunConfig) -> str:
-    """`meta.judge` — the DEFAULT grader model ID (first judge, short string).
+    """`meta.judge` — the DEFAULT grader KEY (first judge, short string).
 
     Kept for back-compat / single-judge dashboards; multi-judge views read
     `meta.judges` and the per-judge blocks under `by_judge`.
     """
-    return cfg.judge
+    return cfg.judge.key
 
 
-def judge_details_for(judge: str) -> dict:
-    """Provider + role + family-stake note for one grader model ID."""
+def judge_details_for(spec, cfg: RunConfig) -> dict:
+    """Per-judge provenance for by_judge[*].judge_details (schema 3.3)."""
+    from pipeline.run_config import candidate_family, family_of
+    fam = family_of(spec.client, spec.model)
+    overlap = fam in {candidate_family(m) for m in cfg.candidates.values()}
+    if spec.client == "anthropic":
+        transport = cfg.judge_mode          # batch | sequential
+        reasoning = {"type": "adaptive"}
+    else:
+        transport = "pooled_stream"
+        reasoning = {"enabled": True}
     return {
-        "id": judge,
-        "provider": JUDGE_PROVIDER,
+        "id": spec.key,
+        "model_id": spec.model,
+        "provider": spec.client,
         "role": JUDGE_ROLE,
-        "family_stake_note": JUDGE_FAMILY_NOTE,
+        "transport": transport,
+        "reasoning": reasoning,
+        "family": fam,
+        "family_overlap": overlap,
+        "family_stake_note": FAMILY_NOTE_OVERLAP if overlap else FAMILY_NOTE_CLEAN,
     }
 
 
 def judge_details_block(cfg: RunConfig) -> dict:
-    """`meta.judge_details` — details for the default (first) grader."""
-    return judge_details_for(cfg.judge)
+    return judge_details_for(cfg.judge, cfg)
 
 
 def counts_block(prompts: list[dict], cfg: RunConfig) -> dict:
@@ -192,10 +206,13 @@ def config_block(cfg: RunConfig) -> dict:
         # executed. judge_mode is frozen per-experiment; the worker count and
         # generation deadline are config.py constants recorded for the record.
         "judge_mode": cfg.judge_mode,
+        "classifier_chain": [s.key for s in cfg.classifier_chain],
         "generation_workers": GENERATION_WORKERS,
         "generation_deadline_s": GENERATION_DEADLINE_S,
         "generation_deadline_basis": GENERATION_DEADLINE_BASIS,
         "judge_max_tokens": JUDGE_MAX_TOKENS,
+        "judge_workers": JUDGE_WORKERS,
+        "judge_deadline_s": JUDGE_DEADLINE_S,
         "judge_prompt_sha256_12": _sha256_prefix(PROMPTS_DIR / "judge.txt"),
         "classifier_prompt_sha256_12": _sha256_prefix(PROMPTS_DIR / "classifier.txt"),
         "validate_seed": VALIDATE_SEED,

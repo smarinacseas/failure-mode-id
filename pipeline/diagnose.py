@@ -49,7 +49,7 @@ def _failed_cells(cfg: RunConfig, records: list[dict],
     by_id = {r["id"]: r for r in records}
     cells: list[dict] = []
     for key in cfg.candidates:
-        grades = {g["id"]: g["verdicts"] for g in read_jsonl(cfg.grades_path(cfg.judge, key))}
+        grades = {g["id"]: g["verdicts"] for g in read_jsonl(cfg.grades_path(cfg.judge.key, key))}
         responses = {r["id"]: r for r in read_jsonl(cfg.responses_path(key))}
         done = set() if include_diagnosed else {r["id"] for r in read_jsonl(cfg.diagnosis_path(key))}
         for rid, verdicts in grades.items():

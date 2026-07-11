@@ -38,7 +38,7 @@ from pipeline._judge_llm import call_json
 from pipeline._select import select_prompts
 from pipeline._json_extract import extract_json_array
 from pipeline.monitor import RunMonitor, stage_ctx
-from pipeline.run_config import RunConfig
+from pipeline.run_config import JudgeSpec, RunConfig
 
 JUDGE_SYSTEM = (PROMPTS_DIR / "judge.txt").read_text(encoding="utf-8")
 
@@ -107,12 +107,13 @@ def _text_to_verdicts(raw: str, stop_reason: str | None,
         return None, f"judge_parse_error: {type(e).__name__}: {e}"
 
 
-def _grade_one(judge: str, prompt: str, response: str, criteria: list[str]) -> list[dict]:
+def _grade_one(spec: JudgeSpec, prompt: str, response: str, criteria: list[str]) -> list[dict]:
     user_msg = _user_message(prompt, response, criteria)
     last_err: str | None = None
     for attempt in (1, 2):
         try:
-            raw, stop_reason = call_json(judge, JUDGE_SYSTEM, user_msg, label=f"anthropic:{judge}")
+            raw, stop_reason = call_json(spec, JUDGE_SYSTEM, user_msg,
+                                         label=f"{spec.client}:{spec.key}")
         except Exception as e:  # noqa: BLE001
             last_err = f"judge_parse_error: {type(e).__name__}: {e}"
             continue
@@ -125,28 +126,29 @@ def _grade_one(judge: str, prompt: str, response: str, criteria: list[str]) -> l
     return _all_fail(len(criteria), last_err or "judge_parse_error: unknown")
 
 
-def _write_cell(cfg: RunConfig, mon, judge: str, key: str, rid: str,
+def _write_cell(cfg: RunConfig, mon, judge_key: str, key: str, rid: str,
                 verdicts: list[dict]) -> None:
-    """Append one grade record with the sequential path's exact accounting."""
-    mon.item_start(model=f"{key}@{judge}", prompt_id=rid)
-    append_jsonl(cfg.grades_path(judge, key), {"id": rid, "verdicts": verdicts})
+    """Append one grade record with the sequential path's exact accounting.
+    `judge_key` is the panel member's path-safe key, not a provider model id."""
+    mon.item_start(model=f"{key}@{judge_key}", prompt_id=rid)
+    append_jsonl(cfg.grades_path(judge_key, key), {"id": rid, "verdicts": verdicts})
     reason0 = str(verdicts[0].get("reason", "")) if verdicts else ""
     if reason0.startswith("judge_parse_error") or reason0.startswith("judge_truncated"):
-        mon.record_error(f"grade {judge}/{key} {rid}: {reason0.split(':', 1)[0]}")
-    mon.item_done(model=f"{key}@{judge}", prompt_id=rid)
+        mon.record_error(f"grade {judge_key}/{key} {rid}: {reason0.split(':', 1)[0]}")
+    mon.item_done(model=f"{key}@{judge_key}", prompt_id=rid)
 
 
-def _skip_empty(cfg: RunConfig, mon, judge: str, key: str, rid: str) -> None:
+def _skip_empty(cfg: RunConfig, mon, judge_key: str, key: str, rid: str) -> None:
     # Defense-in-depth: an empty stored response has nothing to grade.
     # generate.py should never persist one UNFLAGGED, but if it does, skip it
     # (no grade record → prompt excluded at aggregate) rather than
     # spending judge calls to produce a misleading 0/N.
-    mon.item_start(model=f"{key}@{judge}", prompt_id=rid)
-    mon.record_error(f"grade {judge}/{key} {rid}: empty response — skipped (regenerate)")
-    mon.item_done(model=f"{key}@{judge}", prompt_id=rid)
+    mon.item_start(model=f"{key}@{judge_key}", prompt_id=rid)
+    mon.record_error(f"grade {judge_key}/{key} {rid}: empty response — skipped (regenerate)")
+    mon.item_done(model=f"{key}@{judge_key}", prompt_id=rid)
 
 
-def _write_loop_failure(cfg: RunConfig, mon, judge: str, key: str, rid: str,
+def _write_loop_failure(cfg: RunConfig, mon, judge_key: str, key: str, rid: str,
                         n_criteria: int, loop: dict) -> None:
     """Mechanical all-FAIL for a stored loop-failure record — no judge call.
 
@@ -160,27 +162,27 @@ def _write_loop_failure(cfg: RunConfig, mon, judge: str, key: str, rid: str,
     reason = (f"loop_failure: no answer — runaway repetition loop in "
               f"{loop.get('channel', 'reasoning')} "
               f"(period={loop.get('period')}, onset={loop.get('onset')})")
-    _write_cell(cfg, mon, judge, key, rid, _all_fail(n_criteria, reason))
+    _write_cell(cfg, mon, judge_key, key, rid, _all_fail(n_criteria, reason))
 
 
 # --------------------------------------------------------------------------- #
 # Sequential transport (pre-batch behavior, unchanged).
 # --------------------------------------------------------------------------- #
 def _run_sequential(cfg: RunConfig, mon, by_id: dict,
-                    plan: list[tuple[str, str, list[dict]]]) -> None:
-    for judge, key, todo in plan:
+                    plan: list[tuple[JudgeSpec, str, list[dict]]]) -> None:
+    for spec, key, todo in plan:
         for resp_rec in todo:
             rid = resp_rec["id"]
             rec = by_id[rid]
             if resp_rec.get("loop_failure"):
-                _write_loop_failure(cfg, mon, judge, key, rid,
+                _write_loop_failure(cfg, mon, spec.key, key, rid,
                                     len(rec["criteria"]), resp_rec["loop_failure"])
                 continue
             if not (resp_rec.get("response") or "").strip():
-                _skip_empty(cfg, mon, judge, key, rid)
+                _skip_empty(cfg, mon, spec.key, key, rid)
                 continue
-            verdicts = _grade_one(judge, rec["prompt"], resp_rec["response"], rec["criteria"])
-            _write_cell(cfg, mon, judge, key, rid, verdicts)
+            verdicts = _grade_one(spec, rec["prompt"], resp_rec["response"], rec["criteria"])
+            _write_cell(cfg, mon, spec.key, key, rid, verdicts)
 
 
 # --------------------------------------------------------------------------- #
@@ -199,14 +201,15 @@ def _custom_id(key: str, rid: str) -> str:
     return f"{key}{CUSTOM_ID_SEP}{rid}"
 
 
-def _batch_request(judge: str, cid: str, user_msg: str) -> dict:
+def _batch_request(spec: JudgeSpec, cid: str, user_msg: str) -> dict:
     # Params identical to the sequential call in pipeline/_judge_llm.call_json
     # (model, budget, adaptive thinking, system, single user message) — the
-    # transport differs, the treatment does not.
+    # transport differs, the treatment does not. `spec.model` is the provider
+    # id; the batch is keyed downstream by spec.key.
     return {
         "custom_id": cid,
         "params": {
-            "model": judge,
+            "model": spec.model,
             "max_tokens": JUDGE_MAX_TOKENS,
             "thinking": {"type": "adaptive"},
             "system": JUDGE_SYSTEM,
@@ -216,22 +219,27 @@ def _batch_request(judge: str, cid: str, user_msg: str) -> dict:
 
 
 def _run_batch(cfg: RunConfig, mon, by_id: dict,
-               plan: list[tuple[str, str, list[dict]]]) -> None:
+               plan: list[tuple[JudgeSpec, str, list[dict]]]) -> None:
+    # Batch transport is Anthropic-only; the caller passes the anthropic-client
+    # slice of the plan. Cells are keyed by the panel member's KEY (path-safe,
+    # batch-scope-safe); specs_by_key recovers the provider model id when the
+    # request is built.
+    specs_by_key: dict[str, JudgeSpec] = {spec.key: spec for spec, _key, _todo in plan}
     # Build the outstanding cells per judge from the SAME todo sets (done_ids
     # already filtered) the sequential path uses.
-    pending: dict[str, dict[str, dict]] = {}      # judge -> custom_id -> cell
-    for judge, key, todo in plan:
+    pending: dict[str, dict[str, dict]] = {}      # judge_key -> custom_id -> cell
+    for spec, key, todo in plan:
         for resp_rec in todo:
             rid = resp_rec["id"]
             rec = by_id[rid]
             if resp_rec.get("loop_failure"):
-                _write_loop_failure(cfg, mon, judge, key, rid,
+                _write_loop_failure(cfg, mon, spec.key, key, rid,
                                     len(rec["criteria"]), resp_rec["loop_failure"])
                 continue
             if not (resp_rec.get("response") or "").strip():
-                _skip_empty(cfg, mon, judge, key, rid)
+                _skip_empty(cfg, mon, spec.key, key, rid)
                 continue
-            pending.setdefault(judge, {})[_custom_id(key, rid)] = {
+            pending.setdefault(spec.key, {})[_custom_id(key, rid)] = {
                 "key": key,
                 "rid": rid,
                 "user_msg": _user_message(rec["prompt"], resp_rec["response"], rec["criteria"]),
@@ -253,36 +261,37 @@ def _run_batch(cfg: RunConfig, mon, by_id: dict,
     # result is truncated, unparseable, or batch-errored is resubmitted once,
     # then falls through to the all-FAIL record below.
     for attempt in (1, 2):
-        live = {judge: cells for judge, cells in pending.items() if cells}
+        live = {judge_key: cells for judge_key, cells in pending.items() if cells}
         if not live:
             break
 
         open_batches: dict[str, str] = {}
-        for judge, cells in live.items():
-            requests = [_batch_request(judge, cid, cell["user_msg"])
+        for judge_key, cells in live.items():
+            spec = specs_by_key[judge_key]
+            requests = [_batch_request(spec, cid, cell["user_msg"])
                         for cid, cell in cells.items()]
             batch = retry(
-                lambda judge=judge, requests=requests:
+                lambda requests=requests:
                     anthropic.messages.batches.create(requests=requests),
-                label=f"anthropic:batches:create:{judge}",
+                label=f"anthropic:batches:create:{judge_key}",
             )
-            open_batches[judge] = batch.id
+            open_batches[judge_key] = batch.id
             submitted += len(requests)
-            mon.note(f"grade batch {judge}: submitted {len(requests)} request(s) "
+            mon.note(f"grade batch {judge_key}: submitted {len(requests)} request(s) "
                      f"(attempt {attempt}, batch {batch.id})")
-        guards = {judge: BatchStaleGuard(anthropic, batch_id,
-                                         f"grade batch {judge}", note=mon.note)
-                  for judge, batch_id in open_batches.items()}
+        guards = {judge_key: BatchStaleGuard(anthropic, batch_id,
+                                             f"grade batch {judge_key}", note=mon.note)
+                  for judge_key, batch_id in open_batches.items()}
         _counts()
 
         # Poll every POLL_INTERVAL_S with logged status; collect each judge's
         # batch as soon as it ends (no barrier on the other judge).
         while open_batches:
-            for judge, batch_id in list(open_batches.items()):
+            for judge_key, batch_id in list(open_batches.items()):
                 b = retry(
                     lambda batch_id=batch_id:
                         anthropic.messages.batches.retrieve(batch_id),
-                    label=f"anthropic:batches:retrieve:{judge}",
+                    label=f"anthropic:batches:retrieve:{judge_key}",
                 )
                 rc = getattr(b, "request_counts", None)
                 status = getattr(b, "processing_status", "unknown")
@@ -291,18 +300,18 @@ def _run_batch(cfg: RunConfig, mon, by_id: dict,
                     detail = (f" — processing={getattr(rc, 'processing', '?')}, "
                               f"succeeded={getattr(rc, 'succeeded', '?')}, "
                               f"errored={getattr(rc, 'errored', '?')}")
-                mon.note(f"grade batch {judge}: {status}{detail}")
-                guards[judge].observe(b)
+                mon.note(f"grade batch {judge_key}: {status}{detail}")
+                guards[judge_key].observe(b)
                 if status != "ended":
                     continue
-                del open_batches[judge]
+                del open_batches[judge_key]
 
                 results = retry(
                     lambda batch_id=batch_id:
                         list(anthropic.messages.batches.results(batch_id)),
-                    label=f"anthropic:batches:results:{judge}",
+                    label=f"anthropic:batches:results:{judge_key}",
                 )
-                cells = pending[judge]
+                cells = pending[judge_key]
                 for res in results:
                     cell = cells.get(res.custom_id)
                     if cell is None:
@@ -315,14 +324,14 @@ def _run_batch(cfg: RunConfig, mon, by_id: dict,
                         verdicts, err = _text_to_verdicts(
                             raw, getattr(msg, "stop_reason", None), cell["n_criteria"])
                         if verdicts is not None:
-                            _write_cell(cfg, mon, judge, cell["key"], cell["rid"], verdicts)
+                            _write_cell(cfg, mon, judge_key, cell["key"], cell["rid"], verdicts)
                             del cells[res.custom_id]
                             collected += 1
                         elif err.startswith("judge_refusal"):
                             # Sticky (see _text_to_verdicts) — write the
                             # terminal record now; a resubmission round would
                             # only refuse again.
-                            _write_cell(cfg, mon, judge, cell["key"], cell["rid"],
+                            _write_cell(cfg, mon, judge_key, cell["key"], cell["rid"],
                                         _all_fail(cell["n_criteria"], err))
                             del cells[res.custom_id]
                             collected += 1
@@ -346,10 +355,10 @@ def _run_batch(cfg: RunConfig, mon, by_id: dict,
     # Cells that failed both rounds: same terminal record the sequential path
     # writes after its second attempt — all-FAIL verdicts carrying the reason,
     # recorded as an error, item marked done. Never silently dropped.
-    for judge, cells in pending.items():
+    for judge_key, cells in pending.items():
         for cid, cell in list(cells.items()):
             reason = cell["last_err"] or "judge_parse_error: batch result missing after 2 attempts"
-            _write_cell(cfg, mon, judge, cell["key"], cell["rid"],
+            _write_cell(cfg, mon, judge_key, cell["key"], cell["rid"],
                         _all_fail(cell["n_criteria"], reason))
             del cells[cid]
     _counts()
@@ -364,21 +373,26 @@ def run(cfg: RunConfig, monitor: RunMonitor | None = None) -> None:
     with stage_ctx(monitor, "grade", len(records)) as mon:
         # total spans every (judge, candidate, prompt) cell.
         total = len(records) * len(cfg.candidates) * len(cfg.judges)
-        plan: list[tuple[str, str, list[dict]]] = []  # (judge, candidate, todo responses)
+        plan: list[tuple[JudgeSpec, str, list[dict]]] = []  # (spec, candidate, todo responses)
         already = 0
-        for judge in cfg.judges:
+        for spec in cfg.judges:
             for key in cfg.candidates:
                 responses = read_jsonl(cfg.responses_path(key))
-                done_ids = {r["id"] for r in read_jsonl(cfg.grades_path(judge, key))}
+                done_ids = {r["id"] for r in read_jsonl(cfg.grades_path(spec.key, key))}
                 todo = [r for r in responses if r["id"] in by_id and r["id"] not in done_ids]
                 already += len(done_ids)
                 if not responses:
-                    mon.note(f"grade {judge}/{key}: no responses yet — skipping.")
-                plan.append((judge, key, todo))
+                    mon.note(f"grade {spec.key}/{key}: no responses yet — skipping.")
+                plan.append((spec, key, todo))
 
         mon.start_stage("grade", total=total, already_done=already)
+        anth_plan = [p for p in plan if p[0].client == "anthropic"]
+        or_plan = [p for p in plan if p[0].client == "openrouter"]
         if cfg.judge_mode == "sequential":
             _run_sequential(cfg, mon, by_id, plan)
         else:
-            _run_batch(cfg, mon, by_id, plan)
+            # OpenRouter judges have no batch API; until the pooled transport
+            # (next task) they ride the sequential path after the batches.
+            _run_batch(cfg, mon, by_id, anth_plan)
+            _run_sequential(cfg, mon, by_id, or_plan)
         mon.end_stage()

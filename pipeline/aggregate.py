@@ -36,7 +36,7 @@ from pipeline._experiment import (
 from pipeline._io import read_jsonl
 from pipeline._select import select_prompts
 from pipeline.monitor import RunMonitor, stage_ctx
-from pipeline.run_config import RunConfig
+from pipeline.run_config import RunConfig, family_overlaps
 
 DASHBOARD_SYNC_SCRIPT: Path = ROOT / "scripts" / "dashboard_sync.py"
 
@@ -57,9 +57,9 @@ def _load_all(cfg: RunConfig):
     for key in cfg.candidates:
         responses[key] = {r["id"]: r["response"] for r in read_jsonl(cfg.responses_path(key))}
     grades_by_judge: dict[str, dict[str, dict[str, list[dict]]]] = {}
-    for judge in cfg.judges:
-        grades_by_judge[judge] = {
-            key: {r["id"]: r["verdicts"] for r in read_jsonl(cfg.grades_path(judge, key))}
+    for spec in cfg.judges:
+        grades_by_judge[spec.key] = {
+            key: {r["id"]: r["verdicts"] for r in read_jsonl(cfg.grades_path(spec.key, key))}
             for key in cfg.candidates
         }
     tags = {r["id"]: r["tags"] for r in read_jsonl(cfg.criteria_tags_path)}
@@ -221,9 +221,19 @@ def _build_run_notes(cfg: RunConfig, responses: dict, by_judge: dict, skipped: l
     if len(cfg.judges) > 1:
         notes.append("All judges graded the same candidate responses (single generation pass), "
                      "so judge columns are directly comparable.")
-    notes.append("Judges reason with adaptive thinking over a streamed "
-                 f"{JUDGE_MAX_TOKENS}-token budget; candidate reasoning "
-                 f"{'enabled' if cfg.reasoning else 'disabled'} at temperature {cfg.temperature}.")
+    anth = [s.key for s in cfg.judges if s.client == "anthropic"]
+    orj = [s.key for s in cfg.judges if s.client == "openrouter"]
+    parts = []
+    if anth:
+        parts.append(f"{', '.join(anth)} reason with adaptive thinking (Anthropic)")
+    if orj:
+        parts.append(f"{', '.join(orj)} run with reasoning enabled via OpenRouter")
+    notes.append("; ".join(parts) + f" — streamed {JUDGE_MAX_TOKENS}-token budget; "
+                 f"candidate reasoning {'enabled' if cfg.reasoning else 'disabled'} "
+                 f"at temperature {cfg.temperature}.")
+    for key, fam in family_overlaps(cfg):
+        notes.append(f"⚠ Judge {key} shares the {fam!r} model family with a candidate — "
+                     "self-preference bias possible; verdicts flagged via judge_details.")
     return notes
 
 
@@ -248,8 +258,8 @@ def _failure_analysis_block(cfg: RunConfig, records: list[dict],
     judge_concurrence is joined HERE, post-hoc — never an input to diagnosis
     (spec §4 blinding rule 3)."""
     by_id = {r["id"]: r for r in records}
-    other_judges = [j for j in cfg.judges if j != cfg.judge]
-    second = other_judges[0] if other_judges else None
+    other = [s for s in cfg.judges if s.key != cfg.judge.key]
+    second = other[0].key if other else None
 
     def _concurrence(key: str, rid: str, index: int) -> str:
         if second is None:
@@ -343,7 +353,7 @@ def _failure_analysis_block(cfg: RunConfig, records: list[dict],
            if len(taxonomy_versions_seen) > 1 else {}),
         "taxonomy": taxonomy,
         "diagnose_judge": DIAGNOSE_JUDGE,
-        "verdict_basis": cfg.judge,
+        "verdict_basis": cfg.judge.key,
         "diagnosed_at": datetime.now(timezone.utc).isoformat(),
         "counts": {"failed_criteria": len(rows), "diagnosed": len(rows),
                    "cells": cells},
@@ -385,7 +395,7 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
     records = select_prompts(records, cfg.limit, cfg.sample_seed)
 
     models = list(cfg.candidates.keys())
-    judges = list(cfg.judges)
+    judges = list(cfg.judge_keys)
 
     def _grade_present(rid: str, key: str) -> bool:
         return all(rid in grades_by_judge[j][key] for j in judges)
@@ -413,12 +423,12 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
     # Build a self-contained view per judge over the SAME eligible prompts.
     validation = validation_block(cfg)
     by_judge: dict[str, dict] = {}
-    for judge in judges:
-        j_prompts = [_build_prompt_entry(rec, responses, grades_by_judge[judge], tags, models)
+    for spec in cfg.judges:
+        j_prompts = [_build_prompt_entry(rec, responses, grades_by_judge[spec.key], tags, models)
                      for rec in eligible]
-        by_judge[judge] = {
-            "judge": judge,
-            "judge_details": judge_details_for(judge),
+        by_judge[spec.key] = {
+            "judge": spec.key,
+            "judge_details": judge_details_for(spec, cfg),
             "validation": validation,
             "summary": _summary(j_prompts, models),
             "prompts": j_prompts,
@@ -427,7 +437,7 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
     run_date = datetime.now(timezone.utc).isoformat()
 
     # Default (top-level) view = first judge — back-compat for single-judge readers.
-    default = by_judge[cfg.judge]
+    default = by_judge[cfg.judge.key]
     prompts = default["prompts"]
     summary = default["summary"]
 

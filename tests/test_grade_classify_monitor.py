@@ -4,6 +4,7 @@ import pipeline.grade as grade
 from conftest import make_cfg
 from pipeline._io import write_jsonl
 from pipeline.monitor import RecordingSink, RunMonitor, WorkPlan
+from pipeline.run_config import JudgeSpec
 
 
 def test_grade_emits_events(tmp_path, monkeypatch):
@@ -68,7 +69,8 @@ def test_grade_one_records_refusal_distinctly(monkeypatch):
         return "", "refusal"
     monkeypatch.setattr(grade, "call_json", fake_call_json)
 
-    out = grade._grade_one("claude-fable-5", "prompt", "resp", ["c1", "c2"])
+    out = grade._grade_one(JudgeSpec.from_value("claude-fable-5"),
+                           "prompt", "resp", ["c1", "c2"])
     assert len(out) == 2
     assert all(v["verdict"] == "FAIL" for v in out)
     assert all(v["reason"].startswith("judge_refusal") for v in out)

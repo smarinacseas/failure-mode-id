@@ -28,9 +28,9 @@ def _build_pool(cfg: RunConfig) -> list[dict]:
     records = read_jsonl(DATA_JSONL)
     by_id = {r["id"]: r for r in records}
     pool: list[dict] = []
-    for judge in cfg.judges:
+    for spec in cfg.judges:
         for key in cfg.candidates:
-            grades = read_jsonl(cfg.grades_path(judge, key))
+            grades = read_jsonl(cfg.grades_path(spec.key, key))
             responses = {r["id"]: r["response"] for r in read_jsonl(cfg.responses_path(key))}
             for g in grades:
                 rec = by_id.get(g["id"])
@@ -46,7 +46,7 @@ def _build_pool(cfg: RunConfig) -> list[dict]:
                     if reason.startswith(("judge_parse_error", "judge_truncated", "judge_refusal")):
                         continue
                     pool.append({
-                        "judge": judge,
+                        "judge": spec.key,
                         "model": key,
                         "id": g["id"],
                         "criterion_index": idx,

@@ -419,7 +419,7 @@ def test_failure_analysis_block_joins_concurrence_and_rolls_up(tmp_path, monkeyp
     grades_by_judge = {
         j: {"m1": {g["id"]: g["verdicts"]
                    for g in read_jsonl(cfg.grades_path(j, "m1"))}}
-        for j in cfg.judges
+        for j in cfg.judge_keys
     }
     block = aggregate._failure_analysis_block(cfg, records, grades_by_judge)
     assert block["taxonomy_version"] >= 1
@@ -461,7 +461,7 @@ def test_failure_analysis_concurrence_both_fail(tmp_path, monkeypatch):
     grades_by_judge = {
         j: {"m1": {g["id"]: g["verdicts"]
                    for g in read_jsonl(cfg.grades_path(j, "m1"))}}
-        for j in cfg.judges
+        for j in cfg.judge_keys
     }
     block = aggregate._failure_analysis_block(cfg, records, grades_by_judge)
     assert block["rows"][0]["judge_concurrence"] == "both_fail"
@@ -493,7 +493,7 @@ def test_failure_analysis_concurrence_artifact_fails_are_not_both_fail(tmp_path,
     grades_by_judge = {
         j: {"m1": {g["id"]: g["verdicts"]
                    for g in read_jsonl(cfg.grades_path(j, "m1"))}}
-        for j in cfg.judges
+        for j in cfg.judge_keys
     }
     block = aggregate._failure_analysis_block(cfg, records, grades_by_judge)
     assert block["rows"][0]["judge_concurrence"] == "no_second_judge"

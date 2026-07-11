@@ -86,7 +86,7 @@ def test_connectivity_reports_failures_and_exits(monkeypatch):
 def test_connectivity_pings_cfg_models(monkeypatch):
     pinged = []
     monkeypatch.setattr(connectivity, "_ping_candidate", lambda k, mid: pinged.append(("c", k, mid)) or "ok")
-    monkeypatch.setattr(connectivity, "_ping_judge", lambda judge: pinged.append(("j", judge)) or "ok")
+    monkeypatch.setattr(connectivity, "_ping_judge", lambda spec: pinged.append(("j", spec.key)) or "ok")
     cfg = make_cfg(candidates={"x": "prov/x"}, judges=("claude-fable-5",))
     m = RunMonitor(WorkPlan.for_step("connectivity", 0, 1), sinks=[RecordingSink()])
     with m:

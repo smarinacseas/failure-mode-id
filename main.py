@@ -65,11 +65,16 @@ def _parser() -> argparse.ArgumentParser:
                    help="Comma list: registry keys and/or key=provider/model-id pairs "
                         "(frozen; default: full registry).")
     p.add_argument("--judge", default=None,
-                   help="Single Anthropic judge model id (frozen). Shorthand for --judges with one entry.")
+                   help="Single judge (frozen): a registry key, a key=provider/model-id "
+                        "pair, or a bare claude-* id. Shorthand for --judges with one entry.")
     p.add_argument("--judges", default=None,
-                   help="Comma list of Anthropic judge model ids (frozen; default "
-                        "claude-opus-4-8,claude-fable-5). Each grades the same responses; "
-                        "the dashboard toggles between them.")
+                   help="Comma list of judges (frozen; default: full registry). Entries are "
+                        "registry keys, key=provider/model-id pairs, or bare claude-* ids. "
+                        "Each grades the same responses; the dashboard toggles between them.")
+    p.add_argument("--classifier", default=None,
+                   help="Criterion-classifier fallback chain (frozen): comma list in "
+                        "--judges syntax, walked per prompt (refusal/failed members "
+                        "fall through). Default: the first judge.")
     p.add_argument("--sample-seed", type=int, default=None, dest="sample_seed",
                    help="Seeded stratified sampling (frozen): pick --limit prompts "
                         "spread across use cases / instruction types / prompt styles "
@@ -120,9 +125,11 @@ def _overrides(args: argparse.Namespace) -> dict:
     if args.candidates is not None:
         out["candidates"] = parse_candidates(args.candidates)
     if args.judges is not None:
-        out["judges"] = tuple(js.key for js in parse_judges(args.judges))
+        out["judges"] = parse_judges(args.judges)
     elif args.judge is not None:
-        out["judges"] = (resolve_judge(args.judge).key,)
+        out["judges"] = (resolve_judge(args.judge),)
+    if args.classifier is not None:
+        out["classifier_chain"] = parse_judges(args.classifier)
     if args.description is not None:
         out["description"] = args.description
     if args.provider_sort is not None:
