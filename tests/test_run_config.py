@@ -214,6 +214,29 @@ def test_refreezing_same_judges_not_a_conflict(tmp_path, monkeypatch):
         resolve("E97-panel", {"judges": parse_judges("claude-fable-5")})
 
 
+def test_legacy_string_freeze_repass_identical_judges_not_a_conflict(tmp_path, monkeypatch):
+    """A pre-panel experiment.json stores judges as plain strings. Re-passing
+    the IDENTICAL panel as parsed JudgeSpecs must hydrate-and-match, never
+    false-positive the frozen-conflict guard; a genuinely different panel
+    must still conflict."""
+    monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
+    resolve("E96-legacy", {"limit": 1,
+                           "judges": parse_judges("claude-opus-4-8,claude-fable-5")})
+    # Rewrite the freeze into the legacy shape: list-of-strings judges,
+    # no classifier_chain key at all.
+    path = tmp_path / "E96-legacy" / "experiment.json"
+    doc = json.loads(path.read_text())
+    doc["params"]["judges"] = ["claude-opus-4-8", "claude-fable-5"]
+    del doc["params"]["classifier_chain"]
+    path.write_text(json.dumps(doc))
+
+    cfg = resolve("E96-legacy",
+                  {"judges": parse_judges("claude-opus-4-8,claude-fable-5")})  # must NOT raise
+    assert cfg.judges == parse_judges("claude-opus-4-8,claude-fable-5")
+    with pytest.raises(ConfigConflictError):
+        resolve("E96-legacy", {"judges": parse_judges("claude-fable-5")})
+
+
 def test_family_overlap_detection():
     cfg = _cfg(candidates={"qwen-9b": "qwen/qwen3.5-9b"},
                judges=("claude-fable-5", {"key": "qwen-judge", "client": "openrouter",

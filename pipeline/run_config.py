@@ -371,9 +371,20 @@ def resolve(slug: str, overrides: dict) -> RunConfig:
                 return [_norm(i) for i in x]
             return x
 
+        def _norm_param(key, x):
+            # Judge params need FIELD-AWARE normalization: a legacy freeze
+            # stores judges as plain strings while overrides carry JudgeSpecs —
+            # hydrating each element through from_value().to_dict() makes
+            # str/dict/spec forms of the SAME judge compare equal. Only judge
+            # fields get this — candidates dict values are plain strings that
+            # must never be reinterpreted as judge entries.
+            if key in ("judges", "classifier_chain") and isinstance(x, (list, tuple)):
+                return [JudgeSpec.from_value(el).to_dict() for el in x]
+            return _norm(x)
+
         diffs = {
             k: (frozen[k], v) for k, v in overrides.items()
-            if k in frozen and _norm(frozen[k]) != _norm(v)
+            if k in frozen and _norm_param(k, frozen[k]) != _norm_param(k, v)
         }
         if diffs:
             lines = "\n".join(
