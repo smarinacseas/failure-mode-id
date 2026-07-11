@@ -1,5 +1,5 @@
 {
-  "schema_version": "3.1",
+  "schema_version": "3.2",
   "meta": {
     "experiment": {
       "slug": "E06-temp06-3p",
@@ -7,7 +7,7 @@
       "label": "temp06-3p",
       "description": "Temp-only ablation of E03: same 3 prompts, reasoning off, temperature 0.6, default routing. De-confounds E04's headline — three-way compare E03 (greedy) vs E06 (temp effect) vs E04 (temp+reasoning).",
       "run_report": "",
-      "run_date": "2026-07-09T04:18:09.691487+00:00"
+      "run_date": "2026-07-10T21:07:27.046794+00:00"
     },
     "dataset": {
       "name": "Complex Constraints Benchmark Set",
@@ -83,8 +83,8 @@
       "sample_seed": null,
       "judge_mode": "batch",
       "generation_workers": 4,
-      "generation_deadline_s": 2030.0,
-      "generation_deadline_basis": "2 x p99 (nearest-rank) of 69 frozen-treatment generation calls from E04/E05 logs (p99=1014.6s, qwen-9b/CIF-024), floor 900s -> 2030s",
+      "generation_deadline_s": 2700.0,
+      "generation_deadline_basis": "2 x p99 (nearest-rank) of 69 frozen-treatment generation calls from E04/E05 logs (p99=1014.6s, qwen-9b/CIF-024), floor 900s -> 2030s; scaled by 64k/48k token budget and rounded -> 2700s (2026-07-08)",
       "judge_max_tokens": 32000,
       "judge_prompt_sha256_12": "c3ed3a2cefcb",
       "classifier_prompt_sha256_12": "88d130c223aa",
@@ -93,8 +93,8 @@
       "validate_response_excerpt_chars": 800
     },
     "git": {
-      "commit": "ce27604",
-      "dirty": null
+      "commit": "faef440",
+      "dirty": true
     },
     "validation": {
       "status": "sampled",
@@ -103,7 +103,7 @@
       "agreement_pct": null,
       "scored_at": null
     },
-    "run_date": "2026-07-09T04:18:09.691487+00:00",
+    "run_date": "2026-07-10T21:07:27.046794+00:00",
     "max_tokens": 8000,
     "reasoning_enabled": false,
     "run_notes": [
@@ -4954,7 +4954,7 @@
     ],
     "diagnose_judge": "claude-opus-4-8",
     "verdict_basis": "claude-opus-4-8",
-    "diagnosed_at": "2026-07-09T04:18:09.727965+00:00",
+    "diagnosed_at": "2026-07-10T21:07:27.077404+00:00",
     "counts": {
       "failed_criteria": 72,
       "diagnosed": 72,
@@ -5932,5 +5932,107 @@
       ],
       "iteration_note": "Early and unstable on the iterate-vs-train curve. Despite two experiments, no two runs share a config and the top cause has changed each time, so the Pareto is not yet established — intervention_ready is premature. The immediate need is one adequately-powered, frozen-config run before this program can converge."
     }
+  },
+  "decode_health": {
+    "detector": {
+      "window": 4000,
+      "ngram": 40,
+      "min_repeats": 20
+    },
+    "verdict_note": "any repetition loop counts as a failure (user ruling 2026-07-09), including loops the model escaped before finishing",
+    "by_model": {
+      "qwen-9b": {
+        "n_responses": 3,
+        "n_loop_reasoning": 0,
+        "n_loop_content": 0,
+        "n_loop_any": 0,
+        "n_loop_escaped": 0,
+        "n_loop_died": 0,
+        "n_nonstop_finish": 0,
+        "rejected_attempts": {
+          "n_captured": 0,
+          "n_looping": 0
+        }
+      },
+      "qwen-35b": {
+        "n_responses": 3,
+        "n_loop_reasoning": 0,
+        "n_loop_content": 0,
+        "n_loop_any": 0,
+        "n_loop_escaped": 0,
+        "n_loop_died": 0,
+        "n_nonstop_finish": 2,
+        "rejected_attempts": {
+          "n_captured": 0,
+          "n_looping": 0
+        }
+      },
+      "qwen-397b": {
+        "n_responses": 3,
+        "n_loop_reasoning": 0,
+        "n_loop_content": 0,
+        "n_loop_any": 0,
+        "n_loop_escaped": 0,
+        "n_loop_died": 0,
+        "n_nonstop_finish": 1,
+        "rejected_attempts": {
+          "n_captured": 0,
+          "n_looping": 0
+        }
+      }
+    },
+    "rows": [
+      {
+        "model": "qwen-35b",
+        "id": "CIF-001",
+        "finish_reason": "length",
+        "reasoning_chars": 0,
+        "content_chars": 22540,
+        "reasoning_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        },
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        }
+      },
+      {
+        "model": "qwen-35b",
+        "id": "CIF-002",
+        "finish_reason": "length",
+        "reasoning_chars": 0,
+        "content_chars": 26701,
+        "reasoning_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        },
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        }
+      },
+      {
+        "model": "qwen-397b",
+        "id": "CIF-001",
+        "finish_reason": "length",
+        "reasoning_chars": 0,
+        "content_chars": 20330,
+        "reasoning_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        },
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        }
+      }
+    ]
   }
 }

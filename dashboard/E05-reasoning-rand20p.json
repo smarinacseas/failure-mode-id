@@ -1,13 +1,13 @@
 {
-  "schema_version": "3.1",
+  "schema_version": "3.2",
   "meta": {
     "experiment": {
       "slug": "E05-reasoning-rand20p",
       "number": 5,
       "label": "reasoning-rand20p",
       "description": "Randomized-sample scale-up of E04: identical reasoning-on treatment (temp 0.6, 48k shared thinking+answer budget, throughput-sorted routing, dual judges Opus 4.8 + Fable 5) on 20 prompts drawn by seeded stratified sampling (seed 20260706) — all 7 use cases, all 4 instruction types, all 3 prompt styles represented.",
-      "run_report": "meta/2026-07-06-reasoning-rand20p.md",
-      "run_date": "2026-07-07T20:37:47.936985+00:00"
+      "run_report": "",
+      "run_date": "2026-07-10T21:07:26.102342+00:00"
     },
     "dataset": {
       "name": "Complex Constraints Benchmark Set",
@@ -93,8 +93,8 @@
       "sample_seed": 20260706,
       "judge_mode": "batch",
       "generation_workers": 4,
-      "generation_deadline_s": 2030.0,
-      "generation_deadline_basis": "2 x p99 (nearest-rank) of 69 frozen-treatment generation calls from E04/E05 logs (p99=1014.6s, qwen-9b/CIF-024), floor 900s -> 2030s",
+      "generation_deadline_s": 2700.0,
+      "generation_deadline_basis": "2 x p99 (nearest-rank) of 69 frozen-treatment generation calls from E04/E05 logs (p99=1014.6s, qwen-9b/CIF-024), floor 900s -> 2030s; scaled by 64k/48k token budget and rounded -> 2700s (2026-07-08)",
       "judge_max_tokens": 32000,
       "judge_prompt_sha256_12": "c3ed3a2cefcb",
       "classifier_prompt_sha256_12": "88d130c223aa",
@@ -103,7 +103,7 @@
       "validate_response_excerpt_chars": 800
     },
     "git": {
-      "commit": "edbb746",
+      "commit": "faef440",
       "dirty": true
     },
     "validation": {
@@ -113,7 +113,7 @@
       "agreement_pct": null,
       "scored_at": null
     },
-    "run_date": "2026-07-07T20:37:47.936985+00:00",
+    "run_date": "2026-07-10T21:07:26.102342+00:00",
     "max_tokens": 48000,
     "reasoning_enabled": true,
     "run_notes": [
@@ -26940,7 +26940,7 @@
     ],
     "diagnose_judge": "claude-opus-4-8",
     "verdict_basis": "claude-opus-4-8",
-    "diagnosed_at": "2026-07-07T20:37:47.962898+00:00",
+    "diagnosed_at": "2026-07-10T21:07:26.141662+00:00",
     "counts": {
       "failed_criteria": 219,
       "diagnosed": 219,
@@ -29794,5 +29794,243 @@
       ],
       "iteration_note": "Early-to-mid iteration, NOT ready to train: the Pareto is not yet stable (top cause flipped between the last two runs) and the dominant labels remain unvalidated. One adequately-sized replication plus a judge-agreement pass should be enough to lock the ordering; intervention_ready is the likely next step only if E06 confirms E05's ranking."
     }
+  },
+  "decode_health": {
+    "detector": {
+      "window": 4000,
+      "ngram": 40,
+      "min_repeats": 20
+    },
+    "verdict_note": "any repetition loop counts as a failure (user ruling 2026-07-09), including loops the model escaped before finishing",
+    "by_model": {
+      "qwen-9b": {
+        "n_responses": 20,
+        "n_loop_reasoning": 5,
+        "n_loop_content": 1,
+        "n_loop_any": 5,
+        "n_loop_escaped": 5,
+        "n_loop_died": 0,
+        "n_nonstop_finish": 1,
+        "rejected_attempts": {
+          "n_captured": 0,
+          "n_looping": 0
+        }
+      },
+      "qwen-35b": {
+        "n_responses": 20,
+        "n_loop_reasoning": 4,
+        "n_loop_content": 0,
+        "n_loop_any": 4,
+        "n_loop_escaped": 4,
+        "n_loop_died": 0,
+        "n_nonstop_finish": 0,
+        "rejected_attempts": {
+          "n_captured": 0,
+          "n_looping": 0
+        }
+      },
+      "qwen-397b": {
+        "n_responses": 20,
+        "n_loop_reasoning": 0,
+        "n_loop_content": 1,
+        "n_loop_any": 1,
+        "n_loop_escaped": 1,
+        "n_loop_died": 0,
+        "n_nonstop_finish": 0,
+        "rejected_attempts": {
+          "n_captured": 0,
+          "n_looping": 0
+        }
+      }
+    },
+    "rows": [
+      {
+        "model": "qwen-9b",
+        "id": "CIF-010",
+        "finish_reason": "stop",
+        "reasoning_chars": 46152,
+        "content_chars": 3894,
+        "reasoning_loop": {
+          "looping": true,
+          "period": 154,
+          "onset": 28340
+        },
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        }
+      },
+      {
+        "model": "qwen-9b",
+        "id": "CIF-012",
+        "finish_reason": "length",
+        "reasoning_chars": 35806,
+        "content_chars": 87676,
+        "reasoning_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        },
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        }
+      },
+      {
+        "model": "qwen-9b",
+        "id": "CIF-021",
+        "finish_reason": "stop",
+        "reasoning_chars": 40782,
+        "content_chars": 2641,
+        "reasoning_loop": {
+          "looping": true,
+          "period": 147,
+          "onset": 13982
+        },
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        }
+      },
+      {
+        "model": "qwen-9b",
+        "id": "CIF-023",
+        "finish_reason": "stop",
+        "reasoning_chars": 49867,
+        "content_chars": 17291,
+        "reasoning_loop": {
+          "looping": true,
+          "period": 248,
+          "onset": 22979
+        },
+        "content_loop": {
+          "looping": true,
+          "period": 162,
+          "onset": 4474
+        }
+      },
+      {
+        "model": "qwen-9b",
+        "id": "CIF-032",
+        "finish_reason": "stop",
+        "reasoning_chars": 42338,
+        "content_chars": 2220,
+        "reasoning_loop": {
+          "looping": true,
+          "period": 77,
+          "onset": 33136
+        },
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        }
+      },
+      {
+        "model": "qwen-9b",
+        "id": "CIF-070",
+        "finish_reason": "stop",
+        "reasoning_chars": 54577,
+        "content_chars": 1669,
+        "reasoning_loop": {
+          "looping": true,
+          "period": 129,
+          "onset": 34737
+        },
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        }
+      },
+      {
+        "model": "qwen-35b",
+        "id": "CIF-015",
+        "finish_reason": "stop",
+        "reasoning_chars": 47215,
+        "content_chars": 539,
+        "reasoning_loop": {
+          "looping": true,
+          "period": 100,
+          "onset": 37419
+        },
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        }
+      },
+      {
+        "model": "qwen-35b",
+        "id": "CIF-018",
+        "finish_reason": "stop",
+        "reasoning_chars": 83522,
+        "content_chars": 5813,
+        "reasoning_loop": {
+          "looping": true,
+          "period": 119,
+          "onset": 53003
+        },
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        }
+      },
+      {
+        "model": "qwen-35b",
+        "id": "CIF-031",
+        "finish_reason": "stop",
+        "reasoning_chars": 58284,
+        "content_chars": 12800,
+        "reasoning_loop": {
+          "looping": true,
+          "period": 151,
+          "onset": 23699
+        },
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        }
+      },
+      {
+        "model": "qwen-35b",
+        "id": "CIF-058",
+        "finish_reason": "stop",
+        "reasoning_chars": 63691,
+        "content_chars": 283,
+        "reasoning_loop": {
+          "looping": true,
+          "period": 50,
+          "onset": 60696
+        },
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        }
+      },
+      {
+        "model": "qwen-397b",
+        "id": "CIF-058",
+        "finish_reason": "stop",
+        "reasoning_chars": 42616,
+        "content_chars": 347,
+        "reasoning_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        },
+        "content_loop": {
+          "looping": true,
+          "period": 1,
+          "onset": 143
+        }
+      }
+    ]
   }
 }

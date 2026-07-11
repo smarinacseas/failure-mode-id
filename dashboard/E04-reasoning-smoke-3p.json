@@ -1,13 +1,13 @@
 {
-  "schema_version": "3.1",
+  "schema_version": "3.2",
   "meta": {
     "experiment": {
       "slug": "E04-reasoning-smoke-3p",
       "number": 4,
       "label": "reasoning-smoke-3p",
       "description": "Reasoning-on ablation of E03: same 3 prompts, Qwen candidates think before answering. temp 0.6 per Qwen thinking-mode guidance (greedy+thinking loops endlessly); 48k shared thinking+answer budget after two 32k cap-outs; provider sort=throughput (default routing drew ~20 tok/s providers → 25-min calls); dual judges (Opus 4.8 + Fable 5).",
-      "run_report": "meta/2026-07-03-reasoning-smoke.md",
-      "run_date": "2026-07-07T18:18:31.282260+00:00"
+      "run_report": "",
+      "run_date": "2026-07-10T21:07:25.159141+00:00"
     },
     "dataset": {
       "name": "Complex Constraints Benchmark Set",
@@ -86,8 +86,8 @@
       "sample_seed": null,
       "judge_mode": "batch",
       "generation_workers": 4,
-      "generation_deadline_s": 2030.0,
-      "generation_deadline_basis": "2 x p99 (nearest-rank) of 69 frozen-treatment generation calls from E04/E05 logs (p99=1014.6s, qwen-9b/CIF-024), floor 900s -> 2030s",
+      "generation_deadline_s": 2700.0,
+      "generation_deadline_basis": "2 x p99 (nearest-rank) of 69 frozen-treatment generation calls from E04/E05 logs (p99=1014.6s, qwen-9b/CIF-024), floor 900s -> 2030s; scaled by 64k/48k token budget and rounded -> 2700s (2026-07-08)",
       "judge_max_tokens": 32000,
       "judge_prompt_sha256_12": "c3ed3a2cefcb",
       "classifier_prompt_sha256_12": "88d130c223aa",
@@ -96,7 +96,7 @@
       "validate_response_excerpt_chars": 800
     },
     "git": {
-      "commit": "e1810f2",
+      "commit": "faef440",
       "dirty": true
     },
     "validation": {
@@ -106,7 +106,7 @@
       "agreement_pct": null,
       "scored_at": null
     },
-    "run_date": "2026-07-07T18:18:31.282260+00:00",
+    "run_date": "2026-07-10T21:07:25.159141+00:00",
     "max_tokens": 48000,
     "reasoning_enabled": true,
     "run_notes": [
@@ -4963,7 +4963,7 @@
     ],
     "diagnose_judge": "claude-opus-4-8",
     "verdict_basis": "claude-opus-4-8",
-    "diagnosed_at": "2026-07-07T18:18:31.308599+00:00",
+    "diagnosed_at": "2026-07-10T21:07:25.197953+00:00",
     "counts": {
       "failed_criteria": 33,
       "diagnosed": 33,
@@ -5475,5 +5475,55 @@
       ],
       "iteration_note": "Early on the iterate-vs-train curve, not near exit. The top-2 causes are directionally stable, but every run so far is n=3 with a null seed and E04 changed two config axes at once — the Pareto is plausible but neither reproducible nor judge-validated. Do one clean high-n, single-variable run plus judge validation before considering intervention_ready."
     }
+  },
+  "decode_health": {
+    "detector": {
+      "window": 4000,
+      "ngram": 40,
+      "min_repeats": 20
+    },
+    "verdict_note": "any repetition loop counts as a failure (user ruling 2026-07-09), including loops the model escaped before finishing",
+    "by_model": {
+      "qwen-9b": {
+        "n_responses": 3,
+        "n_loop_reasoning": 0,
+        "n_loop_content": 0,
+        "n_loop_any": 0,
+        "n_loop_escaped": 0,
+        "n_loop_died": 0,
+        "n_nonstop_finish": 0,
+        "rejected_attempts": {
+          "n_captured": 0,
+          "n_looping": 0
+        }
+      },
+      "qwen-35b": {
+        "n_responses": 3,
+        "n_loop_reasoning": 0,
+        "n_loop_content": 0,
+        "n_loop_any": 0,
+        "n_loop_escaped": 0,
+        "n_loop_died": 0,
+        "n_nonstop_finish": 0,
+        "rejected_attempts": {
+          "n_captured": 0,
+          "n_looping": 0
+        }
+      },
+      "qwen-397b": {
+        "n_responses": 3,
+        "n_loop_reasoning": 0,
+        "n_loop_content": 0,
+        "n_loop_any": 0,
+        "n_loop_escaped": 0,
+        "n_loop_died": 0,
+        "n_nonstop_finish": 0,
+        "rejected_attempts": {
+          "n_captured": 0,
+          "n_looping": 0
+        }
+      }
+    },
+    "rows": []
   }
 }
