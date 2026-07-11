@@ -12,7 +12,37 @@ automatically for tagged runs.
 The compact registry at `outputs/experiments/index.json` is a legacy /
 back-compat index for consumers other than the dashboard.
 
-Current schema version: **`3.2`**.
+Current schema version: **`3.3`**.
+
+### Changes in `3.3` (judge panel via OpenRouter)
+
+- `by_judge` is keyed by judge **key** (path-safe handle; equals the model id
+  for all pre-3.3 runs). `judge_details` per judge grew to
+  `{id, model_id, provider, transport, reasoning, family, family_overlap,
+  family_stake_note}`.
+- New top-level `panel` block when the run has ≥ 2 judges:
+  `{judges, summary, prompts, agreement}`. Panel `prompts` entries carry
+  consensus verdicts; each criterion's `results[model]` is
+  `{pass, reason, votes: {pass, fail, abstain}}`. Artifact FAILs
+  (judge_refusal / judge_parse_error / judge_truncated /
+  missing_in_judge_output) abstain; `loop_failure` FAILs vote. Quorum
+  min(2, n_judges); ties → FAIL `panel_tie`; below quorum → FAIL
+  `panel_no_quorum`.
+- `panel.agreement`: pairwise percent-agreement matrix, `fleiss_kappa`
+  (variable-rater generalization over cells with ≥ 2 votes), per-judge
+  `with_consensus` agreement, per-judge `abstentions`.
+- Top-level `summary`/`prompts` mirror the **panel** when ≥ 2 judges
+  (single-judge runs keep the first-judge view). New `meta.verdict_basis`
+  records which (`"panel"` or a judge key). NOTE: re-aggregating an old
+  2-judge freeze switches its default view to a 2-member panel where any
+  disagreement is a tie → FAIL (strict both-must-pass); `panel_tie` reasons
+  make the shift auditable.
+- `meta.config` adds `classifier_chain` (judge keys), `judge_workers`,
+  `judge_deadline_s`. `criteria_tags.jsonl` records add `model` (which
+  chain member classified). Diagnosis records add `analyst`;
+  `failure_analysis.diagnose_judge` is now the first entry of
+  `failure_analysis.diagnose_chain`, and `judge_concurrence` generalizes
+  from second-judge strings to a `{pass, fail, abstain}` vote split.
 
 ### Changes in `3.2` (additive)
 

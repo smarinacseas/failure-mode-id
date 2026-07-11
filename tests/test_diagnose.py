@@ -424,7 +424,11 @@ def test_failure_analysis_block_joins_concurrence_and_rolls_up(tmp_path, monkeyp
     block = aggregate._failure_analysis_block(cfg, records, grades_by_judge)
     assert block["taxonomy_version"] >= 1
     assert block["diagnose_judge"] == config.DIAGNOSE_JUDGE
-    assert block["verdict_basis"] == OPUS
+    # Schema 3.3: verdict_basis is a label — "panel" once >=2 judges are
+    # configured (this fixture's _cfg_opus() panel is Opus + Fable), even
+    # though the block's row-selection still targets cfg.judge alone here
+    # (panel-consensus targeting is Task 9).
+    assert block["verdict_basis"] == "panel"
     assert block["counts"] == {"failed_criteria": 1, "diagnosed": 1, "cells": 1}
     (row,) = block["rows"]
     assert row["id"] == "p1" and row["model"] == "m1" and row["criterion_index"] == 2

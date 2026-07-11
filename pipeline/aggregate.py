@@ -24,6 +24,7 @@ from pathlib import Path
 
 from config import DATA_JSONL, DIAGNOSE_JUDGE, JUDGE_MAX_TOKENS, RESULTS_PATH, ROOT
 from pipeline import _taxonomy
+from pipeline._consensus import agreement_stats, consensus_verdict, vote_of
 from pipeline._decode_health import decode_health_block
 from pipeline._experiment import (
     SCHEMA_VERSION,
@@ -108,6 +109,56 @@ def _build_prompt_entry(rec: dict, responses: dict, grades: dict, tags: dict, mo
         "responses": responses_per_model,
         "criteria_passed": criteria_passed,
         "full_pass": full_pass,
+        "criteria": criteria_list,
+    }
+
+
+def _build_panel_prompt_entry(rec: dict, responses: dict, grades_by_judge: dict,
+                              tags: dict, models: list[str], judges: list[str],
+                              cells_out: list[dict]) -> dict:
+    """Same shape as _build_prompt_entry, but results[model] carries the
+    consensus verdict + vote split. Appends one judge->vote map per
+    (criterion, model) to cells_out for the agreement stats.
+
+    `judges` must be iterated in cfg.judges order (the caller's list, built
+    from cfg.judge_keys) — consensus_verdict's reason-tie-break depends on a
+    stably-ordered per_judge dict (Task 6)."""
+    criteria_texts = rec["criteria"]
+    n = len(criteria_texts)
+    tag_by_idx = {t["index"]: t for t in tags[rec["id"]]}
+    criteria_list: list[dict] = []
+    for i, ctext in enumerate(criteria_texts, start=1):
+        tag = tag_by_idx.get(i, {"verifiability": "judge", "gameable": False, "reward_hack": ""})
+        per_model: dict[str, dict] = {}
+        for key in models:
+            per_judge: dict[str, dict] = {}
+            for j in judges:
+                verdicts = grades_by_judge[j].get(key, {}).get(rec["id"])
+                if verdicts is None:
+                    continue                      # missing record = abstain
+                v = next((x for x in verdicts if x.get("index") == i), None)
+                if v is not None:
+                    per_judge[j] = v
+            cv = consensus_verdict(per_judge, len(judges))
+            cells_out.append({j: vote_of(v) for j, v in per_judge.items()})
+            per_model[key] = {"pass": cv["verdict"] == "PASS",
+                              "reason": cv["reason"], "votes": cv["votes"]}
+        criteria_list.append({
+            "text": ctext, "verifiability": tag["verifiability"],
+            "gameable": tag["gameable"], "reward_hack": tag.get("reward_hack", ""),
+            "results": per_model,
+        })
+    responses_per_model = {key: responses[key][rec["id"]] for key in models}
+    criteria_passed, full_pass = {}, {}
+    for key in models:
+        passed = sum(1 for c in criteria_list if c["results"][key]["pass"])
+        criteria_passed[key] = f"{passed}/{n}"
+        full_pass[key] = passed == n
+    return {
+        "id": rec["id"], "use_case": rec["use_case"],
+        "instruction_type": rec["instruction_type"], "prompt_style": rec["prompt_style"],
+        "prompt_text": rec["prompt"], "responses": responses_per_model,
+        "criteria_passed": criteria_passed, "full_pass": full_pass,
         "criteria": criteria_list,
     }
 
@@ -353,7 +404,10 @@ def _failure_analysis_block(cfg: RunConfig, records: list[dict],
            if len(taxonomy_versions_seen) > 1 else {}),
         "taxonomy": taxonomy,
         "diagnose_judge": DIAGNOSE_JUDGE,
-        "verdict_basis": cfg.judge.key,
+        # Label only, for now — its selection semantics (which verdict a
+        # diagnosed FAIL is diagnosing) still target cfg.judge alone; the
+        # panel-consensus target change is Task 9.
+        "verdict_basis": "panel" if len(cfg.judges) >= 2 else cfg.judge.key,
         "diagnosed_at": datetime.now(timezone.utc).isoformat(),
         "counts": {"failed_criteria": len(rows), "diagnosed": len(rows),
                    "cells": cells},
@@ -436,13 +490,34 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
 
     run_date = datetime.now(timezone.utc).isoformat()
 
-    # Default (top-level) view = first judge — back-compat for single-judge readers.
-    default = by_judge[cfg.judge.key]
+    # Panel block (schema 3.3): consensus verdicts + agreement stats over the
+    # SAME eligible prompts, present only when there's more than one judge to
+    # form a panel out of. A single judge has no panel to disagree with, so
+    # it stays the sole default view (byte-identical pre-panel behavior).
+    panel = None
+    if len(judges) >= 2:
+        cells: list[dict] = []
+        p_prompts = [_build_panel_prompt_entry(rec, responses, grades_by_judge, tags,
+                                               models, judges, cells)
+                     for rec in eligible]
+        panel = {
+            "judges": judges,
+            "summary": _summary(p_prompts, models),
+            "prompts": p_prompts,
+            "agreement": agreement_stats(cells, judges),
+        }
+
+    # Default (top-level) view: the panel when one exists (>=2 judges), else
+    # the first judge — back-compat for single-judge readers.
+    default = panel if panel is not None else by_judge[cfg.judge.key]
     prompts = default["prompts"]
     summary = default["summary"]
 
     meta = build_meta(cfg, run_report, run_date, prompts)
     meta["run_notes"] = _build_run_notes(cfg, responses, by_judge, skipped)
+    # Set BEFORE meta is handed to update_index/_merge_manifest below so the
+    # dashboard index and run manifest are built from the same, complete meta.
+    meta["verdict_basis"] = "panel" if panel is not None else cfg.judge.key
     failure_analysis = _failure_analysis_block(cfg, eligible, grades_by_judge)
     results = {
         "schema_version": SCHEMA_VERSION,
@@ -451,6 +526,8 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
         "prompts": prompts,
         "by_judge": by_judge,
     }
+    if panel is not None:
+        results["panel"] = panel
     if failure_analysis is not None:
         results["failure_analysis"] = failure_analysis
         mon.note(f"aggregate: failure_analysis — {failure_analysis['counts']['diagnosed']} "
