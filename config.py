@@ -114,6 +114,23 @@ GENERATION_DEADLINE_BASIS: str = (
 # streamed, so this can exceed the ~16k non-streaming SDK timeout guard.
 JUDGE_MAX_TOKENS: int = 32000
 
+# OpenRouter judge calls: streamed worker pool (Anthropic judges use Message
+# Batches / sequential per the frozen judge_mode; OpenRouter has no batch API).
+# Concurrency is transport, not treatment — not frozen (like GENERATION_WORKERS).
+JUDGE_WORKERS: int = 4
+
+# Hard wall-clock deadline for ONE OpenRouter judge call — same failure surface
+# as candidate generation (half-open sockets, slow trickle; see
+# GENERATION_DEADLINE_S). No observed p99 yet, so the basis is the token budget:
+# JUDGE_MAX_TOKENS (32k) at the worst-case ~24 tok/s the generation deadline
+# implies ≈ 1333 s → 1350 s. Revise from observed judge-call durations.
+JUDGE_DEADLINE_S: float = 1350.0
+JUDGE_DEADLINE_BASIS: str = (
+    "JUDGE_MAX_TOKENS (32k) at worst-case ~24 tok/s (the GENERATION_DEADLINE_S "
+    "basis rate) ≈ 1333 s, rounded to 1350 s (2026-07-11); no observed judge "
+    "p99 yet — revise from data"
+)
+
 # Diagnose stage (failure root-cause analysis; spec 2026-07-06). Opus-solo:
 # Fable demonstrably refuses on CIF-006-class content, which would leave
 # exactly the interesting cells undiagnosable. NOT a frozen param — diagnosis
