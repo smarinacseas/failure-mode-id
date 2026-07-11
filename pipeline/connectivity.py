@@ -14,9 +14,15 @@ from pipeline.monitor import RunMonitor, build_monitor
 from pipeline.run_config import RunConfig
 
 
+# OpenAI-family providers enforce a >=16 floor on max output tokens (observed
+# on openai/gpt-5.2 via OpenRouter, 2026-07-11); 16 keeps the ping tiny for
+# every provider.
+_PING_MAX_TOKENS = 16
+
+
 def _ping_candidate(key: str, model_id: str) -> str:
     resp = router.chat.completions.create(
-        model=model_id, temperature=0, max_tokens=4,
+        model=model_id, temperature=0, max_tokens=_PING_MAX_TOKENS,
         messages=[{"role": "user", "content": "Say 'ok'."}],
     )
     return (resp.choices[0].message.content or "").strip()
@@ -25,12 +31,12 @@ def _ping_candidate(key: str, model_id: str) -> str:
 def _ping_judge(spec) -> str:
     if spec.client == "openrouter":
         resp = router.chat.completions.create(
-            model=spec.model, max_tokens=4,
+            model=spec.model, max_tokens=_PING_MAX_TOKENS,
             messages=[{"role": "user", "content": "Say 'ok'."}],
         )
         return (resp.choices[0].message.content or "").strip()
     resp = anthropic.messages.create(
-        model=spec.model, max_tokens=4,
+        model=spec.model, max_tokens=_PING_MAX_TOKENS,
         messages=[{"role": "user", "content": "Say 'ok'."}],
     )
     return "".join(b.text for b in resp.content if hasattr(b, "text")).strip()
