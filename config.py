@@ -131,11 +131,12 @@ JUDGE_DEADLINE_BASIS: str = (
     "p99 yet — revise from data"
 )
 
-# Diagnose stage (failure root-cause analysis; spec 2026-07-06). Opus-solo:
-# Fable demonstrably refuses on CIF-006-class content, which would leave
-# exactly the interesting cells undiagnosable. NOT a frozen param — diagnosis
-# is post-hoc, re-runnable measurement.
-DIAGNOSE_JUDGE: str = "claude-opus-4-8"
+# Diagnose fallback chain (spec 2026-07-09 §4). Fable is the preferred analyst
+# but demonstrably refuses on CIF-006-class content; per-item fallback to Opus
+# means the preferred model does the work and degrades per CELL, not per stage
+# (pre-panel this forced Opus-solo for everything). NOT frozen — diagnosis is
+# post-hoc, re-runnable measurement. Entries are judge registry keys.
+DIAGNOSE_CHAIN: tuple[str, ...] = ("claude-fable-5", "claude-opus-4-8")
 DIAGNOSE_MAX_TOKENS: int = 32000
 # Head+tail clip threshold for response/trace fields in the analyst payload
 # (the E05 qwen-9b × CIF-012 runaway answer was 87.7k chars).

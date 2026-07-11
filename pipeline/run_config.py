@@ -204,7 +204,8 @@ class RunConfig:
 
     def diagnosis_path(self, key: str) -> Path:
         """Root-cause diagnoses per candidate: diagnosis/<candidate>.jsonl.
-        Single analyst model (config.DIAGNOSE_JUDGE), so no judge subdir."""
+        No judge subdir — the analyst chain (config.DIAGNOSE_CHAIN) degrades per
+        cell, so each record stamps the `analyst` that produced it instead."""
         return self.run_dir / "diagnosis" / f"{key}.jsonl"
 
     @property

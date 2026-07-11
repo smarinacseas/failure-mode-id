@@ -320,8 +320,10 @@ Absent key means the diagnose stage has not run for this experiment. `rows[*]` j
                                   // from mixed taxonomy versions are aggregated together
   "taxonomy": [ { "key": "constraint_dropped", "label": "…",
                   "description": "…", "training_implication": "…" } ],
-  "diagnose_judge": "claude-opus-4-8",
-  "verdict_basis": "claude-opus-4-8",       // whose FAILs were diagnosed
+  "diagnose_chain": ["claude-fable-5", "claude-opus-4-8"],  // analyst fallback chain
+  "diagnose_judge": "claude-fable-5",       // chain[0] — scalar echo for old readers
+  "verdict_basis": "panel",                 // whose FAILs were diagnosed: panel
+                                            // consensus (>=2 judges) or a judge key
   "diagnosed_at": "…",                       // ISO timestamp
   "counts": { "failed_criteria": 219, "diagnosed": 219, "cells": 54 },
   "synthesis": { /* §4b — predecessor, comparison[], prior_recommendations_review[],
@@ -336,7 +338,9 @@ Absent key means the diagnose stage has not run for this experiment. `rows[*]` j
     "evidence": "shortest quote from trace/answer that shows it",
     "rationale": "1–2 sentences",
     "trace_status": "present|absent|truncated",
-    "judge_concurrence": "both_fail|opus_only|fable_refused|no_second_judge"
+    "analyst": "claude-opus-4-8",            // chain member that produced this row
+                                             // (null for pre-3.3 artifacts)
+    "judge_concurrence": { "pass": 0, "fail": 2, "abstain": 0 }  // panel vote split
   } ],
   "by_root_cause": { /* rollups: root_cause × model, × instruction_type, × use_case */ }
 }

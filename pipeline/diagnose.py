@@ -1,10 +1,17 @@
 """Diagnose WHY each failed criterion failed (root-cause labels).
 
-One BLINDED batch call per (candidate, prompt) cell with >=1 real FAIL under
-the canonical judge's grades: the analyst sees the prompt, all criteria, the
-unmet indices, the response, and the reasoning trace — never judge reasons,
-candidate identity, or the second judge's verdicts (spec §4). Output appended
-to runs/<slug>/diagnosis/<candidate>.jsonl. Resumable. Batch-only transport.
+One BLINDED analyst call per (candidate, prompt) cell whose criteria the PANEL
+CONSENSUS marks FAIL (reason != panel_no_quorum — spec §3/§4): the analyst
+sees the prompt, all criteria, the unmet indices, the response, and the
+reasoning trace — never judge reasons, candidate identity, or any judge's
+verdicts. Output appended to runs/<slug>/diagnosis/<candidate>.jsonl; each
+record stamps the `analyst` that produced it.
+
+Transport is a per-item fallback CHAIN (config.DIAGNOSE_CHAIN): the preferred
+analyst runs first and degrades to the next member PER CELL — a refusal or a
+transport failure advances a cell to the next member rather than dooming it.
+Anthropic members use Message Batches (submit → poll → collect); OpenRouter
+members walk pending cells serially. Resumable.
 """
 
 from __future__ import annotations
@@ -15,49 +22,70 @@ import time
 import config
 from config import (
     DATA_JSONL,
-    DIAGNOSE_JUDGE,
     DIAGNOSE_MAX_FIELD_CHARS,
     DIAGNOSE_MAX_TOKENS,
     anthropic,
 )
 from pipeline import _taxonomy
 from pipeline._batch_guard import BatchStaleGuard
+from pipeline._consensus import consensus_verdict
 from pipeline._io import append_jsonl, read_jsonl, retry
 from pipeline._json_extract import extract_json_array
-from pipeline._judge_llm import call_json
+from pipeline._judge_llm import call_json, call_json_chain
 from pipeline._select import select_prompts
 from pipeline.monitor import RunMonitor, stage_ctx
-from pipeline.run_config import RunConfig, parse_slug
+from pipeline.run_config import RunConfig, parse_slug, resolve_judge
 
 POLL_INTERVAL_S = 60.0
 CUSTOM_ID_SEP = "__"
 _sleep = time.sleep          # module attr so tests can stub the poll wait
 
-# Grading-artifact reasons: these FAILs carry no information about the
-# candidate, so they are never diagnose targets (targeting reads reasons;
-# the analyst payload never does — spec §4 rule 1).
+# Grading-artifact reasons — retained as the documented vocabulary (mirrors
+# _consensus.ARTIFACT_PREFIXES). Targeting no longer filters on these directly:
+# the artifact rule now lives inside consensus_verdict (artifact FAILs abstain),
+# which subsumes it — a single-judge run degrades to quorum 1, and an
+# artifact-only criterion has no cast vote, so it resolves to panel_no_quorum
+# and is never targeted (spec §4). Single-judge behaves identically to the
+# pre-panel code.
 _ARTIFACT_PREFIXES = ("judge_refusal", "judge_parse_error", "judge_truncated",
                       "missing_in_judge_output")
 
 
 def _failed_cells(cfg: RunConfig, records: list[dict],
                   include_diagnosed: bool = False) -> list[dict]:
-    """(candidate, prompt) cells with >=1 real FAIL under cfg.judge's grades,
-    minus cells already present in the diagnosis output (resume) — unless
-    include_diagnosed is set (Pass-1 open coding samples from ALL failed
-    cells; the resume filter is Pass-2 behavior only)."""
+    """(candidate, prompt) cells with >=1 criterion the PANEL CONSENSUS marks
+    FAIL for a reason other than panel_no_quorum (spec §3) — missing quorum
+    means no real verdict, so those abstain out of the target set. Minus cells
+    already present in the diagnosis output (resume), unless include_diagnosed
+    is set (Pass-1 open coding samples from ALL failed cells; the resume filter
+    is Pass-2 behavior only)."""
     by_id = {r["id"]: r for r in records}
     cells: list[dict] = []
     for key in cfg.candidates:
-        grades = {g["id"]: g["verdicts"] for g in read_jsonl(cfg.grades_path(cfg.judge.key, key))}
+        # Load EVERY panel judge's grades, in cfg.judges order so the per_judge
+        # dict below is insertion-ordered by cfg.judges — consensus_verdict's
+        # reason-tie-break is caller-order-sensitive (Task 6).
+        grades_by_judge = {
+            s.key: {g["id"]: g["verdicts"] for g in read_jsonl(cfg.grades_path(s.key, key))}
+            for s in cfg.judges
+        }
         responses = {r["id"]: r for r in read_jsonl(cfg.responses_path(key))}
         done = set() if include_diagnosed else {r["id"] for r in read_jsonl(cfg.diagnosis_path(key))}
-        for rid, verdicts in grades.items():
+        rids = set().union(*(g.keys() for g in grades_by_judge.values())) if grades_by_judge else set()
+        for rid in sorted(rids):
             if rid in done or rid not in by_id or rid not in responses:
                 continue
-            failed = [v["index"] for v in verdicts
-                      if v["verdict"] == "FAIL"
-                      and not str(v.get("reason", "")).startswith(_ARTIFACT_PREFIXES)]
+            n = len(by_id[rid]["criteria"])
+            failed: list[int] = []
+            for i in range(1, n + 1):
+                per_judge: dict[str, dict] = {}
+                for jk, g in grades_by_judge.items():
+                    v = next((x for x in g.get(rid, []) if x.get("index") == i), None)
+                    if v is not None:
+                        per_judge[jk] = v
+                cv = consensus_verdict(per_judge, len(cfg.judges))
+                if cv["verdict"] == "FAIL" and cv["reason"] != "panel_no_quorum":
+                    failed.append(i)
             if not failed:
                 continue
             rec = by_id[rid]
@@ -176,11 +204,13 @@ def _error_rows(failed_indices: list[int], reason: str) -> list[dict]:
             for i in failed_indices]
 
 
-def _batch_request(cid: str, system: str, user_msg: str) -> dict:
+def _batch_request(member, cid: str, system: str, user_msg: str) -> dict:
+    """One Anthropic Message Batches request for `member` (its provider model
+    id — the analyst chain, not the grading panel, chooses this)."""
     return {
         "custom_id": cid,
         "params": {
-            "model": DIAGNOSE_JUDGE,
+            "model": member.model,
             "max_tokens": DIAGNOSE_MAX_TOKENS,
             "thinking": {"type": "adaptive"},
             "system": system,
@@ -190,11 +220,14 @@ def _batch_request(cid: str, system: str, user_msg: str) -> dict:
 
 
 def _write_cell(cfg: RunConfig, mon, cell: dict, trace_status: str,
-                rows: list[dict], error: str = "") -> None:
+                rows: list[dict], analyst: str, error: str = "") -> None:
+    """Append one diagnosis record. `analyst` is the chain member that produced
+    it (spec §4) — the producing member on the success path, or chain[-1] on the
+    terminal _error_rows path so provenance is recorded either way."""
     mon.item_start(model=cell["key"], prompt_id=cell["rid"])
     append_jsonl(cfg.diagnosis_path(cell["key"]),
                  {"id": cell["rid"], "trace_status": trace_status, "diagnoses": rows,
-                  "taxonomy_version": _taxonomy.TAXONOMY_VERSION})
+                  "taxonomy_version": _taxonomy.TAXONOMY_VERSION, "analyst": analyst})
     if error:
         mon.record_error(f"diagnose {cell['key']} {cell['rid']}: {error.split(':', 1)[0]}")
     mon.item_done(model=cell["key"], prompt_id=cell["rid"])
@@ -308,11 +341,16 @@ def _synthesize(cfg: RunConfig, mon) -> None:
                          f"{type(e).__name__}: {e} — continuing without a synthesis block.")
         return
 
-    last_err = ""
-    for _attempt in (1, 2):
+    # Synthesis runs through the SAME fallback chain diagnosis uses: the
+    # preferred analyst leads, a refusal/parse failure/transport error falls
+    # through to the next member (call_json_chain: refusal advances with no
+    # retry, a parse failure retries once with the same member then advances).
+    chain = tuple(resolve_judge(k) for k in config.DIAGNOSE_CHAIN)
+
+    def _parse(raw: str, stop: str | None) -> tuple[dict | None, str]:
+        if stop == "refusal":
+            return None, "synthesis_refusal: model declined to synthesize"
         try:
-            raw, _stop = call_json(DIAGNOSE_JUDGE, SYNTHESIS_SYSTEM, user_msg,
-                                   label=f"anthropic:{DIAGNOSE_JUDGE}:synthesis")
             parsed = json.loads(raw[raw.index("{"): raw.rindex("}") + 1])
             recs = [
                 {"category": r["category"],
@@ -324,30 +362,145 @@ def _synthesize(cfg: RunConfig, mon) -> None:
             ][:3]
             if not recs:
                 raise ValueError("no valid recommendations in synthesis output")
-            out = {
+            return {
                 "predecessor": pred_slug,
                 "comparison": [str(x) for x in parsed.get("comparison", [])],
                 "prior_recommendations_review":
                     [str(x) for x in parsed.get("prior_recommendations_review", [])],
                 "recommendations": recs,
                 "iteration_note": str(parsed.get("iteration_note", "")).strip(),
-            }
-            cfg.synthesis_path.parent.mkdir(parents=True, exist_ok=True)
-            cfg.synthesis_path.write_text(
-                json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
-            mon.note(f"diagnose synthesis: {len(recs)} recommendation(s), "
-                     f"predecessor {pred_slug or 'none'}")
-            return
+            }, ""
         except Exception as e:  # noqa: BLE001
-            last_err = f"{type(e).__name__}: {e}"
-    mon.record_error(f"diagnose synthesis failed twice: {last_err} — "
-                     "continuing without a synthesis block.")
+            return None, f"{type(e).__name__}: {e}"
+
+    out, _spec, last_err = call_json_chain(
+        chain, SYNTHESIS_SYSTEM, user_msg, "synthesis", parse=_parse)
+    if out is None:
+        mon.record_error(f"diagnose synthesis failed: {last_err} — "
+                         "continuing without a synthesis block.")
+        return
+    cfg.synthesis_path.parent.mkdir(parents=True, exist_ok=True)
+    cfg.synthesis_path.write_text(
+        json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+    mon.note(f"diagnose synthesis: {len(out['recommendations'])} recommendation(s), "
+             f"predecessor {pred_slug or 'none'}")
+
+
+def _run_member_batch(cfg: RunConfig, mon, member, pending: dict[str, dict]) -> None:
+    """One chain member's Anthropic Message Batches transport, scoped to the
+    cells still in `pending`. Two rounds mirror grade's batch transport:
+    truncated / unparseable / batch-errored cells resubmit ONCE to this member;
+    a refusal is sticky per member (marks refused_by, never resubmits to this
+    member) and — unlike the pre-chain code — is NOT written terminally: the
+    cell stays in `pending` to fall through to the next chain member. Successful
+    cells are written with analyst=member.key and dropped from `pending`."""
+    for attempt in (1, 2):
+        # Never resubmit a cell to a member that already refused it (round 2
+        # here, or a member that appears twice in the chain).
+        to_submit = {cid: c for cid, c in pending.items()
+                     if member.key not in c["refused_by"]}
+        if not to_submit:
+            break
+        requests = [
+            _batch_request(member, cid,
+                           _taxonomy.diagnose_system(c["trace_status"] != "absent"),
+                           c["user_msg"])
+            for cid, c in to_submit.items()
+        ]
+        batch = retry(
+            lambda requests=requests:
+                anthropic.messages.batches.create(requests=requests),
+            label="anthropic:batches:create:diagnose",
+        )
+        mon.note(f"diagnose batch [{member.key}]: submitted {len(requests)} cell(s) "
+                 f"(attempt {attempt}, batch {batch.id})")
+
+        guard = BatchStaleGuard(anthropic, batch.id, "diagnose batch", note=mon.note)
+        while True:
+            b = retry(lambda: anthropic.messages.batches.retrieve(batch.id),
+                      label="anthropic:batches:retrieve:diagnose")
+            status = getattr(b, "processing_status", "unknown")
+            rc = getattr(b, "request_counts", None)
+            detail = ""
+            if rc is not None:
+                detail = (f" — processing={getattr(rc, 'processing', '?')}, "
+                          f"succeeded={getattr(rc, 'succeeded', '?')}, "
+                          f"errored={getattr(rc, 'errored', '?')}")
+            mon.note(f"diagnose batch [{member.key}]: {status}{detail}")
+            guard.observe(b)
+            if status == "ended":
+                break
+            _sleep(POLL_INTERVAL_S)
+
+        results = retry(lambda: list(anthropic.messages.batches.results(batch.id)),
+                        label="anthropic:batches:results:diagnose")
+        for res in results:
+            cell = pending.get(res.custom_id)
+            if cell is None:
+                continue
+            if res.result.type == "succeeded":
+                msg = res.result.message
+                raw = "".join(blk.text for blk in msg.content
+                              if getattr(blk, "type", None) == "text")
+                rows, err = _text_to_diagnoses(
+                    raw, getattr(msg, "stop_reason", None),
+                    cell["failed_indices"], cell["trace_status"] != "absent")
+                if rows is not None:
+                    _write_cell(cfg, mon, cell, cell["trace_status"], rows,
+                                analyst=member.key)
+                    del pending[res.custom_id]
+                elif err.startswith("diagnose_refusal"):
+                    cell["refused_by"].add(member.key)   # sticky; advance to next member
+                    cell["last_err"] = err
+                else:
+                    cell["last_err"] = err               # retriable: round 2 / next member
+            else:
+                err_obj = getattr(res.result, "error", None)
+                etype = getattr(err_obj, "type", None) or ""
+                cell["last_err"] = (f"diagnose_parse_error: batch result "
+                                    f"{res.result.type}"
+                                    + (f" ({etype})" if etype else ""))
+
+
+def _run_member_stream(cfg: RunConfig, mon, member, pending: dict[str, dict]) -> None:
+    """One OpenRouter chain member: walk pending cells serially (one streamed
+    call each) with the SAME rule call_json_chain uses per member — a refusal
+    advances with no retry (sticky), a parse failure/truncation retries once
+    with this member then advances, a post-retry transport failure advances.
+    Serial is fine at diagnose volumes; OpenRouter members are legal but not in
+    the default chain."""
+    for cid, cell in list(pending.items()):
+        if member.key in cell["refused_by"]:
+            continue
+        system = _taxonomy.diagnose_system(cell["trace_status"] != "absent")
+        for _attempt in (1, 2):
+            try:
+                raw, stop = call_json(member, system, cell["user_msg"],
+                                      label=f"{member.client}:{member.key}:diagnose")
+            except Exception as e:  # noqa: BLE001 — retry() exhausted; advance the cell
+                cell["last_err"] = f"diagnose_transport_error: {type(e).__name__}: {e}"
+                break
+            rows, err = _text_to_diagnoses(raw, stop, cell["failed_indices"],
+                                           cell["trace_status"] != "absent")
+            if rows is not None:
+                _write_cell(cfg, mon, cell, cell["trace_status"], rows,
+                            analyst=member.key)
+                del pending[cid]
+                break
+            cell["last_err"] = err
+            if err.startswith("diagnose_refusal"):
+                cell["refused_by"].add(member.key)       # sticky; next member
+                break
 
 
 def run(cfg: RunConfig, monitor: RunMonitor | None = None) -> None:
     records = select_prompts(read_jsonl(DATA_JSONL), cfg.limit, cfg.sample_seed)
     if not records:
         raise RuntimeError(f"No records in {DATA_JSONL}. Run `load` first.")
+
+    # Resolve the analyst fallback chain once — registry keys → JudgeSpecs. This
+    # is the diagnose chain, wholly independent of the grading panel (cfg.judges).
+    chain = tuple(resolve_judge(k) for k in config.DIAGNOSE_CHAIN)
 
     with stage_ctx(monitor, "diagnose", len(records)) as mon:
         cells = _failed_cells(cfg, records)
@@ -367,78 +520,27 @@ def run(cfg: RunConfig, monitor: RunMonitor | None = None) -> None:
             user_msg, trace_status = _user_message(cell)
             pending[f"{cell['key']}{CUSTOM_ID_SEP}{cell['rid']}"] = {
                 **cell, "user_msg": user_msg, "trace_status": trace_status,
-                "last_err": "",
+                "last_err": "", "refused_by": set(),
             }
 
-        # Two rounds mirror grade's batch transport: truncated/unparseable/
-        # batch-errored cells resubmit once; refusals are sticky-terminal.
-        for attempt in (1, 2):
+        # Per-item fallback chain: each member gets the cells still unresolved,
+        # transported on its own client. A cell only leaves `pending` when a
+        # member succeeds; refusals/transport failures carry it to the next.
+        for member in chain:
             if not pending:
                 break
-            requests = [
-                _batch_request(cid, _taxonomy.diagnose_system(c["trace_status"] != "absent"),
-                               c["user_msg"])
-                for cid, c in pending.items()
-            ]
-            batch = retry(
-                lambda requests=requests:
-                    anthropic.messages.batches.create(requests=requests),
-                label="anthropic:batches:create:diagnose",
-            )
-            mon.note(f"diagnose batch: submitted {len(requests)} cell(s) "
-                     f"(attempt {attempt}, batch {batch.id})")
+            if member.client == "anthropic":
+                _run_member_batch(cfg, mon, member, pending)
+            else:
+                _run_member_stream(cfg, mon, member, pending)
 
-            guard = BatchStaleGuard(anthropic, batch.id, "diagnose batch",
-                                    note=mon.note)
-            while True:
-                b = retry(lambda: anthropic.messages.batches.retrieve(batch.id),
-                          label="anthropic:batches:retrieve:diagnose")
-                status = getattr(b, "processing_status", "unknown")
-                rc = getattr(b, "request_counts", None)
-                detail = ""
-                if rc is not None:
-                    detail = (f" — processing={getattr(rc, 'processing', '?')}, "
-                              f"succeeded={getattr(rc, 'succeeded', '?')}, "
-                              f"errored={getattr(rc, 'errored', '?')}")
-                mon.note(f"diagnose batch: {status}{detail}")
-                guard.observe(b)
-                if status == "ended":
-                    break
-                _sleep(POLL_INTERVAL_S)
-
-            results = retry(lambda: list(anthropic.messages.batches.results(batch.id)),
-                            label="anthropic:batches:results:diagnose")
-            for res in results:
-                cell = pending.get(res.custom_id)
-                if cell is None:
-                    continue
-                if res.result.type == "succeeded":
-                    msg = res.result.message
-                    raw = "".join(blk.text for blk in msg.content
-                                  if getattr(blk, "type", None) == "text")
-                    rows, err = _text_to_diagnoses(
-                        raw, getattr(msg, "stop_reason", None),
-                        cell["failed_indices"], cell["trace_status"] != "absent")
-                    if rows is not None:
-                        _write_cell(cfg, mon, cell, cell["trace_status"], rows)
-                        del pending[res.custom_id]
-                    elif err.startswith("diagnose_refusal"):
-                        _write_cell(cfg, mon, cell, cell["trace_status"],
-                                    _error_rows(cell["failed_indices"], err), error=err)
-                        del pending[res.custom_id]
-                    else:
-                        cell["last_err"] = err          # resubmit next round
-                else:
-                    err_obj = getattr(res.result, "error", None)
-                    etype = getattr(err_obj, "type", None) or ""
-                    cell["last_err"] = (f"diagnose_parse_error: batch result "
-                                        f"{res.result.type}"
-                                        + (f" ({etype})" if etype else ""))
-
+        # Terminal sweep: cells no member could diagnose become honest 'other'
+        # rows, attributed to the last member that tried (chain[-1]).
         for cid, cell in list(pending.items()):
-            reason = cell["last_err"] or "diagnose_parse_error: batch result missing after 2 attempts"
+            reason = cell["last_err"] or "diagnose_parse_error: no result after all chain members"
             _write_cell(cfg, mon, cell, cell["trace_status"],
-                        _error_rows(cell["failed_indices"], reason), error=reason)
+                        _error_rows(cell["failed_indices"], reason),
+                        analyst=chain[-1].key, error=reason)
             del pending[cid]
         _synthesize(cfg, mon)
         mon.end_stage()

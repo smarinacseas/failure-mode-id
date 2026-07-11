@@ -22,7 +22,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from config import DATA_JSONL, DIAGNOSE_JUDGE, JUDGE_MAX_TOKENS, RESULTS_PATH, ROOT
+import config
+from config import DATA_JSONL, JUDGE_MAX_TOKENS, RESULTS_PATH, ROOT
 from pipeline import _taxonomy
 from pipeline._consensus import agreement_stats, consensus_verdict, vote_of
 from pipeline._decode_health import decode_health_block
@@ -309,30 +310,21 @@ def _failure_analysis_block(cfg: RunConfig, records: list[dict],
     judge_concurrence is joined HERE, post-hoc — never an input to diagnosis
     (spec §4 blinding rule 3)."""
     by_id = {r["id"]: r for r in records}
-    other = [s for s in cfg.judges if s.key != cfg.judge.key]
-    second = other[0].key if other else None
 
-    def _concurrence(key: str, rid: str, index: int) -> str:
-        if second is None:
-            return "no_second_judge"
-        verdicts = grades_by_judge.get(second, {}).get(key, {}).get(rid)
-        if verdicts is None:
-            return "no_second_judge"
-        v = next((x for x in verdicts if x.get("index") == index), None)
-        if v is None:
-            return "no_second_judge"
-        reason = str(v.get("reason", ""))
-        if reason.startswith("judge_refusal"):
-            return "fable_refused"
-        # Grading-artifact FAILs (grade.py's vocabulary — see
-        # pipeline.diagnose._ARTIFACT_PREFIXES) carry no real second
-        # opinion about the candidate, same as a refusal — just not the
-        # refusal itself. Falling through to both_fail here would inflate
-        # judge-agreement with FAILs that are actually judge-pipeline
-        # noise, not independent verdicts.
-        if reason.startswith(("judge_parse_error", "judge_truncated", "missing_in_judge_output")):
-            return "no_second_judge"
-        return "both_fail" if v.get("verdict") == "FAIL" else "opus_only"
+    def _concurrence(key: str, rid: str, index: int) -> dict:
+        """The panel's PASS/FAIL/ABSTAIN vote split for one diagnosed criterion
+        (spec §3): the generalization of the old second-judge strings to any
+        panel size. Grading-artifact FAILs abstain (vote_of, inside
+        consensus_verdict) so judge-pipeline noise never reads as a real second
+        opinion — a 2-judge refusal shows as one FAIL + one abstain, not
+        both_fail. Judges iterate in cfg.judges order (reason-tie determinism)."""
+        per_judge: dict[str, dict] = {}
+        for s in cfg.judges:
+            verdicts = grades_by_judge.get(s.key, {}).get(key, {}).get(rid)
+            v = next((x for x in (verdicts or []) if x.get("index") == index), None)
+            if v is not None:
+                per_judge[s.key] = v
+        return consensus_verdict(per_judge, len(cfg.judges))["votes"]
 
     rows: list[dict] = []
     cells = 0
@@ -359,6 +351,9 @@ def _failure_analysis_block(cfg: RunConfig, records: list[dict],
                     "evidence": d.get("evidence", ""),
                     "rationale": d.get("rationale", ""),
                     "trace_status": art.get("trace_status", "absent"),
+                    # Which chain member produced this diagnosis (spec §4);
+                    # None for pre-Task-9 artifacts written before the stamp.
+                    "analyst": art.get("analyst"),
                     "judge_concurrence": _concurrence(key, rid, d["index"]),
                 })
     if not rows:
@@ -403,10 +398,13 @@ def _failure_analysis_block(cfg: RunConfig, records: list[dict],
         **({"taxonomy_versions_seen": sorted(taxonomy_versions_seen)}
            if len(taxonomy_versions_seen) > 1 else {}),
         "taxonomy": taxonomy,
-        "diagnose_judge": DIAGNOSE_JUDGE,
-        # Label only, for now — its selection semantics (which verdict a
-        # diagnosed FAIL is diagnosing) still target cfg.judge alone; the
-        # panel-consensus target change is Task 9.
+        # Full analyst chain; diagnose_judge stays as its first entry so
+        # pre-panel readers keep a scalar analyst field (spec §5 / schema 3.3).
+        "diagnose_chain": list(config.DIAGNOSE_CHAIN),
+        "diagnose_judge": config.DIAGNOSE_CHAIN[0],
+        # Which verdict a diagnosed FAIL is diagnosing: the panel consensus once
+        # >=2 judges form a panel (Task 9's _failed_cells targets consensus),
+        # else the sole judge's own verdicts.
         "verdict_basis": "panel" if len(cfg.judges) >= 2 else cfg.judge.key,
         "diagnosed_at": datetime.now(timezone.utc).isoformat(),
         "counts": {"failed_criteria": len(rows), "diagnosed": len(rows),

@@ -44,14 +44,12 @@ def run(cfg: RunConfig | None = None, monitor: RunMonitor | None = None) -> None
     specs = list(cfg.judges) if cfg is not None else [resolve_judge(k) for k in config.JUDGES]
     # A run also calls out to judges that aren't necessarily panel members:
     # the classifier fallback chain (cfg.classifier_chain) and the diagnose
-    # chain (config.DIAGNOSE_CHAIN once Task 9 lands; today just the single
-    # config.DIAGNOSE_JUDGE). Ping every distinct one of those too, so a typo'd
-    # classifier or diagnose model fails here instead of mid-run. cfg is None
-    # only for the bare/default invocation, which has no per-experiment
-    # classifier override to add.
+    # fallback chain (config.DIAGNOSE_CHAIN). Ping every distinct one of those
+    # too, so a typo'd classifier or diagnose model fails here instead of
+    # mid-run. cfg is None only for the bare/default invocation, which has no
+    # per-experiment classifier override to add.
     extra = list(cfg.classifier_chain) if cfg is not None else []
-    diag_chain = getattr(config, "DIAGNOSE_CHAIN", None) or (config.DIAGNOSE_JUDGE,)
-    extra += [resolve_judge(k) if isinstance(k, str) else k for k in diag_chain]
+    extra += [resolve_judge(k) for k in config.DIAGNOSE_CHAIN]
     # Dedup by key: a judge already pinged (as a panel member or an earlier
     # chain entry) is never pinged twice, even if the chains disagree on the
     # underlying JudgeSpec object identity.
