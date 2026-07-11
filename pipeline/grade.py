@@ -10,7 +10,8 @@ for why the budget is generous and the call is streamed.
 
 Two transports, selected by the frozen `judge_mode` param (default "batch"):
 
-  batch      — one Anthropic Message Batch per judge: submit every missing
+  batch      — the panel is split by judge client (Task 3). Anthropic-client
+               judges: one Message Batch per judge — submit every missing
                grade cell, poll every POLL_INTERVAL_S with logged status,
                then collect results through the same locked append_jsonl
                path. `custom_id` is the item's stable id
@@ -19,19 +20,28 @@ Two transports, selected by the frozen `judge_mode` param (default "batch"):
                done_ids are re-derived from the output JSONL exactly as
                before and only the missing ids are submitted. Per-item batch
                errors and unparseable texts get the same one-retry-then-
-               all-FAIL treatment as the sequential path.
-  sequential — the pre-batch path: one streamed call per cell, in order.
+               all-FAIL treatment as the sequential path. OpenRouter-client
+               judges: OpenRouter has no batch API, so their cells grind on
+               a small ThreadPoolExecutor (config.JUDGE_WORKERS) instead —
+               submitted up front and awaited WHILE the Anthropic batches
+               submit/poll/collect, all inside the same `run()` invocation
+               with no barrier between the two transports (see `_run_pool`).
+  sequential — the pre-batch path: one streamed call per cell, in order,
+               for every judge regardless of client. `_run_sequential`
+               already dispatches per spec via `call_json`, so this mode
+               needs no pool.
 
 Grading params (model, max_tokens, adaptive thinking, system prompt, user
-message) and judge-blindness are identical in both modes; batch custom_ids
-are request metadata and never enter the judge's context.
+message) and judge-blindness are identical across every transport; batch
+custom_ids are request metadata and never enter the judge's context.
 """
 
 from __future__ import annotations
 
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from config import DATA_JSONL, JUDGE_MAX_TOKENS, PROMPTS_DIR, anthropic
+from config import DATA_JSONL, JUDGE_MAX_TOKENS, JUDGE_WORKERS, PROMPTS_DIR, anthropic
 from pipeline._batch_guard import BatchStaleGuard
 from pipeline._io import append_jsonl, read_jsonl, retry
 from pipeline._judge_llm import call_json
@@ -364,6 +374,40 @@ def _run_batch(cfg: RunConfig, mon, by_id: dict,
     _counts()
 
 
+# --------------------------------------------------------------------------- #
+# OpenRouter transport: streamed calls on a small worker pool. No batch API
+# exists on OpenRouter; concurrency here is transport, not treatment
+# (JUDGE_WORKERS is a config constant, recorded in meta.config, never frozen).
+# --------------------------------------------------------------------------- #
+def _pool_item(cfg: RunConfig, mon, spec: JudgeSpec, key: str,
+               resp_rec: dict, by_id: dict) -> None:
+    """One (judge, candidate, prompt) grade cell, run on a pool worker.
+    Mirrors _run_sequential's per-cell body exactly (mechanical loop-failure
+    and empty-response short-circuits included) so the same cell graded via
+    either transport lands an identical record."""
+    rid = resp_rec["id"]
+    rec = by_id[rid]
+    if resp_rec.get("loop_failure"):
+        _write_loop_failure(cfg, mon, spec.key, key, rid,
+                            len(rec["criteria"]), resp_rec["loop_failure"])
+        return
+    if not (resp_rec.get("response") or "").strip():
+        _skip_empty(cfg, mon, spec.key, key, rid)
+        return
+    verdicts = _grade_one(spec, rec["prompt"], resp_rec["response"], rec["criteria"])
+    _write_cell(cfg, mon, spec.key, key, rid, verdicts)
+
+
+def _run_pool(cfg: RunConfig, mon, by_id: dict,
+              plan: list[tuple[JudgeSpec, str, list[dict]]],
+              pool: ThreadPoolExecutor) -> list:
+    """Submit every OpenRouter grade cell to `pool`; returns the futures
+    (caller awaits — see run()). Cells share only the locked append_jsonl
+    path and the monitor's own lock; no other mutable state crosses workers."""
+    return [pool.submit(_pool_item, cfg, mon, spec, key, resp_rec, by_id)
+            for spec, key, todo in plan for resp_rec in todo]
+
+
 def run(cfg: RunConfig, monitor: RunMonitor | None = None) -> None:
     records = select_prompts(read_jsonl(DATA_JSONL), cfg.limit, cfg.sample_seed)
     if not records:
@@ -389,10 +433,23 @@ def run(cfg: RunConfig, monitor: RunMonitor | None = None) -> None:
         anth_plan = [p for p in plan if p[0].client == "anthropic"]
         or_plan = [p for p in plan if p[0].client == "openrouter"]
         if cfg.judge_mode == "sequential":
+            # judge_mode=="sequential" intentionally runs the WHOLE plan
+            # sequentially, OpenRouter judges included — one streamed call
+            # per cell is exactly what that mode means.
             _run_sequential(cfg, mon, by_id, plan)
         else:
-            # OpenRouter judges have no batch API; until the pooled transport
-            # (next task) they ride the sequential path after the batches.
-            _run_batch(cfg, mon, by_id, anth_plan)
-            _run_sequential(cfg, mon, by_id, or_plan)
+            # Mixed transports, one invocation: OpenRouter cells grind on the
+            # pool WHILE the Anthropic batches submit/poll/collect.
+            or_futures: list = []
+            with ThreadPoolExecutor(max_workers=max(1, int(JUDGE_WORKERS)),
+                                    thread_name_prefix="grade-pool") as pool:
+                try:
+                    or_futures = _run_pool(cfg, mon, by_id, or_plan, pool)
+                    if anth_plan:
+                        _run_batch(cfg, mon, by_id, anth_plan)
+                    for f in as_completed(or_futures):
+                        f.result()
+                except BaseException:
+                    pool.shutdown(wait=False, cancel_futures=True)
+                    raise
         mon.end_stage()
