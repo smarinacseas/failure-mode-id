@@ -5,7 +5,7 @@ import pytest
 import config
 from pipeline.run_config import (
     ConfigConflictError, InvalidSlugError, RunConfig, parse_candidates,
-    parse_judges, parse_slug, resolve, validate_judge,
+    parse_judges, parse_slug, resolve,
 )
 
 
@@ -60,16 +60,13 @@ def test_json_round_trip():
 
 def test_runs_dir_default_and_judge_default():
     assert config.RUNS_DIR == config.ROOT / "runs"
-    assert config.JUDGES == ["claude-opus-4-8", "claude-fable-5"]
+    assert config.JUDGES == list(config.JUDGE_REGISTRY)
     assert config.JUDGE == config.JUDGES[0]
 
 
-def test_parse_judges_dedups_and_validates():
-    assert parse_judges("claude-opus-4-8, claude-fable-5, claude-opus-4-8") == (
-        "claude-opus-4-8", "claude-fable-5",
-    )
-    with pytest.raises(ValueError, match="claude-"):
-        parse_judges("gpt-5")
+def test_parse_judges_dedups():
+    js = parse_judges("claude-opus-4-8, claude-fable-5, claude-opus-4-8")
+    assert [s.key for s in js] == ["claude-opus-4-8", "claude-fable-5"]
 
 
 def test_judges_default_filled_and_json_round_trip(tmp_path, monkeypatch):
@@ -94,12 +91,6 @@ def test_parse_candidates_unknown_key_lists_registry(monkeypatch):
     monkeypatch.setattr(config, "CANDIDATES", {"qwen-9b": "qwen/qwen3.5-9b"})
     with pytest.raises(ValueError, match="qwen-9b"):
         parse_candidates("nope")
-
-
-def test_validate_judge_prefix():
-    assert validate_judge("claude-fable-5") == "claude-fable-5"
-    with pytest.raises(ValueError, match="claude-"):
-        validate_judge("gpt-5")
 
 
 def test_resolve_freezes_on_first_run(tmp_path, monkeypatch):

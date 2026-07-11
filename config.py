@@ -27,10 +27,20 @@ router = OpenAI(
 anthropic = Anthropic()
 
 # Judges (graders). A run may carry several — each grades the SAME candidate
-# responses, so the dashboard can toggle between them apples-to-apples. The
-# first entry doubles as the criterion classifier. JUDGE kept as a back-compat
-# alias for any single-judge caller.
-JUDGES: list[str] = ["claude-opus-4-8", "claude-fable-5"]
+# responses. Registry maps a short PATH-SAFE key (used in grades/<key>/ dirs,
+# by_judge, custom_ids, dashboard labels) to {client, model}. OpenRouter model
+# ids MUST be verified against https://openrouter.ai/models when pinned.
+JUDGE_REGISTRY: dict[str, dict] = {
+    "claude-opus-4-8": {"client": "anthropic",  "model": "claude-opus-4-8"},
+    "claude-fable-5":  {"client": "anthropic",  "model": "claude-fable-5"},
+    "gpt-5":           {"client": "openrouter", "model": "openai/gpt-5.2"},
+    "gemini-3-pro":    {"client": "openrouter", "model": "google/gemini-3.1-pro-preview"},
+    "deepseek-v4":     {"client": "openrouter", "model": "deepseek/deepseek-v4-pro"},
+}
+# Default panel: every registry key. 5 members (odd) so a full-attendance
+# majority vote cannot tie. Qwen judges stay out: Qwen is the candidate
+# ladder (family overlap warns, never blocks — see run_config.resolve).
+JUDGES: list[str] = list(JUDGE_REGISTRY)
 JUDGE: str = JUDGES[0]
 
 # Single family (Qwen) for v1 size ladder. DeepSeek added later for cross-family.

@@ -33,7 +33,7 @@ from pipeline.run_config import (
     parse_candidates,
     parse_judges,
     resolve,
-    validate_judge,
+    resolve_judge,
 )
 
 DATA_STEPS = ("generate", "grade", "classify", "diagnose", "validate", "aggregate", "all")
@@ -120,9 +120,9 @@ def _overrides(args: argparse.Namespace) -> dict:
     if args.candidates is not None:
         out["candidates"] = parse_candidates(args.candidates)
     if args.judges is not None:
-        out["judges"] = parse_judges(args.judges)
+        out["judges"] = tuple(js.key for js in parse_judges(args.judges))
     elif args.judge is not None:
-        out["judges"] = (validate_judge(args.judge),)
+        out["judges"] = (resolve_judge(args.judge).key,)
     if args.description is not None:
         out["description"] = args.description
     if args.provider_sort is not None:
