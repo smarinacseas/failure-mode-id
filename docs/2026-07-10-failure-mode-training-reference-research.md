@@ -6,7 +6,7 @@ Register note: sections below are written for a team deciding what data to commi
 
 ## AfterQuery product line
 
-AfterQuery (afterquery.com) is an applied-research data vendor, founded 2025, that went through Y Combinator's Winter 2025 batch, is based in San Francisco, and describes itself as "an applied research lab curating data solutions for frontier foundation model development... serving every frontier AI lab" [3]. Scale signals reported across sources vary somewhat by venue: the YC profile lists a team of about 30 and cites an April 2026 Forbes report of a $100M revenue run rate [3]; a March 2026 vendor directory (rl-list.com) separately lists AfterQuery as ranked #2 among commercial RL-environment vendors, with 51–200 headcount and $30.5M raised (Series A led by Altos Ventures, with The Raine Group and Y Combinator) [4]; a BusinessWire release separately reports that AfterQuery operates an expert network of nearly 100,000 verified practicing professionals spanning finance, software engineering, medicine, and law [5]. Treat the rl-list.com headcount/ranking figures as third-party vendor-directory characterization rather than AfterQuery's own disclosure — they are cited here as such, not verified independently.
+AfterQuery (afterquery.com) is an applied-research data vendor, founded 2025, that went through Y Combinator's Winter 2025 batch, is based in San Francisco, and describes itself as "an applied research lab curating data solutions for frontier foundation model development... serving every frontier AI lab" [3]. Scale signals reported across sources vary somewhat by venue: the YC profile lists a team of about 30 and cites an April 2026 Forbes report of a $100M revenue run rate [3]; a June 2026 vendor directory (rl-list.com) separately lists AfterQuery as ranked #2 among commercial RL-environment vendors, with 51–200 headcount and $30.5M raised (Series A led by Altos Ventures, with The Raine Group and Y Combinator) [4]; a BusinessWire release separately reports that AfterQuery operates an expert network of nearly 100,000 verified practicing professionals spanning finance, software engineering, medicine, and law [5]. Treat the rl-list.com headcount/ranking figures as third-party vendor-directory characterization rather than AfterQuery's own disclosure — they are cited here as such, not verified independently.
 
 AfterQuery's own site markets four named data products [1]:
 
@@ -208,5 +208,5 @@ Product read: degenerate_output is the mode with the **thinnest "commission a la
 35. VerIF paper. arXiv. https://arxiv.org/abs/2506.09942
 36. VerInstruct dataset. HuggingFace. https://huggingface.co/datasets/THU-KEG/VerInstruct
 37. Tülu 3 paper (includes RLVR and EOS-termination reward design). arXiv. https://arxiv.org/abs/2411.15124
-38. Repetition-loop mechanism paper. arXiv (HTML). https://arxiv.org/html/2512.12895v1
-39. Overthinking-in-reasoning-models survey. arXiv. https://arxiv.org/abs/2503.16419
+38. Overthinking-in-reasoning-models survey. arXiv. https://arxiv.org/abs/2503.16419
+39. Repetition-loop mechanism paper. arXiv (HTML). https://arxiv.org/html/2512.12895v1
