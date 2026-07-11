@@ -94,18 +94,19 @@ display-only aliases.
 
 - **One file per experiment.** No cross-run joins in the deliverable — every field the dashboard needs to render a run is in that run's file.
 - **Extensive but not exhaustive.** Include what the dashboard displays, what the limitations panel needs to explain the run, and what a future reader needs to reproduce it. Do not include per-call latency logs, provider request IDs, raw response bodies, or debug traces — those live in sidecar files.
-- **Stable shape across runs.** Every experiment carries every key in this schema even when the value is null. Optional data is `null` / `[]` / `""`, never absent.
+- **Stable shape across runs.** Every experiment carries every key in this schema even when the value is null. Optional data is `null` / `[]` / `""`, never absent — with two documented exceptions where the *key itself* is absent: `failure_analysis` (diagnose stage hasn't run) and `panel` (fewer than 2 judges). See their rows in the table below.
 - **Human-readable JSON.** UTF-8, 2-space indent, no trailing whitespace. File size is expected to be 100 KB – 5 MB depending on `n_prompts × n_models × response length`.
 
 ## Top-level shape
 
 ```json
 {
-  "schema_version": "3.2",
+  "schema_version": "3.3",
   "meta":    { … },
   "summary": { … },
   "prompts": [ … ],
   "by_judge": { … },
+  "panel":   { … },
   "failure_analysis": { … },
   "decode_health": { … }
 }
@@ -115,10 +116,11 @@ display-only aliases.
 | --- | --- | --- |
 | `schema_version` | str | Matches this document. Dashboards refuse to render mismatched majors. |
 | `meta` | object | Identity + configuration + validation status. |
-| `summary` | object | Six pre-computed aggregate breakdowns (default judge's view). |
-| `prompts` | array | One entry per included prompt, in benchmark_id order (default judge's view). |
-| `by_judge` | object | One self-contained `{judge, judge_details, validation, summary, prompts}` view per grader (schema 3.0). Top-level `summary`/`prompts` mirror the first judge's. |
-| `failure_analysis` | object | **Optional** (schema 3.1) — root-cause diagnosis; see its section below. The one exception to the never-absent principle: a missing key means the diagnose stage has not run. |
+| `summary` | object | Six pre-computed aggregate breakdowns — the **default view**: the `panel` consensus when ≥ 2 judges form one, else the first judge's view (`meta.verdict_basis` records which). |
+| `prompts` | array | One entry per included prompt, in benchmark_id order — same default-view rule as `summary`. |
+| `by_judge` | object | One self-contained `{judge, judge_details, validation, summary, prompts}` view per grader (schema 3.0). |
+| `panel` | object | **Optional** (schema 3.3) — present when the run has ≥ 2 judges; consensus verdicts + agreement stats over the same eligible prompts. One of two exceptions to the never-absent principle: absent on single-judge runs (nothing to form a panel out of). See its section below. |
+| `failure_analysis` | object | **Optional** (schema 3.1) — root-cause diagnosis; see its section below. The other exception to the never-absent principle: a missing key means the diagnose stage has not run. |
 | `decode_health` | object | Mechanical loop census (schema 3.2) — always present; see its section below. |
 
 ---
@@ -174,18 +176,29 @@ that need the provider-side IDs.
 
 ### `meta.judge`
 
-String — the grader/classifier model ID (e.g. `"claude-opus-4-8"`). The
-dashboard renders this verbatim in the run-details panel and footer.
+String — the **default grader's KEY** (e.g. `"claude-opus-4-8"`), i.e. the
+first entry of `meta.judges`. Kept for back-compat with single-judge
+dashboards; the dashboard renders this verbatim in the run-details panel and
+footer. Grading itself may involve every member of `meta.judges` (a panel,
+schema 3.0+); classification follows the separate, frozen
+`meta.config.classifier_chain` (schema 3.3) — `meta.judge` is no longer a
+"grader/classifier" model ID, just the default judge's handle.
 
 ### `meta.judge_details`
 
-Optional richer variant of `meta.judge`.
+Per-judge provenance for the default judge (same shape as each entry under
+`by_judge[*].judge_details`, schema 3.3).
 
 | key | type | notes |
 | --- | --- | --- |
-| `id` | str | Same string as `meta.judge`. |
-| `provider` | str | e.g. `Anthropic`. |
-| `role` | str | e.g. `grader + classifier`. |
+| `id` | str | Same key string as `meta.judge`. |
+| `model_id` | str | Provider-side model ID (e.g. `"claude-opus-4-8"`, `"openai/gpt-5.2"`). Equals `id` for Anthropic judges. |
+| `provider` | str | `"anthropic"` or `"openrouter"`. |
+| `role` | str | Always `"grader"`. |
+| `transport` | str | `"batch"` (Anthropic Message Batches) / `"sequential"` (Anthropic, one streamed call per cell) / `"pooled_stream"` (OpenRouter judges — no batch API there). |
+| `reasoning` | object | `{"type": "adaptive"}` for Anthropic judges; `{"enabled": true}` for OpenRouter judges. |
+| `family` | str | Model family (e.g. `"anthropic"`, `"openai"`, `"google"`, `"deepseek"`). |
+| `family_overlap` | bool | `true` if this judge shares a family with any candidate in `meta.models` — self-preference-bias risk flag. |
 | `family_stake_note` | str | Human-readable statement of the self-preference-bias control. |
 
 ### `meta.counts`
@@ -197,7 +210,8 @@ Cross-referencing sums the dashboard uses as headers.
 | `n_prompts` | int | Prompts fully graded across all candidates. |
 | `n_criteria` | int | Sum of criteria across included prompts. |
 | `n_models` | int | Candidate count. |
-| `n_grade_cells` | int | `n_criteria × n_models` — the grid the pass-rate metrics aggregate over. |
+| `n_judges` | int | Judge count (schema 3.0) — length of `meta.judges`. |
+| `n_grade_cells` | int | `n_criteria × n_models` — the grid the pass-rate metrics aggregate over (per judge). |
 
 ### `meta.categories`
 
@@ -306,6 +320,54 @@ Each `criteria[]` entry:
 | `gameable` | bool | `true` if a response could satisfy the literal wording while violating intent. |
 | `reward_hack` | str | Short description of the shortcut if `gameable`; `""` otherwise. |
 | `results` | `{model_key → {"pass": bool, "reason": str}}` | Judge verdict + reason per candidate. |
+
+---
+
+## `panel` (schema 3.3, optional)
+
+Present when the run has ≥ 2 judges (`meta.judges` has 2+ entries) — a
+provider-diverse panel of graders scoring the SAME candidate responses.
+Absent for single-judge runs (nothing to form a panel out of); this is the
+other exception to the never-absent shape principle, alongside
+`failure_analysis`.
+
+```json
+"panel": {
+  "judges": ["claude-opus-4-8", "claude-fable-5", "gpt-5", "gemini-3-pro", "deepseek-v4"],
+  "summary": { /* same six keys as top-level summary, computed over consensus verdicts */ },
+  "prompts": [ /* same shape as top-level prompts, but criteria[].results[model]
+                  carries the consensus verdict + vote split (see below) */ ],
+  "agreement": { /* pairwise + aggregate agreement stats, see below */ }
+}
+```
+
+| key | type | notes |
+| --- | --- | --- |
+| `judges` | array | Judge keys that fed the panel, same order as `meta.judges`. |
+| `summary` | object | Same six breakdowns as top-level `summary` (`criterion_pass_rate`, `full_prompt_pass_rate`, `by_instruction_type`, `by_prompt_style`, `by_use_case`, `by_verifiability`), computed over the panel's consensus verdicts. |
+| `prompts` | array | Same shape as top-level `prompts` — same keys, same `criteria[]` structure — except each criterion's `results[model_key]` is `{pass, reason, votes}` (below) instead of `{pass, reason}`. |
+| `agreement` | object | Pairwise + aggregate inter-judge agreement stats, see below. |
+
+Top-level `summary`/`prompts` mirror this block whenever it's present (see
+`meta.verdict_basis`); single-judge runs keep mirroring the first (only)
+judge's `by_judge` view instead.
+
+### `panel.prompts[*].criteria[*].results[model_key]`
+
+| key | type | notes |
+| --- | --- | --- |
+| `pass` | bool | Consensus verdict — majority PASS among the judges that cast a vote. |
+| `reason` | str | `""` on PASS. On FAIL: the most common reason text among the judges that voted FAIL, or `"panel_tie"` (equal PASS/FAIL split) / `"panel_no_quorum"` (fewer than quorum cast a vote). |
+| `votes` | `{"pass": int, "fail": int, "abstain": int}` | Vote split over all panel judges. Artifact FAILs (`judge_refusal` / `judge_parse_error` / `judge_truncated` / `missing_in_judge_output`) abstain rather than cast a vote; `loop_failure` FAILs are genuine FAIL votes. Quorum is `min(2, n_judges)`; fewer cast votes than quorum → FAIL `panel_no_quorum`; an even PASS/FAIL split among cast votes → FAIL `panel_tie`. Missing evidence always resolves to FAIL, never a silent drop. |
+
+### `panel.agreement`
+
+| key | type | notes |
+| --- | --- | --- |
+| `pairwise` | `{judge_key → {judge_key → pct}}` | Percent agreement between each judge pair (0–100 scale), over cells where both judges cast a PASS/FAIL vote. Symmetric; a judge is never compared against itself. |
+| `fleiss_kappa` | float | Variable-rater generalization of Fleiss' kappa, over cells with ≥ 2 cast votes — a chance-corrected agreement statistic, NOT on the 0–100 scale (typical range roughly -1 to 1; higher is more agreement than chance). |
+| `with_consensus` | `{judge_key → pct}` | Each judge's percent agreement with the panel's own consensus verdict (0–100 scale). |
+| `abstentions` | `{judge_key → int}` | Count of cells that judge abstained on (artifact FAILs or a missing grade record for that judge). |
 
 ---
 

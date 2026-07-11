@@ -8,7 +8,8 @@ Live results: <https://smarinacseas.github.io/failure-mode-id/>
 
 A resumable eval pipeline that runs Surge AI's [Complex Constraints](https://huggingface.co/datasets/surgeai/ComplexConstraints)
 benchmark through a candidate-model ladder (default: Qwen3.5 9B→35B→397B via
-OpenRouter), grades every criterion with blind Claude judges, classifies
+OpenRouter), grades every criterion with a blind multi-family judge panel
+(Claude, GPT, Gemini, DeepSeek by default), classifies
 criteria for verifiability, **diagnoses every failed criterion with a blinded
 root-cause taxonomy** (never noticed vs dropped-from-CoT vs executed wrong vs
 judge-suspect …), and publishes a schema-versioned JSON that drives the
@@ -69,7 +70,7 @@ Artifacts live under `runs/<slug>/`; deliverables land in
 - **generate** — streamed candidate calls, 4-worker pool, wall-clock deadline guard
 - **grade** — one blind judge call per (judge, model, prompt); mixed Anthropic/OpenRouter panels supported; ≥2 judges produce consensus verdicts + agreement stats; refusal/truncation/parse failures recorded distinctly, never silently dropped
 - **classify** — criterion verifiability (auto vs judge) + gameability tags
-- **diagnose** — blinded root-cause labels for every failed criterion (Opus-solo, batch; the analyst never sees judge reasons, model identity, or the second judge's verdicts; a reserved `judge_suspect` label licenses disagreement), plus an iteration synthesis comparing against the previous experiment and recommending the next one
+- **diagnose** — blinded root-cause labels for every criterion the panel consensus marks FAIL (walks a Fable-preferred fallback chain to Opus per cell, batch; the analyst never sees judge reasons, model identity, or any judge's verdicts; a reserved `judge_suspect` label licenses disagreement), plus an iteration synthesis comparing against the previous experiment and recommending the next one
 - **validate** — human-validation sampling of judge verdicts
 - **aggregate** — joins everything into the schema-versioned results JSON (see `meta/RESULTS_SCHEMA.md`)
 
