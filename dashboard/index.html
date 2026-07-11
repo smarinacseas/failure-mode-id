@@ -1217,6 +1217,198 @@
               </sc-if>
             </div>
 
+            <!-- judge agreement (schema 3.3 panel) -->
+            <sc-if
+              value="{{ hasAgreement }}"
+              hint-placeholder-val="{{ false }}"
+            >
+              <div
+                style="
+                  background: var(--surface, #fff);
+                  border: 1px solid var(--border, #e2e6ec);
+                  border-radius: 12px;
+                  padding: 16px 20px 18px;
+                  margin-bottom: 14px;
+                  overflow-x: auto;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    margin-bottom: 14px;
+                    flex-wrap: wrap;
+                  "
+                >
+                  <span
+                    style="
+                      width: 3px;
+                      height: 15px;
+                      background: var(--pill-imp, #8a5736);
+                      border-radius: 1px;
+                      flex: none;
+                    "
+                  ></span>
+                  <div
+                    style="
+                      font-family: &quot;Newsreader&quot;, Georgia, serif;
+                      font-size: 15px;
+                      font-weight: 500;
+                    "
+                  >
+                    Judge agreement
+                  </div>
+                  <span style="font-size: 11.5px; color: var(--ink-4, #a8a294)"
+                    >how often the panel's judges cast the same vote</span
+                  >
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 40px;
+                    flex-wrap: wrap;
+                  "
+                >
+                  <div>
+                    <div
+                      style="
+                        font-size: 10px;
+                        color: var(--ink-4, #a8a294);
+                        text-transform: uppercase;
+                        letter-spacing: 0.06em;
+                        font-weight: 600;
+                        margin-bottom: 4px;
+                      "
+                    >
+                      Fleiss' κ
+                    </div>
+                    <div
+                      style="
+                        font-family: 'IBM Plex Mono', monospace;
+                        font-size: 26px;
+                        font-weight: 600;
+                        color: var(--ink, #2a2722);
+                      "
+                    >
+                      {{ agKappa }}
+                    </div>
+                  </div>
+                  <div>
+                    <div
+                      style="
+                        font-size: 10px;
+                        color: var(--ink-4, #a8a294);
+                        text-transform: uppercase;
+                        letter-spacing: 0.06em;
+                        font-weight: 600;
+                        margin-bottom: 6px;
+                      "
+                    >
+                      Abstentions
+                    </div>
+                    <div
+                      style="
+                        display: flex;
+                        gap: 18px;
+                        flex-wrap: wrap;
+                      "
+                    >
+                      <sc-for
+                        list="{{ agAbstain }}"
+                        as="ab"
+                        hint-placeholder-count="2"
+                      >
+                        <div
+                          style="
+                            font-size: 12.5px;
+                            color: var(--ink-1, #46423a);
+                            font-family: 'IBM Plex Mono', monospace;
+                          "
+                        >
+                          {{ ab.label }}:
+                          <b style="color: var(--ink, #2a2722)"
+                            >{{ ab.value }}</b
+                          >
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="min-width: 0">
+                    <div
+                      style="
+                        font-size: 10px;
+                        color: var(--ink-4, #a8a294);
+                        text-transform: uppercase;
+                        letter-spacing: 0.06em;
+                        font-weight: 600;
+                        margin-bottom: 6px;
+                      "
+                    >
+                      Pairwise agreement
+                    </div>
+                    <table style="border-collapse: collapse">
+                      <thead>
+                        <tr>
+                          <th
+                            style="
+                              text-align: left;
+                              font-size: 11px;
+                              color: var(--ink-3, #8c8678);
+                              padding: 4px 10px 6px 0;
+                            "
+                          ></th>
+                          <sc-for
+                            list="{{ agMatrixCols }}"
+                            as="ac"
+                            hint-placeholder-count="2"
+                            ><th
+                              style="
+                                font-size: 11px;
+                                color: var(--ink-3, #8c8678);
+                                padding: 4px 10px 6px;
+                                font-weight: 600;
+                              "
+                            >
+                              {{ ac.label }}
+                            </th></sc-for
+                          >
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <sc-for
+                          list="{{ agMatrix }}"
+                          as="arw"
+                          hint-placeholder-count="2"
+                        >
+                          <tr style="border-top: 1px solid var(--line, #e7e3d6)">
+                            <td
+                              style="
+                                font-size: 12.5px;
+                                padding: 6px 10px 6px 0;
+                                white-space: nowrap;
+                              "
+                            >
+                              {{ arw.label }}
+                            </td>
+                            <sc-for
+                              list="{{ arw.cells }}"
+                              as="acv"
+                              hint-placeholder-count="2"
+                              ><td style="{{ acv.css }};padding:6px 10px">
+                                {{ acv.v }}
+                              </td></sc-for
+                            >
+                          </tr>
+                        </sc-for>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
             <!-- metric row -->
             <div
               style="
@@ -2820,6 +3012,24 @@
                   <div style="border-bottom: 1px solid var(--bg, #f1f3f6)">
                     <div onclick="{{ c.onToggle }}" style="{{ c.rowCss }}">
                       <span style="{{ c.badgeCss }}">{{ c.badge }}</span>
+                      <sc-if
+                        value="{{ c.hasVoteBadge }}"
+                        hint-placeholder-val="{{ false }}"
+                      >
+                        <span
+                          title="panel votes: pass/fail/abstain"
+                          style="{{ c.voteBadgeCss }}"
+                          >{{ c.voteBadge }}</span
+                        >
+                      </sc-if>
+                      <sc-if
+                        value="{{ c.hasPanelReason }}"
+                        hint-placeholder-val="{{ false }}"
+                      >
+                        <span style="{{ c.panelReasonCss }}"
+                          >{{ c.panelReason }}</span
+                        >
+                      </sc-if>
                       <div style="flex: 1; min-width: 0">
                         <div
                           style="
@@ -3185,6 +3395,17 @@
         // selected judge's data unchanged. Runs without a judge axis pass through.
         projectJudge(raw, judge){
           if(!raw) return {data:null, judge:null};
+          // Panel (consensus) view (schema 3.3): a synthetic judge whose
+          // summary/prompts come from the panel consensus rollup. Guarded on
+          // raw.panel so pre-panel runs never take this branch.
+          if(judge === '__panel__' && raw.panel){
+            const data = Object.assign({}, raw, {
+              summary: raw.panel.summary,
+              prompts: raw.panel.prompts,
+              meta: Object.assign({}, raw.meta, {judge:'Panel (consensus)'}),
+            });
+            return {data:data, judge:'__panel__'};
+          }
           const bj = raw.by_judge && raw.by_judge[judge];
           if(!bj) return {data:raw, judge:(raw.meta&&raw.meta.judge)||null};
           const data = Object.assign({}, raw, {
@@ -3276,7 +3497,10 @@
           __loadJson(run.path).then(function(d){
             var meta=d.meta||{}, models=meta.models||[], prompts=d.prompts||[];
             var judges=meta.judges||[];
-            var judge= judges.indexOf(prev.judge)>=0 ? prev.judge : (judges[0]||meta.judge||null);
+            var hasPanel=!!(d&&d.panel);
+            var judgeChoices=hasPanel ? ['__panel__'].concat(judges) : judges;
+            var judge= judgeChoices.indexOf(prev.judge)>=0 ? prev.judge
+                       : (hasPanel ? '__panel__' : (judges[0]||meta.judge||null));
             var proj=self.projectJudge(d, judge);
             var has=function(key,val){ return val!=null && prompts.some(function(p){ return p[key]===val; }); };
             var promptKept= prev.selectedId!=null && prompts.some(function(p){ return p.id===prev.selectedId; });
@@ -3477,8 +3701,17 @@
           const detailCriteria=visible.map(({c,i})=>{
             const r=(c.results&&c.results[model])||{};
             const pass=!!r.pass, expanded=!!this.state.expanded[i], isAuto=c.verifiability==='auto';
+            // Panel vote split (schema 3.3): present only on panel-projection
+            // result cells; null on single-judge cells so the badge is hidden.
+            const votes=r&&r.votes;
+            const voteBadge=votes ? (votes.pass+'P/'+votes.fail+'F/'+votes.abstain+'A') : null;
+            const panelReason= r.reason==='panel_tie' ? 'tie' : (r.reason==='panel_no_quorum' ? 'no quorum' : null);
             return {
               text:c.text, badge: pass?'PASS':'FAIL', badgeCss:this.badge(pass, vivid, true),
+              hasVoteBadge: !!voteBadge, voteBadge: voteBadge||'',
+              voteBadgeCss:'flex:none;font-size:10px;font-family:\'IBM Plex Mono\',monospace;color:var(--ink-3,#8c8678);background:var(--surface-2,#efece2);padding:3px 7px;border-radius:5px;white-space:nowrap;margin-top:1px',
+              hasPanelReason: !!panelReason, panelReason: panelReason||'',
+              panelReasonCss:'flex:none;font-size:10px;font-family:\'IBM Plex Mono\',monospace;color:var(--warn-dim,#977f3e);background:var(--warn-bg,#efe6d1);padding:3px 7px;border-radius:5px;white-space:nowrap;margin-top:1px',
               verifyLabel: isAuto?'auto-verifiable':'judge-required',
               verifyCss: isAuto
                 ?'flex:none;font-size:10.5px;color:var(--pass-dim,#6e8a62);background:var(--pass-bg,#e7ebda);padding:2px 8px;border-radius:5px;white-space:nowrap;font-family:\'IBM Plex Mono\',monospace'
@@ -3507,7 +3740,15 @@
           const faTax=fa?(fa.taxonomy||[]):[];
           const taxByKey={}; faTax.forEach(t=>{taxByKey[t.key]=t;});
           const promptById={}; prompts.forEach(p=>{promptById[p.id]=p;});
-          const faDisputed=(r)=> r.judge_concurrence==='opus_only';
+          // judge_concurrence is a string pre-3.3 ("opus_only" etc.) and a
+          // {pass,fail,abstain} vote dict in 3.3 — a row is "disputed" when a
+          // second judge passed the criterion (opus_only / any panel pass vote).
+          const disputed=(jc)=>{
+            if(!jc) return false;
+            if(typeof jc === 'string') return jc === 'opus_only';   // pre-3.3
+            return (jc.pass|0) > 0;                                 // 3.3 vote split
+          };
+          const faDisputed=(r)=> disputed(r.judge_concurrence);
           const faByCause={};
           faRowsAll.forEach(r=>{ const b=faByCause[r.root_cause]=faByCause[r.root_cause]||{total:0,disputed:0,byModel:{}}; b.total++; if(faDisputed(r)) b.disputed++; b.byModel[r.model]=(b.byModel[r.model]||0)+1; });
           const faCauses=Object.keys(faByCause).sort((a,b)=>{
@@ -3574,8 +3815,15 @@
               options: [{label:'All', check:active?'':'✓', rowStyle:optRow(!active), onClick:()=>this.setState({[m.stateKey]:null, faMenu:null})}].concat(
                 m.opts.map(o=>({label: m.pretty?prettyModel(o):o, check:m.value===o?'✓':'', rowStyle:optRow(m.value===o), onClick:()=>this.setState({[m.stateKey]:o, faMenu:null})}))) };
           });
+          // Concurrence chip is dual-shape: pre-3.3 strings vs 3.3 vote dict.
+          const concLabel=(c)=>{
+            if(c && typeof c === 'object') return (c.pass|0)+'P/'+(c.fail|0)+'F/'+(c.abstain|0)+'A';
+            return c==='both_fail'?'both judges':(c==='opus_only'?'opus only':(c==='fable_refused'?'2nd judge refused':'single judge'));
+          };
           const concStyle=(c)=> 'flex:none;font-size:10px;font-family:\'IBM Plex Mono\',monospace;padding:2px 7px;border-radius:5px;white-space:nowrap;'+(
-            c==='both_fail' ? 'color:var(--fail,#a8483b);background:var(--fail-bg,#f1e1d8)'
+            (c && typeof c === 'object')
+              ? (disputed(c) ? 'color:var(--warn-dim,#977f3e);background:var(--warn-bg,#efe6d1)' : 'color:var(--fail,#a8483b);background:var(--fail-bg,#f1e1d8)')
+            : c==='both_fail' ? 'color:var(--fail,#a8483b);background:var(--fail-bg,#f1e1d8)'
             : c==='opus_only' ? 'color:var(--warn-dim,#977f3e);background:var(--warn-bg,#efe6d1)'
             : 'color:var(--ink-3,#8c8678);background:var(--surface-2,#efece2)');
           const faTableRows=faRows.map(r=>{
@@ -3584,7 +3832,7 @@
             return { id:r.id, model:prettyModel(r.model), idx:'#'+r.criterion_index,
               cause:(taxByKey[r.root_cause]||{}).label||r.root_cause,
               confidence:r.confidence,
-              conc: r.judge_concurrence==='both_fail'?'both judges':(r.judge_concurrence==='opus_only'?'opus only':(r.judge_concurrence==='fable_refused'?'2nd judge refused':'single judge')),
+              conc: concLabel(r.judge_concurrence),
               concCss: concStyle(r.judge_concurrence),
               critText: crit.text||'', evidence:r.evidence||'', rationale:r.rationale||'',
               onClick:()=>this.openPrompt(r.id) };
@@ -3602,6 +3850,28 @@
             action:String(r.action||''), rationale:String(r.rationale||''),
             signal:String(r.expected_signal||'') }));
           const faSynthNote=String((faSynth&&faSynth.iteration_note)||'');
+
+          // ---- PANEL (schema 3.3): judge toggle choices + agreement card ----
+          // All reads guarded on raw.panel; pre-panel runs yield empty/false.
+          const rawPanel=(this.state.dataRaw&&this.state.dataRaw.panel)||null;
+          const hasPanel=!!rawPanel;
+          const judgeChoices=hasPanel ? ['__panel__'].concat(meta.judges||[]) : (meta.judges||[]);
+          const ag=(rawPanel&&rawPanel.agreement)||null;
+          const hasAgreement=!!ag;
+          const agJudges=hasPanel ? (meta.judges||[]) : [];
+          const fmtAgPct=(v)=> v==null ? '—' : (Math.round(v*10)/10).toFixed(1)+'%';
+          const agKappa= ag ? (ag.fleiss_kappa==null ? '—' : (Math.round(ag.fleiss_kappa*1000)/1000).toFixed(3)) : '—';
+          const agAbstain= agJudges.map(j=>({ label:prettyJudge(j), value:String((ag&&ag.abstentions&&ag.abstentions[j])||0) }));
+          const agMatrixCols=agJudges.map(j=>({label:prettyJudge(j)}));
+          const agCellCss=(self,v)=>'text-align:center;font-family:\'IBM Plex Mono\',monospace;font-size:12px;'+(self?'color:var(--ink-5,#cec8b8)':(v!=null?'color:var(--ink,#2a2722);font-weight:600':'color:var(--ink-5,#cec8b8)'));
+          const agMatrix=agJudges.map(a=>({
+            label:prettyJudge(a),
+            cells: agJudges.map(b=>{
+              const self=(a===b);
+              const v= self ? null : ((ag&&ag.pairwise&&ag.pairwise[a]&&ag.pairwise[a][b]!=null) ? ag.pairwise[a][b] : null);
+              return { v: self ? '·' : fmtAgPct(v), css: agCellCss(self,v) };
+            })
+          }));
 
           return {
             ...this.runSelVals(),
@@ -3625,8 +3895,9 @@
             isAnalysis:screen==='analysis',
             modelLabel,
             modelTabs: models.map(m=>({ label:prettyModel(m), onClick:()=>this.setModel(m), btnStyle:this.btn(m===model) })),
-            hasJudgeToggle: !!(meta.judges && meta.judges.length>1),
-            judgeTabs: (meta.judges||[]).map(j=>({ label:prettyJudge(j), onClick:()=>this.setJudge(j), btnStyle:this.btn(j===((this.state.judge)||meta.judge)) })),
+            hasJudgeToggle: hasPanel || !!(meta.judges && meta.judges.length>1),
+            judgeTabs: judgeChoices.map(j=>({ label: j==='__panel__'?'Panel':prettyJudge(j), onClick:()=>this.setJudge(j), btnStyle:this.btn(j===((this.state.judge)||meta.judge)) })),
+            hasAgreement, agKappa, agAbstain, agMatrixCols, agMatrix,
             hasRunNotes: !!(meta.run_notes && meta.run_notes.length),
             runNotes: (meta.run_notes||[]).map(t=>({text:String(t)})),
             notesOpen: !!this.state.notesOpen,
