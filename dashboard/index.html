@@ -3270,15 +3270,15 @@
           return {data:data, judge:judge};
         }
         setJudge(j){ this.setState(this.projectJudge(this.state.dataRaw, j)); }
-        goReference(){ this.setState({screen:'reference'}); this.ensureReference(); }
-        goRefMode(key){ this.__refScrolled=null; this.setState({screen:'reference', refMode:key}); this.ensureReference(); }
-        ensureReference(){
+        goReference(){ this.setState({screen:'reference', refMode:null, refError:null}); this.ensureReference(true); }
+        goRefMode(key){ this.__refScrolled=null; this.setState({screen:'reference', refMode:key, refError:null}); this.ensureReference(true); }
+        ensureReference(retry){
           var self=this;
-          if(this.__refLoading||this.state.reference||this.state.refError) return;
+          if(this.__refLoading||this.state.reference||(this.state.refError&&!retry)) return;
           this.__refLoading=true;
           __loadJson('./reference.json')
-            .then(function(r){ self.setState({reference:r}); })
-            .catch(function(e){ self.setState({refError:String((e&&e.message)||e)}); });
+            .then(function(r){ self.__refLoading=false; self.setState({reference:r}); })
+            .catch(function(e){ self.__refLoading=false; self.setState({refError:String((e&&e.message)||e)}); });
         }
         // Deep-link scroll: runs after every render; fires once per refMode
         // value, only when the target card exists in the DOM.
