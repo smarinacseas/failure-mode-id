@@ -41,10 +41,28 @@ def run(cfg: RunConfig | None = None, monitor: RunMonitor | None = None) -> None
     candidates = cfg.candidates if cfg is not None else dict(config.CANDIDATES)
     # Bare-invocation defaults resolve registry keys to specs so each judge is
     # pinged against its OWN provider, never blindly against Anthropic.
-    judges = list(cfg.judges) if cfg is not None else [resolve_judge(k) for k in config.JUDGES]
+    specs = list(cfg.judges) if cfg is not None else [resolve_judge(k) for k in config.JUDGES]
+    # A run also calls out to judges that aren't necessarily panel members:
+    # the classifier fallback chain (cfg.classifier_chain) and the diagnose
+    # chain (config.DIAGNOSE_CHAIN once Task 9 lands; today just the single
+    # config.DIAGNOSE_JUDGE). Ping every distinct one of those too, so a typo'd
+    # classifier or diagnose model fails here instead of mid-run. cfg is None
+    # only for the bare/default invocation, which has no per-experiment
+    # classifier override to add.
+    extra = list(cfg.classifier_chain) if cfg is not None else []
+    diag_chain = getattr(config, "DIAGNOSE_CHAIN", None) or (config.DIAGNOSE_JUDGE,)
+    extra += [resolve_judge(k) if isinstance(k, str) else k for k in diag_chain]
+    # Dedup by key: a judge already pinged (as a panel member or an earlier
+    # chain entry) is never pinged twice, even if the chains disagree on the
+    # underlying JudgeSpec object identity.
+    seen = {s.key for s in specs}
+    for s in extra:
+        if s.key not in seen:
+            specs.append(s)
+            seen.add(s.key)
     ctx = nullcontext(monitor) if monitor is not None else build_monitor("connectivity", 0)
     with ctx as mon:
-        mon.start_stage("connectivity", total=len(candidates) + len(judges))
+        mon.start_stage("connectivity", total=len(candidates) + len(specs))
         failures: list[tuple[str, str, str]] = []
         for key, model_id in candidates.items():
             mon.item_start(model=key, prompt_id=model_id)
@@ -56,7 +74,7 @@ def run(cfg: RunConfig | None = None, monitor: RunMonitor | None = None) -> None
                 failures.append((key, model_id, f"{type(e).__name__}: {e}"))
             mon.item_done()
 
-        for spec in judges:
+        for spec in specs:
             mon.item_start(model="judge", prompt_id=f"{spec.key} ({spec.model})")
             try:
                 txt = _ping_judge(spec)
