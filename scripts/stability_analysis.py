@@ -17,10 +17,14 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import sys
 from collections import Counter, defaultdict
 from math import sqrt
+from pathlib import Path
 
-import config
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import config  # noqa: E402
 from pipeline._io import read_jsonl
 from pipeline._select import select_prompts
 

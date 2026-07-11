@@ -13,10 +13,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
-import config
-from pipeline._decode_health import (  # noqa: F401 — re-exported for tests/tools
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import config  # noqa: E402
+from pipeline._decode_health import (  # noqa: E402,F401 — re-exported
     MIN_REPEATS,
     NGRAM,
     WINDOW,
