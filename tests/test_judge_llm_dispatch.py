@@ -1,3 +1,5 @@
+import threading
+import time
 import types
 
 import pytest
@@ -18,14 +20,30 @@ def _chunk(content=None, finish=None):
 
 
 class FakeStream:
-    def __init__(self, chunks):
+    """Streamed-response stand-in. hang=True blocks __next__ until close()
+    is called from another thread, then raises — the half-open-socket shape
+    the watchdog exists for (same pattern as tests/test_concurrency.py)."""
+
+    def __init__(self, chunks=(), hang=False):
         self._chunks = list(chunks)
-        self.closed = False
-        self.request_kwargs = None
-    def __iter__(self):
-        return iter(self._chunks)
+        self._hang = hang
+        self._closed = threading.Event()
+        self.close_calls = 0
+
     def close(self):
-        self.closed = True
+        self.close_calls += 1
+        self._closed.set()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self._hang:
+            self._closed.wait()
+            raise RuntimeError("read raised: stream closed under a blocked recv")
+        if self._chunks:
+            return self._chunks.pop(0)
+        raise StopIteration
 
 
 def _patch_router(monkeypatch, stream):
@@ -68,6 +86,23 @@ def test_deadline_abort_raises_retriable(monkeypatch):
         # attempts=1 via retry: patch retry to call through once
         monkeypatch.setattr(_judge_llm, "retry", lambda fn, **kw: fn())
         call_json(OR_SPEC, "s", "u", label="l")
+
+
+def test_deadline_hanging_stream_aborted_by_watchdog(monkeypatch):
+    """No chunk ever arrives (half-open socket: no bytes, no EOF). The
+    per-chunk elapsed check can never run; the watchdog must close the
+    stream from its timer thread and the blocked read's resulting error is
+    translated to JudgeDeadlineExceeded — the E04-incident defense."""
+    monkeypatch.setattr(config, "JUDGE_DEADLINE_S", 0.2)
+    monkeypatch.setattr(_judge_llm, "retry", lambda fn, **kw: fn())
+    stream = FakeStream(hang=True)
+    _patch_router(monkeypatch, stream)
+    t0 = time.monotonic()
+    with pytest.raises(JudgeDeadlineExceeded, match="closed by watchdog"):
+        call_json(OR_SPEC, "s", "u", label="l")
+    elapsed = time.monotonic() - t0
+    assert 0.2 <= elapsed < 3.0                 # aborted at the deadline, not later
+    assert stream.close_calls >= 1              # the watchdog actually fired
 
 
 def test_anthropic_branch_unchanged(monkeypatch):
