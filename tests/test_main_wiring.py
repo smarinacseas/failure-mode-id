@@ -93,8 +93,8 @@ def test_judge_mode_flag_flows_to_cfg_and_defaults_batch(tmp_path, monkeypatch):
 
 def test_bad_judge_exits_2(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
-    assert main.main(["grade", "--experiment", "E93-j", "--judge", "gpt-5"]) == 2
-    assert "claude-" in capsys.readouterr().err
+    assert main.main(["grade", "--experiment", "E93-j", "--judge", "unknown-judge"]) == 2
+    assert "unknown judge" in capsys.readouterr().err
 
 
 def test_all_on_slug_frozen_without_limit_gives_distinct_error(tmp_path, monkeypatch, capsys):

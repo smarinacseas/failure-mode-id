@@ -44,6 +44,7 @@ def test_diagnose_system_prompt_is_analyst_not_grader():
         assert key in text
 
 
+import pipeline._judge_llm as judge_llm
 import pipeline.diagnose as diagnose
 from conftest import make_cfg
 from pipeline._io import read_jsonl, write_jsonl
@@ -59,7 +60,13 @@ def _cfg_opus(**kw):
 
 def _seed_run(tmp_path, monkeypatch, *, reasoning_trace="I will check c2… it fails."):
     """One prompt, one model, 3 criteria: c1 PASS, c2 real FAIL, c3 FAIL from a
-    grading artifact (judge_truncated) that must NOT become a diagnose target."""
+    grading artifact (judge_truncated) that must NOT become a diagnose target.
+
+    BOTH panel judges (Opus + Fable) are seeded so the 2-judge panel reaches
+    quorum and consensus targeting yields the same [2] the pre-panel first-judge
+    code did: index 2 is a real FAIL under both, index 1 PASSes both, and index 3
+    is an artifact FAIL under both (both abstain → panel_no_quorum). Concurrence
+    tests overwrite Fable's grades to script the specific vote split they need."""
     monkeypatch.setattr(config, "RUNS_DIR", tmp_path / "runs")
     cfg = _cfg_opus()
     data = tmp_path / "prompts.jsonl"
@@ -79,6 +86,15 @@ def _seed_run(tmp_path, monkeypatch, *, reasoning_trace="I will check c2… it f
         "verdicts": [
             {"index": 1, "verdict": "PASS", "reason": "MARKER_PASS_REASON fine"},
             {"index": 2, "verdict": "FAIL", "reason": "MARKER_FAIL_REASON cats"},
+            {"index": 3, "verdict": "FAIL",
+             "reason": "judge_truncated: stop_reason=max_tokens"},
+        ],
+    }])
+    write_jsonl(cfg.grades_path("claude-fable-5", "m1"), [{
+        "id": "p1",
+        "verdicts": [
+            {"index": 1, "verdict": "PASS", "reason": ""},
+            {"index": 2, "verdict": "FAIL", "reason": "cats mentioned"},
             {"index": 3, "verdict": "FAIL",
              "reason": "judge_truncated: stop_reason=max_tokens"},
         ],
@@ -304,7 +320,9 @@ def test_diagnose_batch_submit_collect_and_request_shape(tmp_path, monkeypatch):
     (req,) = fake.created[0]
     assert req["custom_id"] == "m1__p1"
     p = req["params"]
-    assert p["model"] == config.DIAGNOSE_JUDGE
+    # The chain head (Fable) is the first analyst — its provider model, not the
+    # grading panel's — and the request carries that model.
+    assert p["model"] == "claude-fable-5" == config.DIAGNOSE_CHAIN[0]
     assert p["max_tokens"] == config.DIAGNOSE_MAX_TOKENS
     assert p["thinking"] == {"type": "adaptive"}
     assert "failure analyst" in p["system"]
@@ -313,6 +331,7 @@ def test_diagnose_batch_submit_collect_and_request_shape(tmp_path, monkeypatch):
     (row,) = read_jsonl(cfg.diagnosis_path("m1"))
     assert row["id"] == "p1" and row["trace_status"] == "present"
     assert row["diagnoses"][0]["root_cause"] == "judge_suspect"
+    assert row["analyst"] == "claude-fable-5"               # head succeeded
     snap = m.snapshot()
     assert snap["errors"] == 0 and snap["stages"][0]["done"] == 1
 
@@ -332,42 +351,55 @@ def test_write_cell_stamps_taxonomy_version(tmp_path, monkeypatch):
     assert row["taxonomy_version"] == taxonomy.TAXONOMY_VERSION == 1
 
 
-def test_diagnose_refusal_is_terminal_without_resubmission(tmp_path, monkeypatch):
-    script = [{"polls": ["ended"],
-               "results": lambda reqs: [_succeeded(reqs[0]["custom_id"], "", "refusal")]}]
+def test_diagnose_refusal_advances_without_same_member_resubmission(tmp_path, monkeypatch):
+    """A refusal is sticky PER MEMBER: the head (Fable) is not resubmitted after
+    it refuses (no round-2), and the cell is NOT written terminally — it advances
+    to the next member (Opus), which here succeeds. Exactly two batches; a
+    same-member refusal resubmission would make it three."""
+    script = [{"polls": ["ended"],                           # member 1 (Fable): refusal
+               "results": lambda reqs: [_succeeded(reqs[0]["custom_id"], "", "refusal")]},
+              {"polls": ["ended"],                           # member 2 (Opus): success
+               "results": lambda reqs: [_succeeded(reqs[0]["custom_id"], _diag_json())]}]
     cfg, fake = _batch_setup(tmp_path, monkeypatch, script)
     m = _diag_monitor()
     with m:
         diagnose.run(cfg, monitor=m)
-    assert len(fake.created) == 1                            # no second round
+    assert len(fake.created) == 2                            # Fable once, Opus once
     (row,) = read_jsonl(cfg.diagnosis_path("m1"))
-    assert row["diagnoses"][0]["rationale"].startswith("diagnose_refusal")
+    assert row["diagnoses"][0]["root_cause"] == "judge_suspect"   # real, not error_rows
+    assert row["analyst"] == OPUS
+    assert m.snapshot()["errors"] == 0
 
 
-def test_diagnose_parse_error_retries_once_then_error_rows(tmp_path, monkeypatch):
-    script = [
+def test_diagnose_parse_error_retries_once_per_member_then_error_rows(tmp_path, monkeypatch):
+    """A retriable failure (parse error, then a batch error) resubmits ONCE to
+    the same member; when both chain members exhaust their two rounds the cell
+    lands in the terminal _error_rows sweep, attributed to the last member
+    (Opus). Four batches: two rounds × two members."""
+    parse_then_error = [
         {"polls": ["ended"],
          "results": lambda reqs: [_succeeded(reqs[0]["custom_id"], "not json")]},
         {"polls": ["ended"],
          "results": lambda reqs: [_errored(reqs[0]["custom_id"])]},
     ]
-    cfg, fake = _batch_setup(tmp_path, monkeypatch, script)
+    cfg, fake = _batch_setup(tmp_path, monkeypatch, parse_then_error * 2)
     m = _diag_monitor()
     with m:
         diagnose.run(cfg, monitor=m)
-    assert len(fake.created) == 2
+    assert len(fake.created) == 4
     (row,) = read_jsonl(cfg.diagnosis_path("m1"))
     assert row["diagnoses"][0]["root_cause"] == "other"
+    assert row["analyst"] == OPUS                           # chain[-1]
     assert m.snapshot()["errors"] == 1
 
 
 def test_diagnose_parse_error_then_success_second_round(tmp_path, monkeypatch):
-    """Item 3 (characterization — existing behavior, previously untested):
-    the round-2 SUCCESS path of the resubmit loop. A round-1 parse failure
-    is retriable and resubmits the cell; a clean round-2 parse writes
-    normally, with no error residue carried over from round 1's failed
-    attempt (round 1 only sets cell["last_err"] in memory — it never calls
-    mon.record_error)."""
+    """The round-2 SUCCESS path of a single member's resubmit loop. A round-1
+    parse failure is retriable and resubmits the cell to the SAME member
+    (Fable); a clean round-2 parse writes normally (analyst=Fable), with no
+    error residue from round 1's failed attempt (round 1 only sets
+    cell["last_err"] in memory — it never calls mon.record_error). pending
+    empties, so member 2 never runs."""
     script = [
         {"polls": ["ended"],
          "results": lambda reqs: [_succeeded(reqs[0]["custom_id"], "not json")]},
@@ -381,15 +413,19 @@ def test_diagnose_parse_error_then_success_second_round(tmp_path, monkeypatch):
     assert len(fake.created) == 2
     (row,) = read_jsonl(cfg.diagnosis_path("m1"))
     assert row["diagnoses"][0]["root_cause"] == "judge_suspect"
+    assert row["analyst"] == "claude-fable-5"               # head recovered on round 2
     assert m.snapshot()["errors"] == 0
 
 
 def test_diagnose_noop_when_no_failures(tmp_path, monkeypatch):
     cfg, fake = _batch_setup(tmp_path, monkeypatch, [])
-    write_jsonl(cfg.grades_path(OPUS, "m1"), [{
-        "id": "p1", "verdicts": [{"index": i, "verdict": "PASS", "reason": ""}
-                                 for i in (1, 2, 3)],
-    }])
+    # Both panel judges must PASS for consensus to clear the cell — a lingering
+    # second-judge FAIL would tie → consensus FAIL → a target.
+    for j in (OPUS, "claude-fable-5"):
+        write_jsonl(cfg.grades_path(j, "m1"), [{
+            "id": "p1", "verdicts": [{"index": i, "verdict": "PASS", "reason": ""}
+                                     for i in (1, 2, 3)],
+        }])
     m = _diag_monitor()
     with m:
         diagnose.run(cfg, monitor=m)
@@ -401,7 +437,7 @@ import pipeline.aggregate as aggregate
 
 def test_failure_analysis_block_joins_concurrence_and_rolls_up(tmp_path, monkeypatch):
     cfg = _seed_run(tmp_path, monkeypatch)
-    # Fable disagrees on criterion 2 (PASS) → opus_only concurrence.
+    # Fable disagrees on criterion 2 (PASS) → a 1-pass/1-fail vote split.
     write_jsonl(cfg.grades_path("claude-fable-5", "m1"), [{
         "id": "p1",
         "verdicts": [
@@ -411,7 +447,7 @@ def test_failure_analysis_block_joins_concurrence_and_rolls_up(tmp_path, monkeyp
         ],
     }])
     write_jsonl(cfg.diagnosis_path("m1"), [{
-        "id": "p1", "trace_status": "present",
+        "id": "p1", "trace_status": "present", "analyst": OPUS,
         "diagnoses": [{"index": 2, "evidence": "q", "root_cause": "judge_suspect",
                        "secondary": None, "confidence": "high", "rationale": "r"}],
     }])
@@ -419,16 +455,22 @@ def test_failure_analysis_block_joins_concurrence_and_rolls_up(tmp_path, monkeyp
     grades_by_judge = {
         j: {"m1": {g["id"]: g["verdicts"]
                    for g in read_jsonl(cfg.grades_path(j, "m1"))}}
-        for j in cfg.judges
+        for j in cfg.judge_keys
     }
     block = aggregate._failure_analysis_block(cfg, records, grades_by_judge)
     assert block["taxonomy_version"] >= 1
-    assert block["diagnose_judge"] == config.DIAGNOSE_JUDGE
-    assert block["verdict_basis"] == OPUS
+    # Schema 3.3: the chain echo, with diagnose_judge kept as its first entry.
+    assert block["diagnose_chain"] == list(config.DIAGNOSE_CHAIN)
+    assert block["diagnose_judge"] == config.DIAGNOSE_CHAIN[0]
+    # verdict_basis is "panel" once >=2 judges form a panel (Task 9 targets
+    # consensus): this fixture's _cfg_opus() panel is Opus + Fable.
+    assert block["verdict_basis"] == "panel"
     assert block["counts"] == {"failed_criteria": 1, "diagnosed": 1, "cells": 1}
     (row,) = block["rows"]
     assert row["id"] == "p1" and row["model"] == "m1" and row["criterion_index"] == 2
-    assert row["judge_concurrence"] == "opus_only"
+    # judge_concurrence is now the panel vote split: Opus FAIL vs Fable PASS.
+    assert row["judge_concurrence"] == {"pass": 1, "fail": 1, "abstain": 0}
+    assert row["analyst"] == OPUS
     assert row["trace_status"] == "present"
     rc = block["by_root_cause"]["judge_suspect"]
     assert rc["total"] == 1
@@ -440,9 +482,8 @@ def test_failure_analysis_block_joins_concurrence_and_rolls_up(tmp_path, monkeyp
 
 
 def test_failure_analysis_concurrence_both_fail(tmp_path, monkeypatch):
-    """Characterization test (behavior shipped in the fold-in commit, not TDD):
-    the majority case — second judge independently FAILs the same criterion
-    with a normal reason — must map to both_fail, not opus_only/fable_refused."""
+    """The majority case — both judges independently FAIL the same criterion
+    with normal reasons — is a unanimous 2-fail vote split (the old both_fail)."""
     cfg = _seed_run(tmp_path, monkeypatch)
     write_jsonl(cfg.grades_path("claude-fable-5", "m1"), [{
         "id": "p1",
@@ -453,7 +494,7 @@ def test_failure_analysis_concurrence_both_fail(tmp_path, monkeypatch):
         ],
     }])
     write_jsonl(cfg.diagnosis_path("m1"), [{
-        "id": "p1", "trace_status": "present",
+        "id": "p1", "trace_status": "present", "analyst": OPUS,
         "diagnoses": [{"index": 2, "evidence": "q", "root_cause": "other",
                        "secondary": None, "confidence": "high", "rationale": "r"}],
     }])
@@ -461,19 +502,19 @@ def test_failure_analysis_concurrence_both_fail(tmp_path, monkeypatch):
     grades_by_judge = {
         j: {"m1": {g["id"]: g["verdicts"]
                    for g in read_jsonl(cfg.grades_path(j, "m1"))}}
-        for j in cfg.judges
+        for j in cfg.judge_keys
     }
     block = aggregate._failure_analysis_block(cfg, records, grades_by_judge)
-    assert block["rows"][0]["judge_concurrence"] == "both_fail"
+    assert block["rows"][0]["judge_concurrence"] == {"pass": 0, "fail": 2, "abstain": 0}
 
 
-def test_failure_analysis_concurrence_artifact_fails_are_not_both_fail(tmp_path, monkeypatch):
-    """Item 1: a second-judge FAIL whose reason is a grading-artifact prefix
+def test_failure_analysis_concurrence_artifact_fails_abstain(tmp_path, monkeypatch):
+    """A second-judge FAIL whose reason is a grading-artifact prefix
     (judge_parse_error/judge_truncated/missing_in_judge_output) carries no
     information about the candidate — same spirit as judge_refusal — so it
-    must not inflate judge-agreement into both_fail. Only judge_refusal maps
-    to fable_refused; these three have no usable second verdict at all, so
-    they must map to no_second_judge instead."""
+    ABSTAINS in the vote split (via vote_of inside consensus_verdict) rather
+    than inflating the fail tally. Here: Opus FAIL + Fable-artifact-abstain →
+    one fail, one abstain, not two fails."""
     cfg = _seed_run(tmp_path, monkeypatch)
     write_jsonl(cfg.grades_path("claude-fable-5", "m1"), [{
         "id": "p1",
@@ -485,7 +526,7 @@ def test_failure_analysis_concurrence_artifact_fails_are_not_both_fail(tmp_path,
         ],
     }])
     write_jsonl(cfg.diagnosis_path("m1"), [{
-        "id": "p1", "trace_status": "present",
+        "id": "p1", "trace_status": "present", "analyst": OPUS,
         "diagnoses": [{"index": 2, "evidence": "q", "root_cause": "other",
                        "secondary": None, "confidence": "high", "rationale": "r"}],
     }])
@@ -493,21 +534,21 @@ def test_failure_analysis_concurrence_artifact_fails_are_not_both_fail(tmp_path,
     grades_by_judge = {
         j: {"m1": {g["id"]: g["verdicts"]
                    for g in read_jsonl(cfg.grades_path(j, "m1"))}}
-        for j in cfg.judges
+        for j in cfg.judge_keys
     }
     block = aggregate._failure_analysis_block(cfg, records, grades_by_judge)
-    assert block["rows"][0]["judge_concurrence"] == "no_second_judge"
+    assert block["rows"][0]["judge_concurrence"] == {"pass": 0, "fail": 1, "abstain": 1}
 
 
 def test_failure_analysis_concurrence_refused_and_single_judge(tmp_path, monkeypatch):
     cfg = _seed_run(tmp_path, monkeypatch)
     write_jsonl(cfg.diagnosis_path("m1"), [{
-        "id": "p1", "trace_status": "present",
+        "id": "p1", "trace_status": "present", "analyst": OPUS,
         "diagnoses": [{"index": 2, "evidence": "q", "root_cause": "other",
                        "secondary": None, "confidence": "low", "rationale": "r"}],
     }])
     records = read_jsonl(diagnose.DATA_JSONL)
-    # Fable refused this cell → fable_refused.
+    # Fable refused this cell → its verdict abstains: Opus FAIL + one abstain.
     fable = {"m1": {"p1": [
         {"index": i, "verdict": "FAIL",
          "reason": "judge_refusal: model declined to grade this cell"}
@@ -516,13 +557,13 @@ def test_failure_analysis_concurrence_refused_and_single_judge(tmp_path, monkeyp
                    for g in read_jsonl(cfg.grades_path(OPUS, "m1"))}}
     block = aggregate._failure_analysis_block(
         cfg, records, {OPUS: opus, "claude-fable-5": fable})
-    assert block["rows"][0]["judge_concurrence"] == "fable_refused"
+    assert block["rows"][0]["judge_concurrence"] == {"pass": 0, "fail": 1, "abstain": 1}
 
-    # Single-judge cfg → no_second_judge. Distinct slug: E99-test's run dir
-    # already holds this test's dual-judge artifacts.
+    # Single-judge cfg → no second vote, just the one FAIL. Distinct slug:
+    # E99-test's run dir already holds this test's dual-judge artifacts.
     solo = make_cfg(slug="E98-solo", judges=(OPUS,))
     write_jsonl(solo.diagnosis_path("m1"), [{
-        "id": "p1", "trace_status": "absent",
+        "id": "p1", "trace_status": "absent", "analyst": OPUS,
         "diagnoses": [{"index": 2, "evidence": "", "root_cause": "other",
                        "secondary": None, "confidence": "low", "rationale": "r"}],
     }])
@@ -531,7 +572,7 @@ def test_failure_analysis_concurrence_refused_and_single_judge(tmp_path, monkeyp
                     {"index": 2, "verdict": "FAIL", "reason": "x"}]}])
     block = aggregate._failure_analysis_block(solo, records, {OPUS: {
         "m1": {"p1": [{"index": 2, "verdict": "FAIL", "reason": "x"}]}}})
-    assert block["rows"][0]["judge_concurrence"] == "no_second_judge"
+    assert block["rows"][0]["judge_concurrence"] == {"pass": 0, "fail": 1, "abstain": 0}
 
 
 def test_failure_analysis_absent_when_no_diagnosis_dir(tmp_path, monkeypatch):
@@ -636,8 +677,12 @@ def test_synthesize_writes_validates_and_resumes(tmp_path, monkeypatch):
     _index_and_results(tmp_path, monkeypatch, [("E97-prior", 97, True)])
     calls = {"n": 0}
 
-    def fake_call_json(model, system, user_msg, label):
+    def fake_call_json(spec, system, user_msg, label):
         calls["n"] += 1
+        # Synthesis runs through call_json_chain now; the head member (Fable)
+        # produces valid output on the first call, so the chain returns without
+        # touching the fallback.
+        assert label == "anthropic:claude-fable-5:synthesis"
         # Blind-side check of the INPUT: rollups only — no response text,
         # no criterion text, and the predecessor's data made it in.
         assert "A plan featuring cats." not in user_msg
@@ -658,7 +703,7 @@ def test_synthesize_writes_validates_and_resumes(tmp_path, monkeypatch):
             ],
             "iteration_note": "one more eval round before training",
         }), "end_turn"
-    monkeypatch.setattr(diagnose, "call_json", fake_call_json)
+    monkeypatch.setattr(judge_llm, "call_json", fake_call_json)
 
     mon = SimpleNamespace(note=lambda *a, **k: None,
                           record_error=lambda *a, **k: None)
@@ -683,11 +728,11 @@ def test_synthesize_nonfatal_on_failure_and_skips_without_rows(tmp_path, monkeyp
     # No diagnosis rows on disk → nothing to synthesize, no call attempted.
     def boom(*a, **k):
         raise AssertionError("must not be called")
-    monkeypatch.setattr(diagnose, "call_json", boom)
+    monkeypatch.setattr(judge_llm, "call_json", boom)
     diagnose._synthesize(cfg, mon)
     assert not cfg.synthesis_path.exists() and errors == []
 
-    # Rows exist but both attempts fail → recorded error, no file, no raise.
+    # Rows exist but every chain member fails → recorded error, no file, no raise.
     write_jsonl(cfg.diagnosis_path("m1"), [{
         "id": "p1", "trace_status": "present",
         "diagnoses": [{"index": 2, "evidence": "q", "root_cause": "other",
@@ -695,7 +740,7 @@ def test_synthesize_nonfatal_on_failure_and_skips_without_rows(tmp_path, monkeyp
     }])
     def raiser(*a, **k):
         raise RuntimeError("api down")
-    monkeypatch.setattr(diagnose, "call_json", raiser)
+    monkeypatch.setattr(judge_llm, "call_json", raiser)
     diagnose._synthesize(cfg, mon)
     assert not cfg.synthesis_path.exists()
     assert errors and "synthesis" in errors[0]
@@ -732,7 +777,7 @@ def test_synthesize_nonfatal_on_malformed_artifacts(tmp_path, monkeypatch):
     _index_and_results(tmp_path, monkeypatch, [])
     errors = []
     mon = SimpleNamespace(note=lambda *a, **k: None, record_error=errors.append)
-    monkeypatch.setattr(diagnose, "call_json",
+    monkeypatch.setattr(judge_llm, "call_json",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not be called")))
     diagnose._synthesize(cfg, mon)          # must NOT raise
     assert not cfg.synthesis_path.exists()

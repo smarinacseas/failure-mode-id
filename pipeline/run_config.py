@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,13 +21,85 @@ import config
 SLUG_RE = re.compile(r"^E(\d{2,})-[a-z0-9]+(-[a-z0-9]+)*$")
 
 _PARAM_FIELDS = (
-    "candidates", "judges", "max_tokens", "temperature",
+    "candidates", "judges", "classifier_chain", "max_tokens", "temperature",
     "reasoning", "timeout_s", "limit", "description", "provider_sort",
     "sample_seed", "judge_mode",
 )
 
 PROVIDER_SORTS = ("throughput", "latency", "price")
 JUDGE_MODES = ("batch", "sequential")
+
+JUDGE_CLIENTS = ("anthropic", "openrouter")
+# Path- and custom_id-safe; no "/" (paths) and no "__" (CUSTOM_ID_SEP).
+JUDGE_KEY_RE = re.compile(r"^(?!.*__)[a-zA-Z0-9.-]+(_[a-zA-Z0-9.-]+)*$")
+
+
+@dataclass(frozen=True)
+class JudgeSpec:
+    """One panel member. `key` is the judge's identity everywhere downstream
+    (grades/<key>/, by_judge[<key>], dashboard labels, batch custom_ids);
+    `model` is the provider-side id and never appears in a path."""
+    key: str
+    client: str
+    model: str
+
+    def __post_init__(self) -> None:
+        if self.client not in JUDGE_CLIENTS:
+            raise ValueError(f"judge client must be one of {JUDGE_CLIENTS}, got {self.client!r}")
+        if not JUDGE_KEY_RE.match(self.key):
+            raise ValueError(
+                f"judge key {self.key!r} must be path-safe ([a-zA-Z0-9._-], no '__', no '/')")
+
+    def to_dict(self) -> dict:
+        return {"key": self.key, "client": self.client, "model": self.model}
+
+    @classmethod
+    def from_value(cls, v: "JudgeSpec | dict | str") -> "JudgeSpec":
+        """Hydrate a freeze entry. Plain strings are pre-panel Anthropic ids
+        (key == model) — byte-identical legacy behavior."""
+        if isinstance(v, cls):
+            return v
+        if isinstance(v, dict):
+            return cls(key=v["key"], client=v["client"], model=v["model"])
+        return cls(key=v, client="anthropic", model=v)
+
+
+def _infer_client(model: str, entry: str) -> str:
+    if model.startswith("claude-"):
+        return "anthropic"
+    if "/" in model:
+        return "openrouter"
+    raise ValueError(
+        f"cannot infer client for judge entry {entry!r}: model {model!r} is neither "
+        "claude-* (anthropic) nor org/model-id (openrouter)")
+
+
+def resolve_judge(entry: str) -> JudgeSpec:
+    """CLI judge entry → JudgeSpec: registry key | key=provider/id | bare claude-*."""
+    entry = entry.strip()
+    if "=" in entry:
+        key, model = (s.strip() for s in entry.split("=", 1))
+        if not key or not model:
+            raise ValueError(f"malformed judge entry {entry!r}; use key=provider/model-id")
+        return JudgeSpec(key=key, client=_infer_client(model, entry), model=model)
+    if entry in config.JUDGE_REGISTRY:
+        reg = config.JUDGE_REGISTRY[entry]
+        return JudgeSpec(key=entry, client=reg["client"], model=reg["model"])
+    if entry.startswith("claude-"):
+        return JudgeSpec(key=entry, client="anthropic", model=entry)
+    raise ValueError(
+        f"unknown judge {entry!r}; registry keys: {', '.join(config.JUDGE_REGISTRY)} — "
+        "or add an unregistered judge with key=provider/model-id")
+
+
+def family_of(client: str, model: str) -> str:
+    """Model family for self-preference checks: 'anthropic' for the Anthropic
+    client, else the OpenRouter id's org prefix (qwen/… → qwen)."""
+    return "anthropic" if client == "anthropic" else model.split("/", 1)[0]
+
+
+def candidate_family(model_id: str) -> str:
+    return model_id.split("/", 1)[0] if "/" in model_id else model_id
 
 
 class InvalidSlugError(ValueError):
@@ -56,7 +129,10 @@ class RunConfig:
 
     slug: str
     candidates: dict[str, str]      # key -> provider model id
-    judges: tuple[str, ...]         # Anthropic model ids; each grades the same responses
+    # Panel graders; each grades the SAME responses. Constructor accepts
+    # registry-key strings / {key,client,model} dicts / JudgeSpecs — all
+    # hydrated to JudgeSpec in __post_init__.
+    judges: tuple[JudgeSpec, ...]
     max_tokens: int
     temperature: float
     reasoning: bool
@@ -82,18 +158,31 @@ class RunConfig:
     # in both modes — this is a transport choice, not a treatment change —
     # but it is frozen so the manifest records how a run's grades were made.
     judge_mode: str = "batch"
+    # Classify fallback chain (frozen). None -> (first judge,). Walked per prompt; refusal advances, one retry then advance (spec §4).
+    classifier_chain: tuple[JudgeSpec, ...] | None = None
 
     def __post_init__(self) -> None:
         if self.judge_mode not in JUDGE_MODES:
             raise ValueError(
                 f"judge_mode must be one of {JUDGE_MODES}, got {self.judge_mode!r}"
             )
+        # Frozen dataclass: hydrate the accepted string/dict/spec forms in place
+        # (object.__setattr__ is the sanctioned escape hatch for frozen writes).
+        object.__setattr__(self, "judges",
+                           tuple(JudgeSpec.from_value(j) for j in self.judges))
+        chain = self.classifier_chain if self.classifier_chain is not None else (self.judges[0],)
+        object.__setattr__(self, "classifier_chain",
+                           tuple(JudgeSpec.from_value(j) for j in chain))
 
     @property
-    def judge(self) -> str:
-        """The canonical judge (first) — used for criterion classification and
-        as the default view. Grades exist for every judge in `self.judges`."""
+    def judge(self) -> JudgeSpec:
+        """The canonical judge (first spec) — default dashboard view;
+        classification uses classifier_chain."""
         return self.judges[0]
+
+    @property
+    def judge_keys(self) -> tuple[str, ...]:
+        return tuple(s.key for s in self.judges)
 
     # --- derived paths (config.RUNS_DIR read at access time for testability) ---
     @property
@@ -109,12 +198,14 @@ class RunConfig:
 
     def grades_path(self, judge: str, key: str) -> Path:
         """Grades are keyed by (judge, candidate): grades/<judge>/<candidate>.jsonl.
-        Each judge scores the same responses, so its verdicts live in its own dir."""
+        Each judge scores the same responses, so its verdicts live in its own dir.
+        `judge` is the judge KEY (path-safe), never a provider model id."""
         return self.run_dir / "grades" / judge / f"{key}.jsonl"
 
     def diagnosis_path(self, key: str) -> Path:
         """Root-cause diagnoses per candidate: diagnosis/<candidate>.jsonl.
-        Single analyst model (config.DIAGNOSE_JUDGE), so no judge subdir."""
+        No judge subdir — the analyst chain (config.DIAGNOSE_CHAIN) degrades per
+        cell, so each record stamps the `analyst` that produced it instead."""
         return self.run_dir / "diagnosis" / f"{key}.jsonl"
 
     @property
@@ -146,7 +237,9 @@ class RunConfig:
     # --- serialization (slug is the filename's job, not the payload's) ---
     def to_json_dict(self) -> dict:
         d = {f: getattr(self, f) for f in _PARAM_FIELDS}
-        d["judges"] = list(self.judges)  # tuple → JSON array
+        # tuple[JudgeSpec] → JSON array of {key,client,model} dicts.
+        d["judges"] = [s.to_dict() for s in self.judges]
+        d["classifier_chain"] = [s.to_dict() for s in self.classifier_chain]
         return d
 
     @classmethod
@@ -161,6 +254,8 @@ class RunConfig:
         d.setdefault("sample_seed", None)
         # Back-compat: freezes older than the judge_mode knob (pre-concurrency).
         d.setdefault("judge_mode", "batch")
+        # Back-compat: freezes older than the classifier_chain knob (pre-panel).
+        d.setdefault("classifier_chain", None)
         try:
             kwargs = {f: d[f] for f in _PARAM_FIELDS}
         except KeyError as e:
@@ -168,7 +263,11 @@ class RunConfig:
                 f"experiment.json for {slug!r} is missing field {e.args[0]!r} — "
                 f"was it hand-edited? Delete runs/{slug}/ to start over."
             ) from e
+        # Lists → tuples; the string/dict entries hydrate to JudgeSpec in
+        # __post_init__ (None classifier_chain stays None → defaults there).
         kwargs["judges"] = tuple(kwargs["judges"])
+        if kwargs["classifier_chain"] is not None:
+            kwargs["classifier_chain"] = tuple(kwargs["classifier_chain"])
         return cls(slug=slug, **kwargs)
 
 
@@ -203,23 +302,21 @@ def parse_candidates(spec: str) -> dict[str, str]:
     return out
 
 
-def validate_judge(judge: str) -> str:
-    if not judge.startswith("claude-"):
-        raise ValueError(
-            f"--judge must be an Anthropic model id (claude-*), got {judge!r}. "
-            "The judge/classifier client is Anthropic-only; non-Anthropic judges "
-            "are the E04-judge-swap roadmap item."
-        )
-    return judge
-
-
-def parse_judges(spec: str) -> tuple[str, ...]:
-    """Parse `--judges`: comma list of Anthropic model ids (dedup, order-preserving)."""
-    out: list[str] = []
+def parse_judges(spec: str) -> tuple[JudgeSpec, ...]:
+    """Parse `--judges`/`--classifier`: comma list of registry keys,
+    key=provider/model-id pairs, or bare claude-* ids (dedup by key)."""
+    out: list[JudgeSpec] = []
     for entry in spec.split(","):
         entry = entry.strip()
-        if entry and entry not in out:
-            out.append(validate_judge(entry))
+        if not entry:
+            continue
+        js = resolve_judge(entry)
+        dup = next((o for o in out if o.key == js.key), None)
+        if dup is not None:
+            if dup != js:
+                raise ValueError(f"judge key {js.key!r} given twice with different models")
+            continue
+        out.append(js)
     if not out:
         raise ValueError("--judges parsed to an empty set")
     return tuple(out)
@@ -228,7 +325,11 @@ def parse_judges(spec: str) -> tuple[str, ...]:
 def _defaults() -> dict:
     return {
         "candidates": dict(config.CANDIDATES),
-        "judges": tuple(config.JUDGES),
+        # Resolve registry keys to specs so the default panel carries real
+        # clients/models — a raw "gpt-5" key would otherwise be sent to the
+        # Anthropic API by grade/connectivity.
+        "judges": tuple(resolve_judge(k) for k in config.JUDGES),
+        "classifier_chain": None,
         "max_tokens": config.CANDIDATE_MAX_TOKENS,
         "temperature": config.CANDIDATE_TEMPERATURE,
         "reasoning": False,
@@ -239,6 +340,16 @@ def _defaults() -> dict:
         "sample_seed": None,
         "judge_mode": "batch",
     }
+
+
+def family_overlaps(cfg: RunConfig) -> list[tuple[str, str]]:
+    """Judges whose model family matches a candidate family — the
+    self-preference-bias configuration the v1 design structurally avoided.
+    Recorded and warned about, never blocked (a deliberate same-family
+    ablation is a legitimate experiment)."""
+    cand = {candidate_family(m) for m in cfg.candidates.values()}
+    return [(s.key, family_of(s.client, s.model)) for s in cfg.judges
+            if family_of(s.client, s.model) in cand]
 
 
 def resolve(slug: str, overrides: dict) -> RunConfig:
@@ -254,12 +365,27 @@ def resolve(slug: str, overrides: dict) -> RunConfig:
     if path.exists():
         frozen = json.loads(path.read_text(encoding="utf-8"))["params"]
 
-        def _norm(x):  # JSON round-trips tuples to lists; compare shape-agnostically
-            return list(x) if isinstance(x, (list, tuple)) else x
+        def _norm(x):  # JSON round-trips tuples→lists and specs→dicts; compare shape-agnostically
+            if isinstance(x, JudgeSpec):
+                return x.to_dict()
+            if isinstance(x, (list, tuple)):
+                return [_norm(i) for i in x]
+            return x
+
+        def _norm_param(key, x):
+            # Judge params need FIELD-AWARE normalization: a legacy freeze
+            # stores judges as plain strings while overrides carry JudgeSpecs —
+            # hydrating each element through from_value().to_dict() makes
+            # str/dict/spec forms of the SAME judge compare equal. Only judge
+            # fields get this — candidates dict values are plain strings that
+            # must never be reinterpreted as judge entries.
+            if key in ("judges", "classifier_chain") and isinstance(x, (list, tuple)):
+                return [JudgeSpec.from_value(el).to_dict() for el in x]
+            return _norm(x)
 
         diffs = {
             k: (frozen[k], v) for k, v in overrides.items()
-            if k in frozen and _norm(frozen[k]) != _norm(v)
+            if k in frozen and _norm_param(k, frozen[k]) != _norm_param(k, v)
         }
         if diffs:
             lines = "\n".join(
@@ -288,4 +414,8 @@ def resolve(slug: str, overrides: dict) -> RunConfig:
     tmp = path.with_suffix(".json.tmp")
     tmp.write_text(payload, encoding="utf-8")
     os.replace(tmp, path)
+    for key, fam in family_overlaps(cfg):
+        print(f"⚠ judge {key!r} shares the {fam!r} family with a candidate — "
+              "self-preference bias is possible; this is recorded in the results JSON.",
+              file=sys.stderr)
     return cfg

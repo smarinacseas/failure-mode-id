@@ -205,6 +205,19 @@ def _cut_block(rows: list[dict], ci: dict[str, tuple[float, float]]) -> dict:
     }
 
 
+def _concurs_fail(jc) -> bool:
+    """True when the panel concurred on FAIL. Pre-3.3 artifacts carry the
+    second-judge string ("both_fail"); 3.3 rows carry the consensus vote
+    split — the generalization of both-judges-failed is >=2 real FAIL votes
+    with zero dissenting PASS votes (abstentions are non-votes, so they
+    neither concur nor dissent)."""
+    if isinstance(jc, str):
+        return jc == "both_fail"
+    if isinstance(jc, dict):
+        return jc.get("fail", 0) >= 2 and jc.get("pass", 0) == 0
+    return False
+
+
 def analyze(e05_slug: str, e07_slug: str,
             n_boot: int = DEFAULT_N_BOOT, seed: int = DEFAULT_SEED) -> dict:
     e05_rows = load_rows(e05_slug)
@@ -240,7 +253,7 @@ def analyze(e05_slug: str, e07_slug: str,
 
     # Judge-reliability proxies (spec section 6.3), E07 only.
     verif = load_verifiability(e07_slug)
-    both = [r for r in e07_rows if r["judge_concurrence"] == "both_fail"]
+    both = [r for r in e07_rows if _concurs_fail(r["judge_concurrence"])]
     auto = [r for r in e07_rows
             if verif.get((r["id"], r["criterion_index"])) == "auto"]
     full_top3 = top_k_set(e07_rows)

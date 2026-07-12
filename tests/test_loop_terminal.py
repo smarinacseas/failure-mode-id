@@ -17,8 +17,10 @@ import pipeline.generate as generate
 import pipeline.grade as grade
 from conftest import make_cfg
 from pipeline._io import read_jsonl
+from pipeline.run_config import JudgeSpec
 
 LOOP_UNIT = "the same reasoning going around again. "   # 39 chars
+FABLE = JudgeSpec.from_value("claude-fable-5")           # panel-spec plan entry
 
 
 def _chunk(content=None, reasoning=None, finish=None):
@@ -97,7 +99,7 @@ def test_sequential_grade_writes_mechanical_all_fail(tmp_path, monkeypatch):
                             AssertionError("judge must not be called")))
     cfg = make_cfg()
     by_id = {"p1": {"id": "p1", "prompt": "p", "criteria": ["c1", "c2", "c3"]}}
-    plan = [("claude-fable-5", "m1", [_loop_rec("p1")])]
+    plan = [(FABLE, "m1", [_loop_rec("p1")])]
     grade._run_sequential(cfg, _mon(), by_id, plan)
     rows = read_jsonl(cfg.grades_path("claude-fable-5", "m1"))
     assert len(rows) == 1
@@ -115,7 +117,7 @@ def test_batch_grade_never_submits_loop_failures(tmp_path, monkeypatch):
     monkeypatch.setattr(grade, "anthropic", exploding)
     cfg = make_cfg()
     by_id = {"p1": {"id": "p1", "prompt": "p", "criteria": ["c1"]}}
-    plan = [("claude-fable-5", "m1", [_loop_rec("p1")])]
+    plan = [(FABLE, "m1", [_loop_rec("p1")])]
     mon = SimpleNamespace(item_start=lambda **k: None, item_done=lambda **k: None,
                           record_error=lambda *a, **k: None,
                           set_batch_counts=lambda **k: None,

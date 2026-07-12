@@ -14,28 +14,59 @@ from pipeline.monitor import RunMonitor, build_monitor
 from pipeline.run_config import RunConfig
 
 
+# OpenAI-family providers enforce a >=16 floor on max output tokens (observed
+# on openai/gpt-5.2 via OpenRouter, 2026-07-11); 16 keeps the ping tiny for
+# every provider.
+_PING_MAX_TOKENS = 16
+
+
 def _ping_candidate(key: str, model_id: str) -> str:
     resp = router.chat.completions.create(
-        model=model_id, temperature=0, max_tokens=4,
+        model=model_id, temperature=0, max_tokens=_PING_MAX_TOKENS,
         messages=[{"role": "user", "content": "Say 'ok'."}],
     )
     return (resp.choices[0].message.content or "").strip()
 
 
-def _ping_judge(judge: str) -> str:
+def _ping_judge(spec) -> str:
+    if spec.client == "openrouter":
+        resp = router.chat.completions.create(
+            model=spec.model, max_tokens=_PING_MAX_TOKENS,
+            messages=[{"role": "user", "content": "Say 'ok'."}],
+        )
+        return (resp.choices[0].message.content or "").strip()
     resp = anthropic.messages.create(
-        model=judge, max_tokens=4,
+        model=spec.model, max_tokens=_PING_MAX_TOKENS,
         messages=[{"role": "user", "content": "Say 'ok'."}],
     )
     return "".join(b.text for b in resp.content if hasattr(b, "text")).strip()
 
 
 def run(cfg: RunConfig | None = None, monitor: RunMonitor | None = None) -> None:
+    from pipeline.run_config import resolve_judge
     candidates = cfg.candidates if cfg is not None else dict(config.CANDIDATES)
-    judges = list(cfg.judges) if cfg is not None else list(config.JUDGES)
+    # Bare-invocation defaults resolve registry keys to specs so each judge is
+    # pinged against its OWN provider, never blindly against Anthropic.
+    specs = list(cfg.judges) if cfg is not None else [resolve_judge(k) for k in config.JUDGES]
+    # A run also calls out to judges that aren't necessarily panel members:
+    # the classifier fallback chain (cfg.classifier_chain) and the diagnose
+    # fallback chain (config.DIAGNOSE_CHAIN). Ping every distinct one of those
+    # too, so a typo'd classifier or diagnose model fails here instead of
+    # mid-run. cfg is None only for the bare/default invocation, which has no
+    # per-experiment classifier override to add.
+    extra = list(cfg.classifier_chain) if cfg is not None else []
+    extra += [resolve_judge(k) for k in config.DIAGNOSE_CHAIN]
+    # Dedup by key: a judge already pinged (as a panel member or an earlier
+    # chain entry) is never pinged twice, even if the chains disagree on the
+    # underlying JudgeSpec object identity.
+    seen = {s.key for s in specs}
+    for s in extra:
+        if s.key not in seen:
+            specs.append(s)
+            seen.add(s.key)
     ctx = nullcontext(monitor) if monitor is not None else build_monitor("connectivity", 0)
     with ctx as mon:
-        mon.start_stage("connectivity", total=len(candidates) + len(judges))
+        mon.start_stage("connectivity", total=len(candidates) + len(specs))
         failures: list[tuple[str, str, str]] = []
         for key, model_id in candidates.items():
             mon.item_start(model=key, prompt_id=model_id)
@@ -47,14 +78,14 @@ def run(cfg: RunConfig | None = None, monitor: RunMonitor | None = None) -> None
                 failures.append((key, model_id, f"{type(e).__name__}: {e}"))
             mon.item_done()
 
-        for judge in judges:
-            mon.item_start(model="judge", prompt_id=judge)
+        for spec in specs:
+            mon.item_start(model="judge", prompt_id=f"{spec.key} ({spec.model})")
             try:
-                txt = _ping_judge(judge)
-                mon.note(f"judge ({judge}) ok ({txt[:40]!r})")
+                txt = _ping_judge(spec)
+                mon.note(f"judge {spec.key} ({spec.model}) ok ({txt[:40]!r})")
             except Exception as e:  # noqa: BLE001
-                mon.record_error(f"judge ({judge}): {type(e).__name__}: {e}")
-                failures.append(("judge", judge, f"{type(e).__name__}: {e}"))
+                mon.record_error(f"judge {spec.key} ({spec.model}): {type(e).__name__}: {e}")
+                failures.append(("judge", spec.key, f"{type(e).__name__}: {e}"))
             mon.item_done()
         mon.end_stage()
 

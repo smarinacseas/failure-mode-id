@@ -27,10 +27,20 @@ router = OpenAI(
 anthropic = Anthropic()
 
 # Judges (graders). A run may carry several — each grades the SAME candidate
-# responses, so the dashboard can toggle between them apples-to-apples. The
-# first entry doubles as the criterion classifier. JUDGE kept as a back-compat
-# alias for any single-judge caller.
-JUDGES: list[str] = ["claude-opus-4-8", "claude-fable-5"]
+# responses. Registry maps a short PATH-SAFE key (used in grades/<key>/ dirs,
+# by_judge, custom_ids, dashboard labels) to {client, model}. OpenRouter model
+# ids MUST be verified against https://openrouter.ai/models when pinned.
+JUDGE_REGISTRY: dict[str, dict] = {
+    "claude-opus-4-8": {"client": "anthropic",  "model": "claude-opus-4-8"},
+    "claude-fable-5":  {"client": "anthropic",  "model": "claude-fable-5"},
+    "gpt-5":           {"client": "openrouter", "model": "openai/gpt-5.2"},
+    "gemini-3-pro":    {"client": "openrouter", "model": "google/gemini-3.1-pro-preview"},
+    "deepseek-v4":     {"client": "openrouter", "model": "deepseek/deepseek-v4-pro"},
+}
+# Default panel: every registry key. 5 members (odd) so a full-attendance
+# majority vote cannot tie. Qwen judges stay out: Qwen is the candidate
+# ladder (family overlap warns, never blocks — see run_config.resolve).
+JUDGES: list[str] = list(JUDGE_REGISTRY)
 JUDGE: str = JUDGES[0]
 
 # Single family (Qwen) for v1 size ladder. DeepSeek added later for cross-family.
@@ -104,11 +114,29 @@ GENERATION_DEADLINE_BASIS: str = (
 # streamed, so this can exceed the ~16k non-streaming SDK timeout guard.
 JUDGE_MAX_TOKENS: int = 32000
 
-# Diagnose stage (failure root-cause analysis; spec 2026-07-06). Opus-solo:
-# Fable demonstrably refuses on CIF-006-class content, which would leave
-# exactly the interesting cells undiagnosable. NOT a frozen param — diagnosis
-# is post-hoc, re-runnable measurement.
-DIAGNOSE_JUDGE: str = "claude-opus-4-8"
+# OpenRouter judge calls: streamed worker pool (Anthropic judges use Message
+# Batches / sequential per the frozen judge_mode; OpenRouter has no batch API).
+# Concurrency is transport, not treatment — not frozen (like GENERATION_WORKERS).
+JUDGE_WORKERS: int = 4
+
+# Hard wall-clock deadline for ONE OpenRouter judge call — same failure surface
+# as candidate generation (half-open sockets, slow trickle; see
+# GENERATION_DEADLINE_S). No observed p99 yet, so the basis is the token budget:
+# JUDGE_MAX_TOKENS (32k) at the worst-case ~24 tok/s the generation deadline
+# implies ≈ 1333 s → 1350 s. Revise from observed judge-call durations.
+JUDGE_DEADLINE_S: float = 1350.0
+JUDGE_DEADLINE_BASIS: str = (
+    "JUDGE_MAX_TOKENS (32k) at worst-case ~24 tok/s (the GENERATION_DEADLINE_S "
+    "basis rate) ≈ 1333 s, rounded to 1350 s (2026-07-11); no observed judge "
+    "p99 yet — revise from data"
+)
+
+# Diagnose fallback chain (spec 2026-07-09 §4). Fable is the preferred analyst
+# but demonstrably refuses on CIF-006-class content; per-item fallback to Opus
+# means the preferred model does the work and degrades per CELL, not per stage
+# (pre-panel this forced Opus-solo for everything). NOT frozen — diagnosis is
+# post-hoc, re-runnable measurement. Entries are judge registry keys.
+DIAGNOSE_CHAIN: tuple[str, ...] = ("claude-fable-5", "claude-opus-4-8")
 DIAGNOSE_MAX_TOKENS: int = 32000
 # Head+tail clip threshold for response/trace fields in the analyst payload
 # (the E05 qwen-9b × CIF-012 runaway answer was 87.7k chars).

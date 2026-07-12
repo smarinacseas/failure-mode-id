@@ -22,8 +22,10 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from config import DATA_JSONL, DIAGNOSE_JUDGE, JUDGE_MAX_TOKENS, RESULTS_PATH, ROOT
+import config
+from config import DATA_JSONL, JUDGE_MAX_TOKENS, RESULTS_PATH, ROOT
 from pipeline import _taxonomy
+from pipeline._consensus import agreement_stats, consensus_verdict, vote_of
 from pipeline._decode_health import decode_health_block
 from pipeline._experiment import (
     SCHEMA_VERSION,
@@ -36,7 +38,7 @@ from pipeline._experiment import (
 from pipeline._io import read_jsonl
 from pipeline._select import select_prompts
 from pipeline.monitor import RunMonitor, stage_ctx
-from pipeline.run_config import RunConfig
+from pipeline.run_config import RunConfig, family_overlaps
 
 DASHBOARD_SYNC_SCRIPT: Path = ROOT / "scripts" / "dashboard_sync.py"
 
@@ -57,9 +59,9 @@ def _load_all(cfg: RunConfig):
     for key in cfg.candidates:
         responses[key] = {r["id"]: r["response"] for r in read_jsonl(cfg.responses_path(key))}
     grades_by_judge: dict[str, dict[str, dict[str, list[dict]]]] = {}
-    for judge in cfg.judges:
-        grades_by_judge[judge] = {
-            key: {r["id"]: r["verdicts"] for r in read_jsonl(cfg.grades_path(judge, key))}
+    for spec in cfg.judges:
+        grades_by_judge[spec.key] = {
+            key: {r["id"]: r["verdicts"] for r in read_jsonl(cfg.grades_path(spec.key, key))}
             for key in cfg.candidates
         }
     tags = {r["id"]: r["tags"] for r in read_jsonl(cfg.criteria_tags_path)}
@@ -108,6 +110,56 @@ def _build_prompt_entry(rec: dict, responses: dict, grades: dict, tags: dict, mo
         "responses": responses_per_model,
         "criteria_passed": criteria_passed,
         "full_pass": full_pass,
+        "criteria": criteria_list,
+    }
+
+
+def _build_panel_prompt_entry(rec: dict, responses: dict, grades_by_judge: dict,
+                              tags: dict, models: list[str], judges: list[str],
+                              cells_out: list[dict]) -> dict:
+    """Same shape as _build_prompt_entry, but results[model] carries the
+    consensus verdict + vote split. Appends one judge->vote map per
+    (criterion, model) to cells_out for the agreement stats.
+
+    `judges` must be iterated in cfg.judges order (the caller's list, built
+    from cfg.judge_keys) — consensus_verdict's reason-tie-break depends on a
+    stably-ordered per_judge dict (Task 6)."""
+    criteria_texts = rec["criteria"]
+    n = len(criteria_texts)
+    tag_by_idx = {t["index"]: t for t in tags[rec["id"]]}
+    criteria_list: list[dict] = []
+    for i, ctext in enumerate(criteria_texts, start=1):
+        tag = tag_by_idx.get(i, {"verifiability": "judge", "gameable": False, "reward_hack": ""})
+        per_model: dict[str, dict] = {}
+        for key in models:
+            per_judge: dict[str, dict] = {}
+            for j in judges:
+                verdicts = grades_by_judge[j].get(key, {}).get(rec["id"])
+                if verdicts is None:
+                    continue                      # missing record = abstain
+                v = next((x for x in verdicts if x.get("index") == i), None)
+                if v is not None:
+                    per_judge[j] = v
+            cv = consensus_verdict(per_judge, len(judges))
+            cells_out.append({j: vote_of(v) for j, v in per_judge.items()})
+            per_model[key] = {"pass": cv["verdict"] == "PASS",
+                              "reason": cv["reason"], "votes": cv["votes"]}
+        criteria_list.append({
+            "text": ctext, "verifiability": tag["verifiability"],
+            "gameable": tag["gameable"], "reward_hack": tag.get("reward_hack", ""),
+            "results": per_model,
+        })
+    responses_per_model = {key: responses[key][rec["id"]] for key in models}
+    criteria_passed, full_pass = {}, {}
+    for key in models:
+        passed = sum(1 for c in criteria_list if c["results"][key]["pass"])
+        criteria_passed[key] = f"{passed}/{n}"
+        full_pass[key] = passed == n
+    return {
+        "id": rec["id"], "use_case": rec["use_case"],
+        "instruction_type": rec["instruction_type"], "prompt_style": rec["prompt_style"],
+        "prompt_text": rec["prompt"], "responses": responses_per_model,
+        "criteria_passed": criteria_passed, "full_pass": full_pass,
         "criteria": criteria_list,
     }
 
@@ -221,9 +273,19 @@ def _build_run_notes(cfg: RunConfig, responses: dict, by_judge: dict, skipped: l
     if len(cfg.judges) > 1:
         notes.append("All judges graded the same candidate responses (single generation pass), "
                      "so judge columns are directly comparable.")
-    notes.append("Judges reason with adaptive thinking over a streamed "
-                 f"{JUDGE_MAX_TOKENS}-token budget; candidate reasoning "
-                 f"{'enabled' if cfg.reasoning else 'disabled'} at temperature {cfg.temperature}.")
+    anth = [s.key for s in cfg.judges if s.client == "anthropic"]
+    orj = [s.key for s in cfg.judges if s.client == "openrouter"]
+    parts = []
+    if anth:
+        parts.append(f"{', '.join(anth)} reason with adaptive thinking (Anthropic)")
+    if orj:
+        parts.append(f"{', '.join(orj)} run with reasoning enabled via OpenRouter")
+    notes.append("; ".join(parts) + f" — streamed {JUDGE_MAX_TOKENS}-token budget; "
+                 f"candidate reasoning {'enabled' if cfg.reasoning else 'disabled'} "
+                 f"at temperature {cfg.temperature}.")
+    for key, fam in family_overlaps(cfg):
+        notes.append(f"⚠ Judge {key} shares the {fam!r} model family with a candidate — "
+                     "self-preference bias possible; verdicts flagged via judge_details.")
     return notes
 
 
@@ -248,30 +310,21 @@ def _failure_analysis_block(cfg: RunConfig, records: list[dict],
     judge_concurrence is joined HERE, post-hoc — never an input to diagnosis
     (spec §4 blinding rule 3)."""
     by_id = {r["id"]: r for r in records}
-    other_judges = [j for j in cfg.judges if j != cfg.judge]
-    second = other_judges[0] if other_judges else None
 
-    def _concurrence(key: str, rid: str, index: int) -> str:
-        if second is None:
-            return "no_second_judge"
-        verdicts = grades_by_judge.get(second, {}).get(key, {}).get(rid)
-        if verdicts is None:
-            return "no_second_judge"
-        v = next((x for x in verdicts if x.get("index") == index), None)
-        if v is None:
-            return "no_second_judge"
-        reason = str(v.get("reason", ""))
-        if reason.startswith("judge_refusal"):
-            return "fable_refused"
-        # Grading-artifact FAILs (grade.py's vocabulary — see
-        # pipeline.diagnose._ARTIFACT_PREFIXES) carry no real second
-        # opinion about the candidate, same as a refusal — just not the
-        # refusal itself. Falling through to both_fail here would inflate
-        # judge-agreement with FAILs that are actually judge-pipeline
-        # noise, not independent verdicts.
-        if reason.startswith(("judge_parse_error", "judge_truncated", "missing_in_judge_output")):
-            return "no_second_judge"
-        return "both_fail" if v.get("verdict") == "FAIL" else "opus_only"
+    def _concurrence(key: str, rid: str, index: int) -> dict:
+        """The panel's PASS/FAIL/ABSTAIN vote split for one diagnosed criterion
+        (spec §3): the generalization of the old second-judge strings to any
+        panel size. Grading-artifact FAILs abstain (vote_of, inside
+        consensus_verdict) so judge-pipeline noise never reads as a real second
+        opinion — a 2-judge refusal shows as one FAIL + one abstain, not
+        both_fail. Judges iterate in cfg.judges order (reason-tie determinism)."""
+        per_judge: dict[str, dict] = {}
+        for s in cfg.judges:
+            verdicts = grades_by_judge.get(s.key, {}).get(key, {}).get(rid)
+            v = next((x for x in (verdicts or []) if x.get("index") == index), None)
+            if v is not None:
+                per_judge[s.key] = v
+        return consensus_verdict(per_judge, len(cfg.judges))["votes"]
 
     rows: list[dict] = []
     cells = 0
@@ -298,6 +351,9 @@ def _failure_analysis_block(cfg: RunConfig, records: list[dict],
                     "evidence": d.get("evidence", ""),
                     "rationale": d.get("rationale", ""),
                     "trace_status": art.get("trace_status", "absent"),
+                    # Which chain member produced this diagnosis (spec §4);
+                    # None for pre-Task-9 artifacts written before the stamp.
+                    "analyst": art.get("analyst"),
                     "judge_concurrence": _concurrence(key, rid, d["index"]),
                 })
     if not rows:
@@ -342,8 +398,14 @@ def _failure_analysis_block(cfg: RunConfig, records: list[dict],
         **({"taxonomy_versions_seen": sorted(taxonomy_versions_seen)}
            if len(taxonomy_versions_seen) > 1 else {}),
         "taxonomy": taxonomy,
-        "diagnose_judge": DIAGNOSE_JUDGE,
-        "verdict_basis": cfg.judge,
+        # Full analyst chain; diagnose_judge stays as its first entry so
+        # pre-panel readers keep a scalar analyst field (spec §5 / schema 3.3).
+        "diagnose_chain": list(config.DIAGNOSE_CHAIN),
+        "diagnose_judge": config.DIAGNOSE_CHAIN[0],
+        # Which verdict a diagnosed FAIL is diagnosing: the panel consensus once
+        # >=2 judges form a panel (Task 9's _failed_cells targets consensus),
+        # else the sole judge's own verdicts.
+        "verdict_basis": "panel" if len(cfg.judges) >= 2 else cfg.judge.key,
         "diagnosed_at": datetime.now(timezone.utc).isoformat(),
         "counts": {"failed_criteria": len(rows), "diagnosed": len(rows),
                    "cells": cells},
@@ -385,7 +447,7 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
     records = select_prompts(records, cfg.limit, cfg.sample_seed)
 
     models = list(cfg.candidates.keys())
-    judges = list(cfg.judges)
+    judges = list(cfg.judge_keys)
 
     def _grade_present(rid: str, key: str) -> bool:
         return all(rid in grades_by_judge[j][key] for j in judges)
@@ -413,12 +475,12 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
     # Build a self-contained view per judge over the SAME eligible prompts.
     validation = validation_block(cfg)
     by_judge: dict[str, dict] = {}
-    for judge in judges:
-        j_prompts = [_build_prompt_entry(rec, responses, grades_by_judge[judge], tags, models)
+    for spec in cfg.judges:
+        j_prompts = [_build_prompt_entry(rec, responses, grades_by_judge[spec.key], tags, models)
                      for rec in eligible]
-        by_judge[judge] = {
-            "judge": judge,
-            "judge_details": judge_details_for(judge),
+        by_judge[spec.key] = {
+            "judge": spec.key,
+            "judge_details": judge_details_for(spec, cfg),
             "validation": validation,
             "summary": _summary(j_prompts, models),
             "prompts": j_prompts,
@@ -426,13 +488,34 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
 
     run_date = datetime.now(timezone.utc).isoformat()
 
-    # Default (top-level) view = first judge — back-compat for single-judge readers.
-    default = by_judge[cfg.judge]
+    # Panel block (schema 3.3): consensus verdicts + agreement stats over the
+    # SAME eligible prompts, present only when there's more than one judge to
+    # form a panel out of. A single judge has no panel to disagree with, so
+    # it stays the sole default view (byte-identical pre-panel behavior).
+    panel = None
+    if len(judges) >= 2:
+        cells: list[dict] = []
+        p_prompts = [_build_panel_prompt_entry(rec, responses, grades_by_judge, tags,
+                                               models, judges, cells)
+                     for rec in eligible]
+        panel = {
+            "judges": judges,
+            "summary": _summary(p_prompts, models),
+            "prompts": p_prompts,
+            "agreement": agreement_stats(cells, judges),
+        }
+
+    # Default (top-level) view: the panel when one exists (>=2 judges), else
+    # the first judge — back-compat for single-judge readers.
+    default = panel if panel is not None else by_judge[cfg.judge.key]
     prompts = default["prompts"]
     summary = default["summary"]
 
     meta = build_meta(cfg, run_report, run_date, prompts)
     meta["run_notes"] = _build_run_notes(cfg, responses, by_judge, skipped)
+    # Set BEFORE meta is handed to update_index/_merge_manifest below so the
+    # dashboard index and run manifest are built from the same, complete meta.
+    meta["verdict_basis"] = "panel" if panel is not None else cfg.judge.key
     failure_analysis = _failure_analysis_block(cfg, eligible, grades_by_judge)
     results = {
         "schema_version": SCHEMA_VERSION,
@@ -441,6 +524,8 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
         "prompts": prompts,
         "by_judge": by_judge,
     }
+    if panel is not None:
+        results["panel"] = panel
     if failure_analysis is not None:
         results["failure_analysis"] = failure_analysis
         mon.note(f"aggregate: failure_analysis — {failure_analysis['counts']['diagnosed']} "

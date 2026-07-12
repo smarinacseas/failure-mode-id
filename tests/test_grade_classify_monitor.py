@@ -4,6 +4,7 @@ import pipeline.grade as grade
 from conftest import make_cfg
 from pipeline._io import write_jsonl
 from pipeline.monitor import RecordingSink, RunMonitor, WorkPlan
+from pipeline.run_config import JudgeSpec
 
 
 def test_grade_emits_events(tmp_path, monkeypatch):
@@ -32,9 +33,9 @@ def test_classify_emits_events(tmp_path, monkeypatch):
                 [{"id": "p1", "prompt": "a", "criteria": ["c1", "c2"]}])
     monkeypatch.setattr(classify, "DATA_JSONL", tmp_path / "prompts.jsonl")
     monkeypatch.setattr(classify, "_classify_one",
-                        lambda cfg, criteria: [{"index": 1, "verifiability": "auto",
+                        lambda cfg, criteria: ([{"index": 1, "verifiability": "auto",
                                            "gameable": False, "reward_hack": "",
-                                           "ambiguous": False}])
+                                           "ambiguous": False}], "claude-fable-5"))
     m = RunMonitor(WorkPlan.for_step("classify", 1, 1), sinks=[RecordingSink()])
     with m:
         classify.run(cfg, monitor=m)
@@ -68,7 +69,8 @@ def test_grade_one_records_refusal_distinctly(monkeypatch):
         return "", "refusal"
     monkeypatch.setattr(grade, "call_json", fake_call_json)
 
-    out = grade._grade_one("claude-fable-5", "prompt", "resp", ["c1", "c2"])
+    out = grade._grade_one(JudgeSpec.from_value("claude-fable-5"),
+                           "prompt", "resp", ["c1", "c2"])
     assert len(out) == 2
     assert all(v["verdict"] == "FAIL" for v in out)
     assert all(v["reason"].startswith("judge_refusal") for v in out)
@@ -80,9 +82,9 @@ def test_classify_records_error_on_parse_failure(tmp_path, monkeypatch):
     cfg = make_cfg()
     write_jsonl(tmp_path / "prompts.jsonl", [{"id": "p1", "prompt": "a", "criteria": ["c1", "c2"]}])
     monkeypatch.setattr(classify, "DATA_JSONL", tmp_path / "prompts.jsonl")
-    def _boom(cfg, user_msg):
-        raise RuntimeError("classifier boom")
-    monkeypatch.setattr(classify, "_classifier_call", _boom)   # both retry attempts fail -> note_error
+    # Patch call_json to always fail parsing -> chain exhausts -> note_error
+    from pipeline import _judge_llm
+    monkeypatch.setattr(_judge_llm, "call_json", lambda *a, **k: ("not json at all", "stop"))
     m = RunMonitor(WorkPlan.for_step("classify", 1, 1), sinks=[RecordingSink()])
     with m:
         classify.run(cfg, monitor=m)

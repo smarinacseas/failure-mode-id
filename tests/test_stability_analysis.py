@@ -145,3 +145,49 @@ def test_analyze_cuts_proxies_and_decision(tmp_path, monkeypatch):
     assert result["proxies"]["auto_verifiable"]["n_rows"] == len(e07_rows)
     assert result["proxies"]["concurrence_both_fail"]["top3_matches_full"] is True
     assert "delta_e07full_minus_e05" in result
+
+
+def test_concurrence_proxy_selects_both_string_and_vote_split_rows(tmp_path, monkeypatch):
+    """Schema 3.3 re-aggregations store judge_concurrence as the consensus
+    {pass, fail, abstain} vote split; pre-3.3 artifacts carry the second-judge
+    string. The both_fail judge-reliability proxy must select unanimous-FAIL
+    rows under EITHER shape — with the old string-equality filter, every dict
+    row silently fails the comparison and the proxy computes over the legacy
+    rows alone (or an empty set on a pure-3.3 experiment).
+
+    Included: string "both_fail"; dict {pass:0, fail:2, abstain:0}.
+    Excluded: dict {pass:1, fail:2, abstain:0} (a dissenting PASS vote);
+    dict {pass:0, fail:1, abstain:1} (a single FAIL is one judge's opinion,
+    not concurrence); string "opus_only"."""
+    exp = tmp_path / "experiments"
+    exp.mkdir()
+    runs = tmp_path / "runs"
+    monkeypatch.setattr(config, "EXPERIMENTS_DIR", exp)
+    monkeypatch.setattr(config, "RUNS_DIR", runs)
+    monkeypatch.setattr(sa, "e05_sample_ids", lambda: {"P1"})
+
+    def row(pid, i, jc):
+        return {"id": pid, "root_cause": "a", "model": "m",
+                "criterion_index": i, "judge_concurrence": jc}
+
+    e07_rows = [
+        row("P1", 1, "both_fail"),                              # in  (pre-3.3)
+        row("P1", 2, {"pass": 0, "fail": 2, "abstain": 0}),     # in  (3.3 unanimous)
+        row("P2", 1, {"pass": 1, "fail": 2, "abstain": 0}),     # out (dissent)
+        row("P2", 2, {"pass": 0, "fail": 1, "abstain": 1}),     # out (single fail)
+        row("P3", 1, "opus_only"),                              # out (pre-3.3)
+    ]
+    _write_experiment(exp, "E05-test", [row("P1", 1, "both_fail")])
+    _write_experiment(exp, "E07-test", e07_rows)
+
+    run7 = runs / "E07-test"
+    run7.mkdir(parents=True)
+    # Empty tags + no grades dir: read_jsonl returns [] for missing/empty
+    # inputs, keeping the other proxies inert — this test scopes to the
+    # concurrence row selection only.
+    (run7 / "criteria_tags.jsonl").write_text("", encoding="utf-8")
+    (run7 / "experiment.json").write_text(
+        json.dumps({"params": {"candidates": {"m": "prov/m"}}}), encoding="utf-8")
+
+    result = sa.analyze("E05-test", "E07-test", n_boot=50, seed=1)
+    assert result["proxies"]["concurrence_both_fail"]["n_rows"] == 2

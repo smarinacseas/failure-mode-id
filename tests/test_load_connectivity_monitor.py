@@ -46,6 +46,11 @@ def test_connectivity_pings_all_and_reports(monkeypatch):
     monkeypatch.setattr(connectivity, "anthropic", _FakeAnthropic)
     monkeypatch.setattr(config, "CANDIDATES", {"m1": "x", "m2": "y"})
     monkeypatch.setattr(config, "JUDGES", ["claude-j1"])
+    # Connectivity also pings config.DIAGNOSE_CHAIN; pin it to the same key as
+    # the lone panel judge so this test stays scoped to candidate/judge counting
+    # rather than the diagnose-chain dedup (which test_connectivity_clients.py
+    # covers directly).
+    monkeypatch.setattr(config, "DIAGNOSE_CHAIN", ("claude-j1",))
 
     m = RunMonitor(WorkPlan.for_step("connectivity", 2, 2), sinks=[RecordingSink()])
     with m:
@@ -73,6 +78,9 @@ def test_connectivity_reports_failures_and_exits(monkeypatch):
     monkeypatch.setattr(connectivity, "anthropic", _OkAnthropic)
     monkeypatch.setattr(config, "CANDIDATES", {"m1": "x"})
     monkeypatch.setattr(config, "JUDGES", ["claude-j1"])
+    # See test_connectivity_pings_all_and_reports: keep the diagnose chain
+    # deduped against the single panel judge here too.
+    monkeypatch.setattr(config, "DIAGNOSE_CHAIN", ("claude-j1",))
 
     m = RunMonitor(WorkPlan.for_step("connectivity", 1, 1), sinks=[RecordingSink()])
     with pytest.raises(SystemExit) as exc:
@@ -86,7 +94,7 @@ def test_connectivity_reports_failures_and_exits(monkeypatch):
 def test_connectivity_pings_cfg_models(monkeypatch):
     pinged = []
     monkeypatch.setattr(connectivity, "_ping_candidate", lambda k, mid: pinged.append(("c", k, mid)) or "ok")
-    monkeypatch.setattr(connectivity, "_ping_judge", lambda judge: pinged.append(("j", judge)) or "ok")
+    monkeypatch.setattr(connectivity, "_ping_judge", lambda spec: pinged.append(("j", spec.key)) or "ok")
     cfg = make_cfg(candidates={"x": "prov/x"}, judges=("claude-fable-5",))
     m = RunMonitor(WorkPlan.for_step("connectivity", 0, 1), sinks=[RecordingSink()])
     with m:
