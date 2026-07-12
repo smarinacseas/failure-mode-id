@@ -3473,8 +3473,14 @@
           if(view===this.state.view) return;
           var self=this;
           var indexPath=view==='training'?'./training.json':'./runs.json';
+          // Request token: rapid toggles (or a click racing the initial mount
+          // fetch) issue overlapping index fetches that can resolve out of
+          // order — only the latest request may apply its result.
+          this._viewReq=(this._viewReq||0)+1;
+          var req=this._viewReq;
           this.setState({view:view});
           __loadJson(indexPath).catch(function(){ return null; }).then(function(mf){
+            if(req!==self._viewReq) return;   // a newer switch superseded this fetch
             var runs=(mf&&mf.runs&&mf.runs.length)?mf.runs:[];
             self.applyHash(runs);   // resets runs + currentRun → the two views never share a picker
             // applyHash re-derives `view` from location.hash, which hasn't been
@@ -3576,7 +3582,12 @@
           var p0=new URLSearchParams(location.hash.slice(1));
           var isTraining0=p0.get('view')==='training';
           var indexPath=isTraining0?'./training.json':'./runs.json';
+          // Same request token as switchView: if the user toggles views before
+          // this initial fetch resolves, the stale result must not apply.
+          this._viewReq=(this._viewReq||0)+1;
+          var req0=this._viewReq;
           __loadJson(indexPath).catch(function(){ return null; }).then(function(mf){
+            if(req0!==self._viewReq) return;   // a view switch superseded the mount fetch
             // The results.json fallback is an Analysis-only resilience path (legacy
             // single-run pipeline); Training legitimately has zero runs until a
             // T-series run lands, so it must fall back to [], same as switchView.
