@@ -4,7 +4,7 @@
 constraint-dense prompts — and root-cause diagnosis of *why*, in training-
 protocol terms.**
 
-Live results: <https://smarinacseas.github.io/failure-mode-id/#run=E05-reasoning-rand20p&tab=analysis&model=qwen-9b&judge=claude-opus-4-8>
+Live results: <https://smarinacseas.github.io/failure-mode-id/#run=E07-reasoning-full75&tab=analysis&model=qwen-9b&judge=claude-opus-4-8>
 
 A resumable eval pipeline that runs Surge AI's [Complex Constraints](https://huggingface.co/datasets/surgeai/ComplexConstraints)
 benchmark through a candidate-model ladder (default: Qwen3.5 9B→35B→397B via
