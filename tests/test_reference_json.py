@@ -49,8 +49,8 @@ def test_trainable_dossiers_complete(ref):
         for d in m["dataset_taxonomy"]:
             for f in ("name", "structure", "annotation", "scale", "verifiability"):
                 assert d.get(f), (m["key"], f)
-        assert m["afterquery"].get("product"), m["key"]
-        assert m["afterquery"].get("commission"), m["key"]
+        assert m["commissioning"].get("solution"), m["key"]
+        assert m["commissioning"].get("commission"), m["key"]
         assert len(m["citations"]) >= 3, m["key"]
         for c in m["citations"]:
             assert c.get("title") and str(c.get("url", "")).startswith("http"), m["key"]

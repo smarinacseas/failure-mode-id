@@ -28,8 +28,8 @@
           "verifiability": "judge-only by design"
         }
       ],
-      "afterquery": {
-        "product": "Supervised Fine-Tuning (SFT) data \u2014 prompt-response pairs and CoT traces; AfterQuery's constraint-decomposition SFT line.",
+      "commissioning": {
+        "solution": "Expert-written SFT corpus",
         "commission": "Commission a WildChecklists-style corpus: real user prompts paired with synthetically generated, per-item requirement checklists and per-item pass/fail grading guides for the judge pass."
       },
       "citations": [
@@ -90,8 +90,8 @@
           "verifiability": "judge-dependent \u2014 GPT-4-Turbo annotated, no rule-based verifier"
         }
       ],
-      "afterquery": {
-        "product": "Reinforcement Learning + Rubrics \u2014 expert-designed grading frameworks turning subjective judgment into scalable reward signals.",
+      "commissioning": {
+        "solution": "Rubric/judge reward data",
         "commission": "Commission a Conifer-style multi-turn corpus of difficulty-graded instructions with judge-identified constraint drops and corrected rewrites, plus a critic-training slice of CoT trails labeled for per-constraint satisfaction."
       },
       "citations": [
@@ -152,8 +152,8 @@
           "verifiability": "RLVR-ready without human labels"
         }
       ],
-      "afterquery": {
-        "product": "Reinforcement Learning + Rubrics \u2014 expert-designed grading frameworks for reasoning, spanning both spec-conditioned judge rubrics and per-datapoint verifiable graders.",
+      "commissioning": {
+        "solution": "Verifier-based RL data",
         "commission": "Commission a graded instruction-conflict set spanning both spec-conditioned judge rubrics (deliberative-alignment style) and per-datapoint Python graders (IH-Challenge/VerIH style) for objective format/quantity/keyword conflicts."
       },
       "citations": [
@@ -221,8 +221,8 @@
           "verifiability": "human-reviewed synthetic preference data, not rule-verified"
         }
       ],
-      "afterquery": {
-        "product": "Reinforcement Learning + Rubrics \u2014 expert-designed grading frameworks for reasoning, the direct vendor analog for confession-style honesty grading and dual-compliance judging.",
+      "commissioning": {
+        "solution": "Rubric/judge reward data",
         "commission": "Commission a conflict-preference corpus pairing compliant vs. silently-sacrificing responses, plus a confession-style structured self-report layer graded on honesty by an independent judge rubric."
       },
       "citations": [
@@ -283,8 +283,8 @@
           "verifiability": "execution-checkable \u2014 whether a model recovers both gold-SQL readings"
         }
       ],
-      "afterquery": {
-        "product": "Supervised Fine-Tuning (SFT) data \u2014 prompt-response pairs; AfterQuery's negation/table SFT corpus line.",
+      "commissioning": {
+        "solution": "Expert-written SFT corpus",
         "commission": "Commission a HedgeTriple-style contrastive minimal-pair corpus spanning negation and hedging types, plus an AMBROSIA-style human-written ambiguous-reading set for scope/attachment/vagueness coverage."
       },
       "citations": [
@@ -345,8 +345,8 @@
           "verifiability": "RLVR-ready for QA/fact-verification/classification portions; the table-to-text portion (Rouge) needs rubric or preference supervision"
         }
       ],
-      "afterquery": {
-        "product": "Supervised Fine-Tuning (SFT) data \u2014 prompt-response pairs; AfterQuery's negation/table SFT corpus line.",
+      "commissioning": {
+        "solution": "Expert-written SFT corpus",
         "commission": "Commission a TableDreamer-style weakness-guided synthetic corpus spanning multiple table serializations, enriched with GPT-generated reasoning traces per the replication study's one generalizing design lesson."
       },
       "citations": [
@@ -400,8 +400,8 @@
           "verifiability": "fully RLVR-ready \u2014 the genuinely auto-verifiable slice of instruction-following work"
         }
       ],
-      "afterquery": {
-        "product": "Reinforcement Learning + Rubrics \u2014 expert-designed grading frameworks for reasoning and code generation, turning subjective judgment into scalable reward signals.",
+      "commissioning": {
+        "solution": "Rubric/judge reward data",
         "commission": "Commission a VerInstruct-style multi-constraint corpus with per-constraint checkers, paired with a large-reasoning-model verifier (QwQ-32B pattern) or judge rubric for the majority-share soft constraints."
       },
       "citations": [
@@ -462,8 +462,8 @@
           "verifiability": "auto-verifiable \u2014 both loop detection and EOS emission are mechanically checkable"
         }
       ],
-      "afterquery": {
-        "product": "Supervised Fine-Tuning (SFT) data \u2014 prompt-response pairs and CoT traces; the variable-length CoT pairs this mode's one dataset-shaped artifact needs.",
+      "commissioning": {
+        "solution": "Expert-written SFT corpus",
         "commission": "Commission a small variable-length CoT SFT set (long/short traces reaching the same correct answer) plus a loop-rate diagnostic census across model sizes to scope EOS-penalty and length-reward shaping on existing RLVR pipelines, not a large new human-annotated corpus."
       },
       "citations": [
