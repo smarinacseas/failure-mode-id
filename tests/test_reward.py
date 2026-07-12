@@ -23,6 +23,8 @@ def test_keyword_word_boundary_not_substring():
 def test_sentence_count():
     assert check_constraint({"type": "sentence_count", "n": 2}, "One here. Two here.")
     assert check_constraint({"type": "sentence_count", "n": 1}, "The value is 3.14.")
+    assert check_constraint({"type": "sentence_count", "n": 2}, "The value is 3.14. That is pi.")
+    assert check_constraint({"type": "sentence_count", "n": 2}, "Is it 42? Yes.")
 
 
 def test_unknown_type_raises():

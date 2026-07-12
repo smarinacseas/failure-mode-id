@@ -31,11 +31,12 @@ def check_constraint(constraint: dict, response: str) -> bool:
     if t == "keyword_forbid":
         return re.search(rf"\b{re.escape(constraint['word'])}\b", response, re.IGNORECASE) is None
     if t == "sentence_count":
-        # Heuristic: terminal-punctuation runs end a sentence, except inside
-        # decimal numbers (3.14). Abbreviations (Dr., e.g.) still over-count —
-        # known limitation; dataset-native verifiers supersede these checkers
-        # once the real VerIH schema lands (training/data.py).
-        parts = [s for s in re.split(r"(?<!\d)[.!?]+(?![\d.])", response) if s.strip()]
+        # Heuristic: neutralize decimal points (3.14), then count
+        # terminal-punctuation runs. Abbreviations (Dr., e.g.) still
+        # over-count — known limitation; dataset-native verifiers supersede
+        # these checkers once the real VerIH schema lands (training/data.py).
+        no_decimals = re.sub(r"(?<=\d)\.(?=\d)", "", response)
+        parts = [s for s in re.split(r"[.!?]+", no_decimals) if s.strip()]
         return len(parts) == constraint["n"]
     if t == "json_parses":
         try:
