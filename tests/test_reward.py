@@ -1,9 +1,33 @@
+import pytest
+
 from training.reward import check_constraint, reward
 
 
 def test_max_words():
     assert check_constraint({"type": "max_words", "n": 3}, "one two three")
     assert not check_constraint({"type": "max_words", "n": 3}, "one two three four")
+
+
+def test_min_words():
+    assert check_constraint({"type": "min_words", "n": 3}, "one two three")
+    assert not check_constraint({"type": "min_words", "n": 4}, "one two three")
+
+
+def test_keyword_word_boundary_not_substring():
+    # "cat" inside "concatenate" must not count — reward-hacking guard.
+    assert not check_constraint({"type": "keyword_include", "word": "cat"}, "we concatenate strings")
+    assert check_constraint({"type": "keyword_forbid", "word": "cat"}, "we concatenate strings")
+    assert check_constraint({"type": "keyword_include", "word": "cat"}, "the cat sat")
+
+
+def test_sentence_count():
+    assert check_constraint({"type": "sentence_count", "n": 2}, "One here. Two here.")
+    assert check_constraint({"type": "sentence_count", "n": 1}, "The value is 3.14.")
+
+
+def test_unknown_type_raises():
+    with pytest.raises(ValueError, match="unknown constraint type"):
+        check_constraint({"type": "nope"}, "text")
 
 
 def test_keyword_include_and_forbid():

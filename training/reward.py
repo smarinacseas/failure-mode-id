@@ -14,6 +14,9 @@ import re
 
 
 def _words(text: str) -> list[str]:
+    # \b\w+\b counts contractions ("don't" -> 2) and hyphenated compounds
+    # ("well-known" -> 2) as multiple words — an accepted simplification
+    # for quantity constraints.
     return re.findall(r"\b\w+\b", text)
 
 
@@ -24,12 +27,16 @@ def check_constraint(constraint: dict, response: str) -> bool:
     if t == "min_words":
         return len(_words(response)) >= constraint["n"]
     if t == "keyword_include":
-        return constraint["word"].lower() in response.lower()
+        return re.search(rf"\b{re.escape(constraint['word'])}\b", response, re.IGNORECASE) is not None
     if t == "keyword_forbid":
-        return constraint["word"].lower() not in response.lower()
+        return re.search(rf"\b{re.escape(constraint['word'])}\b", response, re.IGNORECASE) is None
     if t == "sentence_count":
-        n = len([s for s in re.split(r"[.!?]+", response) if s.strip()])
-        return n == constraint["n"]
+        # Heuristic: terminal-punctuation runs end a sentence, except inside
+        # decimal numbers (3.14). Abbreviations (Dr., e.g.) still over-count —
+        # known limitation; dataset-native verifiers supersede these checkers
+        # once the real VerIH schema lands (training/data.py).
+        parts = [s for s in re.split(r"(?<!\d)[.!?]+(?![\d.])", response) if s.strip()]
+        return len(parts) == constraint["n"]
     if t == "json_parses":
         try:
             json.loads(response.strip())
