@@ -3078,10 +3078,10 @@
                       </div>
                     </div>
                   </sc-for>
-                  <sc-if value="{{ rm.hasAq }}" hint-placeholder-val="{{ false }}">
+                  <sc-if value="{{ rm.hasCm }}" hint-placeholder-val="{{ false }}">
                     <div style="background:var(--accent-bg,#efe2d4);border:1px solid var(--accent-line,#e0cab2);border-radius:9px;padding:9px 13px;margin:12px 0;font-size:12px">
-                      <span style="font-weight:700;color:var(--accent,#b06a3c)">AfterQuery — {{ rm.aqProduct }}</span>
-                      <span style="color:var(--ink-1,#46423a)"> · {{ rm.aqCommission }}</span>
+                      <span style="font-weight:700;color:var(--accent,#b06a3c)">{{ rm.cmSolution }}</span>
+                      <span style="color:var(--ink-1,#46423a)"> · {{ rm.cmCommission }}</span>
                     </div>
                   </sc-if>
                   <sc-if value="{{ rm.hasCitations }}" hint-placeholder-val="{{ false }}">
@@ -3721,9 +3721,9 @@
             domId:'ref-'+m.key, key:m.key, label:m.label, desc:m.description,
             strategy:(m.strategy||[]).map(t=>({text:String(t)})),
             datasets:(m.dataset_taxonomy||[]).map(d=>({name:d.name,structure:d.structure,annotation:d.annotation,scale:d.scale,verifiability:d.verifiability})),
-            hasAq:!!(m.afterquery&&m.afterquery.product),
-            aqProduct:(m.afterquery&&m.afterquery.product)||'',
-            aqCommission:(m.afterquery&&m.afterquery.commission)||'',
+            hasCm:!!(m.commissioning&&m.commissioning.solution),
+            cmSolution:(m.commissioning&&m.commissioning.solution)||'',
+            cmCommission:(m.commissioning&&m.commissioning.commission)||'',
             hasCitations:((m.citations||[]).length>0),
             citations:(m.citations||[]).map(c=>({title:c.title,url:c.url,meta:[c.venue,c.year].filter(Boolean).join(' · '),relevance:c.relevance||''})),
           });
