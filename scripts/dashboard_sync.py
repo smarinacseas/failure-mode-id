@@ -21,10 +21,15 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+from pipeline.run_config import track_for_slug  # noqa: E402 — needs REPO_ROOT on sys.path
+
 DEFAULT_SRC = REPO_ROOT / "outputs" / "experiments"
 DEFAULT_DST = REPO_ROOT / "dashboard"
 
@@ -68,12 +73,15 @@ def _run_entry(payload: dict, filename: str) -> dict:
     }
 
 
+_INDEX_FILES = {"runs.json", "training.json"}
+
+
 def _clean_stale(dst: Path, keep: set[str]) -> list[str]:
     """Remove `dashboard/*.json` files that don't correspond to a current
-    experiment. Preserves `runs.json` regardless."""
+    experiment. Preserves the run-index files (runs.json, training.json)."""
     removed: list[str] = []
     for jf in dst.glob("*.json"):
-        if jf.name == "runs.json" or jf.name in keep:
+        if jf.name in _INDEX_FILES or jf.name in keep:
             continue
         jf.unlink()
         removed.append(jf.name)
@@ -95,16 +103,19 @@ def sync(src: Path = DEFAULT_SRC, dst: Path = DEFAULT_DST) -> dict:
         entries.append(_run_entry(payload, dst_name))
         kept_names.add(dst_name)
 
-    entries.sort(key=lambda e: e["id"])
     removed = _clean_stale(dst, kept_names)
 
-    runs = {
-        "runs": entries,
-        "synced_at": datetime.now(timezone.utc).isoformat(),
-    }
-    (dst / "runs.json").write_text(
-        json.dumps(runs, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    def _write_index(name: str, track: str) -> None:
+        rows = sorted((e for e in entries if track_for_slug(e["id"]) == track),
+                      key=lambda e: e["id"])
+        (dst / name).write_text(
+            json.dumps({"runs": rows, "synced_at": datetime.now(timezone.utc).isoformat()},
+                       ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    _write_index("runs.json", "analysis")
+    _write_index("training.json", "training")
 
     return {
         "copied": len(files),
