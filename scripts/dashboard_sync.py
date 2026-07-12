@@ -73,15 +73,18 @@ def _run_entry(payload: dict, filename: str) -> dict:
     }
 
 
-_INDEX_FILES = {"runs.json", "training.json"}
+# Never pruned: the two run indexes plus hand-authored dashboard data files
+# that are tracked in git but are not experiment deliverables.
+_PRESERVED_FILES = {"runs.json", "training.json", "reference.json"}
 
 
 def _clean_stale(dst: Path, keep: set[str]) -> list[str]:
     """Remove `dashboard/*.json` files that don't correspond to a current
-    experiment. Preserves the run-index files (runs.json, training.json)."""
+    experiment. Preserves tracked dashboard files (_PRESERVED_FILES) that
+    are not experiment deliverables."""
     removed: list[str] = []
     for jf in dst.glob("*.json"):
-        if jf.name in _INDEX_FILES or jf.name in keep:
+        if jf.name in _PRESERVED_FILES or jf.name in keep:
             continue
         jf.unlink()
         removed.append(jf.name)
