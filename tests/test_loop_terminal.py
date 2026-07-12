@@ -51,7 +51,7 @@ def _router(chunks_factory):
 
 def test_empty_looping_completion_returns_terminal_record(monkeypatch):
     monkeypatch.setattr(generate, "retry", lambda fn, label: fn())
-    monkeypatch.setattr(generate, "router", _router(lambda: [
+    monkeypatch.setattr(config, "router", _router(lambda: [
         _chunk(reasoning=LOOP_UNIT * 300),
         _chunk(reasoning=LOOP_UNIT * 100, finish="length"),
     ]))
@@ -69,7 +69,7 @@ def test_empty_looping_completion_returns_terminal_record(monkeypatch):
 def test_empty_nonlooping_completion_still_retries(monkeypatch):
     monkeypatch.setattr(generate, "retry", lambda fn, label: fn())
     varied = " ".join(f"w{i}" for i in range(2000))
-    monkeypatch.setattr(generate, "router", _router(lambda: [
+    monkeypatch.setattr(config, "router", _router(lambda: [
         _chunk(reasoning=varied, finish="length"),
     ]))
     captured = []

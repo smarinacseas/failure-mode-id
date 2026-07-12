@@ -23,6 +23,40 @@ router = OpenAI(
     api_key=os.environ["OPENROUTER_API_KEY"],
 )
 
+# Optional local proxy for self-hosted / fine-tuned candidates (training track).
+# A candidate whose model-id is "proxy://<served-name>" is routed here instead
+# of OpenRouter. Base URL + key come from the environment (transport, NOT a
+# frozen treatment) so the same experiment.json replays against any proxy host.
+_PROXY_CLIENT: "OpenAI | None" = None
+PROXY_SCHEME = "proxy://"
+
+
+def proxy_client() -> "OpenAI":
+    """Lazily build the OpenAI-compatible client for the local candidate proxy.
+    Raises if the proxy env vars are absent — so a normal OpenRouter-only run
+    never touches this path."""
+    global _PROXY_CLIENT
+    if _PROXY_CLIENT is None:
+        base_url = os.environ.get("PROXY_BASE_URL")
+        if not base_url:
+            raise RuntimeError(
+                "a proxy:// candidate needs PROXY_BASE_URL set (e.g. "
+                "http://127.0.0.1:8000/v1); start training/proxy.py first.")
+        _PROXY_CLIENT = OpenAI(
+            base_url=base_url,
+            api_key=os.environ.get("PROXY_API_KEY", "local-dev"),
+        )
+    return _PROXY_CLIENT
+
+
+def resolve_candidate_transport(model_id: str):
+    """(client, model_name) for a candidate model-id. proxy://X → the proxy
+    client with model 'X'; anything else → the OpenRouter `router`, unchanged."""
+    if model_id.startswith(PROXY_SCHEME):
+        return proxy_client(), model_id[len(PROXY_SCHEME):]
+    return router, model_id
+
+
 # Judge + classifier via Anthropic. Non-candidate family → no self-preference bias.
 anthropic = Anthropic()
 

@@ -115,7 +115,7 @@ def test_generate_empty_completion_is_error_not_data(tmp_path, monkeypatch):
                     assert _k.get("stream") is True     # deadline guard needs streaming
                     return _EmptyStream()
 
-    monkeypatch.setattr(generate, "router", _EmptyRouter)
+    monkeypatch.setattr(config, "router", _EmptyRouter)
     # retry() must treat empty completions as retriable, then give up loudly.
     monkeypatch.setattr(generate, "retry",
                         lambda fn, label: fn())  # single attempt: surfacing the raise is what we test
