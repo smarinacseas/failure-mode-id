@@ -26,3 +26,9 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+filterwarnings = [
+    # Third-party: starlette.testclient emits this at import until we move to
+    # httpx2 (tracked upstream); keep test output pristine without masking
+    # warnings from our own code.
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
+]
