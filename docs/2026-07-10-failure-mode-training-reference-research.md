@@ -10,7 +10,7 @@ The eight failure modes analyzed below cluster into three recurring data-solutio
 
 Across every mode where the underlying papers quantify the split, the empirical verdict is the same: realistic instruction-following data is hybrid, not purely rule-checkable. VerIF's VerInstruct dataset finds only about 22% of real constraints carry a deterministic code verifier, with the remaining ~78% requiring LLM verification; RECAST's independent measurement lands close to the same ratio, at roughly 36% deterministic to 64% model-graded (see execution_slip below for both figures). A commissioning plan built on the assumption of pure RLVR will therefore under-cover most of the constraints a model actually needs to learn — the realistic engagement pairs a programmatic verifier layer for the format/length/keyword slice with rubric or judge infrastructure for everything else.
 
-This report's register does not change with the removal of vendor mapping: each per-mode section below still ends with a "Product read" paragraph naming the concrete data a lab should commission — structure, annotation scheme, scale, and verifiability posture. It simply names no vendor as the counterparty. Readers commissioning against any of these eight modes should treat the per-mode dossier, not this overview, as the specification.
+Each per-mode section below ends with a "Product read" paragraph naming the concrete data a lab should commission — structure, annotation scheme, scale, and verifiability posture — independent of any particular data vendor. Readers commissioning against any of these eight modes should treat the per-mode dossier, not this overview, as the specification.
 
 ## constraint_never_surfaced
 
