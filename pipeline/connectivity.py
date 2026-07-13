@@ -21,8 +21,9 @@ _PING_MAX_TOKENS = 16
 
 
 def _ping_candidate(key: str, model_id: str) -> str:
-    resp = router.chat.completions.create(
-        model=model_id, temperature=0, max_tokens=_PING_MAX_TOKENS,
+    client, send_model = config.resolve_candidate_transport(model_id)
+    resp = client.chat.completions.create(
+        model=send_model, temperature=0, max_tokens=_PING_MAX_TOKENS,
         messages=[{"role": "user", "content": "Say 'ok'."}],
     )
     return (resp.choices[0].message.content or "").strip()

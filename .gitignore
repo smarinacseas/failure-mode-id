@@ -228,6 +228,10 @@ outputs/
 data/complexconstraints.jsonl
 runs/
 
+# VerIH RLVR dataset (cloned from github.com/skai-research/VerIH, not HF Hub;
+# not our source — see training/data.py)
+data/verih/
+
 # Personal planning / AI-assisted development artifacts (local only)
 docs/superpowers/
 .superpowers/

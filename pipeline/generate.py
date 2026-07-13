@@ -28,7 +28,8 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from config import DATA_JSONL, GENERATION_DEADLINE_S, GENERATION_WORKERS, router
+from config import DATA_JSONL, GENERATION_DEADLINE_S, GENERATION_WORKERS
+import config
 from pipeline._decode_health import detect_repetition_loop
 from pipeline._io import append_jsonl, read_jsonl, retry
 from pipeline._select import select_prompts
@@ -76,6 +77,7 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
     silently discards the very text the failure analysis wants.
     """
     deadline = GENERATION_DEADLINE_S if deadline_s is None else deadline_s
+    client, send_model = config.resolve_candidate_transport(model_id)
 
     def _reject(error: str, finish, content_parts, reasoning_parts) -> None:
         if on_reject is None:
@@ -92,8 +94,8 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
 
     def _call():
         started = time.monotonic()
-        stream = router.chat.completions.create(
-            model=model_id,
+        stream = client.chat.completions.create(
+            model=send_model,
             temperature=cfg.temperature,
             max_tokens=cfg.max_tokens,
             messages=[{"role": "user", "content": prompt}],
@@ -209,7 +211,7 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
             fields["reasoning"] = reasoning
         return fields
 
-    return retry(_call, label=f"openrouter:{model_id}")
+    return retry(_call, label=f"candidate:{send_model}")
 
 
 def _run_item(cfg: RunConfig, mon: RunMonitor, key: str, model_id: str, rec: dict) -> None:

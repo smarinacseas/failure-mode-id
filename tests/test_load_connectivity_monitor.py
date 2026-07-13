@@ -43,6 +43,7 @@ def test_connectivity_pings_all_and_reports(monkeypatch):
                 return _Msg("ok")
 
     monkeypatch.setattr(connectivity, "router", _FakeRouter)
+    monkeypatch.setattr(config, "router", _FakeRouter)
     monkeypatch.setattr(connectivity, "anthropic", _FakeAnthropic)
     monkeypatch.setattr(config, "CANDIDATES", {"m1": "x", "m2": "y"})
     monkeypatch.setattr(config, "JUDGES", ["claude-j1"])
@@ -75,6 +76,7 @@ def test_connectivity_reports_failures_and_exits(monkeypatch):
                 return type("R", (), {"content": [b]})()
 
     monkeypatch.setattr(connectivity, "router", _FailRouter)
+    monkeypatch.setattr(config, "router", _FailRouter)
     monkeypatch.setattr(connectivity, "anthropic", _OkAnthropic)
     monkeypatch.setattr(config, "CANDIDATES", {"m1": "x"})
     monkeypatch.setattr(config, "JUDGES", ["claude-j1"])

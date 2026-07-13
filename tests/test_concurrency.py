@@ -172,7 +172,7 @@ def test_deadline_aborts_trickling_stream(tmp_path, monkeypatch):
     elapsed wall clock crosses the deadline → per-chunk check aborts."""
     cfg = make_cfg()
     stream = FakeStream(endless=0.02)
-    monkeypatch.setattr(generate, "router", _router(lambda p: stream))
+    monkeypatch.setattr(config, "router", _router(lambda p: stream))
     monkeypatch.setattr(generate, "retry", lambda fn, label: fn())   # guard only
 
     t0 = time.monotonic()
@@ -189,7 +189,7 @@ def test_deadline_aborts_hanging_stream_via_watchdog(tmp_path, monkeypatch):
     the blocked read's resulting error is translated to the deadline error."""
     cfg = make_cfg()
     stream = FakeStream(hang=True)
-    monkeypatch.setattr(generate, "router", _router(lambda p: stream))
+    monkeypatch.setattr(config, "router", _router(lambda p: stream))
     monkeypatch.setattr(generate, "retry", lambda fn, label: fn())
 
     t0 = time.monotonic()
@@ -205,7 +205,7 @@ def test_deadline_abort_routes_into_retry_then_error(tmp_path, monkeypatch):
     error — identical to any other transient failure's accounting."""
     cfg = _gen_setup(tmp_path, monkeypatch, ["p1"])
     monkeypatch.setattr(generate, "GENERATION_DEADLINE_S", 0.15)
-    monkeypatch.setattr(generate, "router", _router(lambda p: FakeStream(hang=True)))
+    monkeypatch.setattr(config, "router", _router(lambda p: FakeStream(hang=True)))
     _no_backoff(monkeypatch)
 
     m = _gen_monitor(1)
@@ -352,7 +352,7 @@ def test_wedged_worker_is_retried_then_errored_never_stalls(tmp_path, monkeypatc
             return FakeStream(hang=True)            # the wedge: no bytes, no EOF
         return FakeStream(chunks=_ok_chunks(f"RESP-{prompt}"))
 
-    monkeypatch.setattr(generate, "router", _router(stream_for))
+    monkeypatch.setattr(config, "router", _router(stream_for))
 
     t0 = time.monotonic()
     m = _gen_monitor(len(prompts))

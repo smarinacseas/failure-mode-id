@@ -55,7 +55,7 @@ def _single_attempt(monkeypatch):
 
 def test_empty_completion_invokes_on_reject_then_raises(monkeypatch):
     _single_attempt(monkeypatch)
-    monkeypatch.setattr(generate, "router", _router(lambda: _Stream(chunks=[
+    monkeypatch.setattr(config, "router", _router(lambda: _Stream(chunks=[
         _chunk(reasoning="ruminating forever "),
         _chunk(reasoning="ruminating forever ", finish="length"),
     ])))
@@ -72,7 +72,7 @@ def test_empty_completion_invokes_on_reject_then_raises(monkeypatch):
 
 def test_deadline_abort_invokes_on_reject_with_partial(monkeypatch):
     _single_attempt(monkeypatch)
-    monkeypatch.setattr(generate, "router",
+    monkeypatch.setattr(config, "router",
                         _router(lambda: _Stream(endless=0.02)))
     captured = []
     with pytest.raises(GenerationDeadlineExceeded):

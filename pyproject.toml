@@ -6,11 +6,16 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "anthropic>=0.115.0",
+    "fastapi>=0.139.0",
+    "httpx>=0.28.1",
     "openai>=2.44.0",
     "openpyxl>=3.1.5",
     "pandas>=3.0.3",
     "python-dotenv>=1.2.2",
     "rich>=13",
+    "tinker>=0.22.7",
+    "tinker-cookbook>=0.4.3",
+    "uvicorn>=0.51.0",
 ]
 
 [dependency-groups]
@@ -21,3 +26,9 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+filterwarnings = [
+    # Third-party: starlette.testclient emits this at import until we move to
+    # httpx2 (tracked upstream); keep test output pristine without masking
+    # warnings from our own code.
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
+]

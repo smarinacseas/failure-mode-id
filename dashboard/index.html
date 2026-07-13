@@ -727,6 +727,11 @@
                   FailureModeID
                 </div>
               </div>
+              <div style="display:flex;gap:4px;margin-right:10px">
+                <span onclick="{{ goAnalysisView }}" style="{{ viewAnalysisStyle }}">Analysis</span>
+                <span style="opacity:0.3">·</span>
+                <span onclick="{{ goTrainingView }}" style="{{ viewTrainingStyle }}">Training pilots</span>
+              </div>
               <div
                 style="
                   position: relative;
@@ -3406,7 +3411,7 @@
       // --- Standalone asset resolution: fetch()'d JSON is inlined as blob URLs by the bundler ---
       function __assetUrl(path){
         var R=(typeof window!=='undefined'&&window.__resources)||{};
-        var MAP={'./runs.json':'runsJson','runs.json':'runsJson','./results.json':'resultsJson','results.json':'resultsJson','./reference.json':'referenceJson','reference.json':'referenceJson'};
+        var MAP={'./runs.json':'runsJson','runs.json':'runsJson','./training.json':'trainingJson','training.json':'trainingJson','./results.json':'resultsJson','results.json':'resultsJson','./reference.json':'referenceJson','reference.json':'referenceJson'};
         var id=MAP[path];
         return (id&&R[id])?R[id]:path;
       }
@@ -3455,7 +3460,7 @@
           sortKey:'id', sortDir:'asc',
           selectedId:null, critFilter:'all', expanded:{},
           data:null, dataRaw:null, judge:null, error:null,
-          runs:[], currentRun:null, runOpen:false, notesOpen:false,
+          view:'analysis', runs:[], currentRun:null, runOpen:false, notesOpen:false,
           faCause:null, faModelF:null, faMenu:null,
           reference:null, refError:null, refMode:null,
         };
@@ -3464,6 +3469,26 @@
         isFull(p,model){ return !!(p.full_pass && p.full_pass[model]); }
 
         go(screen,patch){this.setState(Object.assign({screen},patch||{}));}
+        switchView(view){
+          if(view===this.state.view) return;
+          var self=this;
+          var indexPath=view==='training'?'./training.json':'./runs.json';
+          // Request token: rapid toggles (or a click racing the initial mount
+          // fetch) issue overlapping index fetches that can resolve out of
+          // order — only the latest request may apply its result.
+          this._viewReq=(this._viewReq||0)+1;
+          var req=this._viewReq;
+          this.setState({view:view});
+          __loadJson(indexPath).catch(function(){ return null; }).then(function(mf){
+            if(req!==self._viewReq) return;   // a newer switch superseded this fetch
+            var runs=(mf&&mf.runs&&mf.runs.length)?mf.runs:[];
+            self.applyHash(runs);   // resets runs + currentRun → the two views never share a picker
+            // applyHash re-derives `view` from location.hash, which hasn't been
+            // rewritten to match this switch yet (syncHash only fires once
+            // currentRun is set) — pin it back so a stale hash can't win the race.
+            self.setState({view:view});
+          });
+        }
         setModel(m){this.setState({model:m});}
         // Project the raw multi-judge payload down to a single-judge view so every
         // downstream render (summary, prompts, meta.judge/validation) reads the
@@ -3540,6 +3565,7 @@
           var run=runs.find(function(r){ return r.id===p.get('run'); })||runs[0];
           var tab=p.get('tab'), prompt=p.get('prompt');
           this.setState({
+            view: p.get('view')==='training'?'training':'analysis',
             runs:runs, currentRun:run,
             screen: prompt?'detail':(tab==='prompts'?'drilldown':(tab==='analysis'?'analysis':(tab==='reference'?'reference':'overview'))),
             selectedId: prompt||null,
@@ -3553,14 +3579,32 @@
         componentDidMount(){
           this.applyTheme(); this.setupGliders();
           var self=this;
-          __loadJson('./runs.json').catch(function(){ return null; }).then(function(mf){
-            var runs=(mf&&mf.runs&&mf.runs.length)?mf.runs:[{id:'results', label:'CIF pilot — results.json', path:'./results.json'}];
+          var p0=new URLSearchParams(location.hash.slice(1));
+          var isTraining0=p0.get('view')==='training';
+          var indexPath=isTraining0?'./training.json':'./runs.json';
+          // Same request token as switchView: if the user toggles views before
+          // this initial fetch resolves, the stale result must not apply.
+          this._viewReq=(this._viewReq||0)+1;
+          var req0=this._viewReq;
+          __loadJson(indexPath).catch(function(){ return null; }).then(function(mf){
+            if(req0!==self._viewReq) return;   // a view switch superseded the mount fetch
+            // The results.json fallback is an Analysis-only resilience path (legacy
+            // single-run pipeline); Training legitimately has zero runs until a
+            // T-series run lands, so it must fall back to [], same as switchView.
+            var runs=(mf&&mf.runs&&mf.runs.length)?mf.runs:(isTraining0?[]:[{id:'results', label:'CIF pilot — results.json', path:'./results.json'}]);
             self.applyHash(runs);
           });
           // Pasting a link into an already-open tab only fires hashchange
           // (same document) — honor it via the same seed-and-validate path.
           // Our own writes use replaceState, which never fires this event.
           window.addEventListener('hashchange', function(){
+            // Check view first, ahead of the "runs not loaded yet" guard below:
+            // Training can legitimately sit at runs.length===0 forever (no
+            // T-series runs yet), which would otherwise trap a manual hash
+            // edit back to Analysis.
+            var hp=new URLSearchParams(location.hash.slice(1));
+            var hView=hp.get('view')==='training'?'training':'analysis';
+            if(hView!==self.state.view){ self.switchView(hView); return; }
             if(!self.state.runs.length) return;
             if(location.hash.slice(1)===self.hashFromState()) return;
             self.applyHash(self.state.runs);
@@ -3570,9 +3614,13 @@
         // model, judge) so the address bar is shareable at any moment.
         // replaceState keeps browser history clean of per-click entries.
         hashFromState(){
-          var s=this.state; if(!s.currentRun) return '';
+          var s=this.state;
+          // Training view can be current-run-less (empty training.json) — still
+          // round-trip `view=training` so the toggle and deep links agree.
+          if(!s.currentRun && s.view!=='training') return '';
           var p=new URLSearchParams();
-          p.set('run', s.currentRun.id||s.currentRun.path);
+          if(s.currentRun) p.set('run', s.currentRun.id||s.currentRun.path);
+          if(s.view==='training') p.set('view','training');
           if(s.screen==='drilldown'||s.screen==='detail') p.set('tab','prompts');
           else if(s.screen==='analysis') p.set('tab','analysis');
           else if(s.screen==='reference'){ p.set('tab','reference'); if(s.refMode) p.set('mode', s.refMode); }
@@ -3592,6 +3640,9 @@
         // honor them; only the pieces the new run lacks fall back to defaults.
         loadRun(run){
           var self=this;
+          // A view can have zero runs (e.g. training.json before any T-series
+          // run lands) — there is nothing to fetch, just clear to an empty state.
+          if(!run){ this.setState({data:null, dataRaw:null, judge:null, error:null, currentRun:null, openMenu:null, runOpen:false, faMenu:null}); return; }
           var prev={screen:this.state.screen, model:this.state.model, judge:this.state.judge,
                     selectedId:this.state.selectedId, expanded:this.state.expanded,
                     fInstr:this.state.fInstr, fUse:this.state.fUse, fStyle:this.state.fStyle,
@@ -3626,7 +3677,15 @@
           var self=this;
           const runs=this.state.runs||[], cur=this.state.currentRun, open=!!this.state.runOpen;
           const optRowR=(sel)=> 'display:flex;align-items:center;justify-content:space-between;gap:16px;padding:8px 11px;border-radius:7px;cursor:pointer;'+(sel?'background:var(--accent-bg,#efe2d4)':'');
+          const viewIsAnalysis=this.state.view!=='training', viewIsTraining=this.state.view==='training';
           return {
+            // Full style strings, not mid-attribute {{ }} interpolation: this
+            // template compiler only binds style="{{ x }}" as a whole value,
+            // matching bcOverviewStyle/runBtnStyle elsewhere in this file.
+            viewAnalysisStyle: 'cursor:pointer;font-size:12px;font-weight:'+(viewIsAnalysis?'700':'400')+';opacity:'+(viewIsAnalysis?'1':'0.55'),
+            viewTrainingStyle: 'cursor:pointer;font-size:12px;font-weight:'+(viewIsTraining?'700':'400')+';opacity:'+(viewIsTraining?'1':'0.55'),
+            goAnalysisView: ()=>this.switchView('analysis'),
+            goTrainingView: ()=>this.switchView('training'),
             runLabel: cur ? (cur.label||cur.id||'results.json') : 'Loading run…',
             runCaret: open?'▴':'▾', runOpen: open,
             runOnToggle: ()=> this.setState(s=>({runOpen:!s.runOpen})),

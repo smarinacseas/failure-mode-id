@@ -18,7 +18,7 @@ from pathlib import Path
 
 import config
 
-SLUG_RE = re.compile(r"^E(\d{2,})-[a-z0-9]+(-[a-z0-9]+)*$")
+SLUG_RE = re.compile(r"^([ET])(\d{2,})-[a-z0-9]+(-[a-z0-9]+)*$")
 
 _PARAM_FIELDS = (
     "candidates", "judges", "classifier_chain", "max_tokens", "temperature",
@@ -109,18 +109,25 @@ class InvalidSlugError(ValueError):
 def parse_slug(slug: str) -> tuple[int, str]:
     """Return (number, label) for a valid slug or raise InvalidSlugError.
 
-    Example: `E01-smoke-3p` → (1, "smoke-3p").
+    Example: `E01-smoke-3p` → (1, "smoke-3p"); `T01-ihrlvr` → (1, "ihrlvr").
+    Prefix E = analysis track, T = training track (see track_for_slug).
     """
     m = SLUG_RE.match(slug)
     if not m:
         raise InvalidSlugError(
-            f"experiment slug {slug!r} must match E<NN>-<kebab-case-label> "
-            "(e.g. E01-smoke-3p). Digits ≥ 2; label is lowercase-alphanumeric "
-            "words separated by hyphens."
+            f"experiment slug {slug!r} must match [ET]<NN>-<kebab-case-label> "
+            "(e.g. E01-smoke-3p, T01-ihrlvr). Digits ≥ 2; label is "
+            "lowercase-alphanumeric words separated by hyphens."
         )
-    number = int(m.group(1))
+    number = int(m.group(2))
     label = slug.split("-", 1)[1]
     return number, label
+
+
+def track_for_slug(slug: str) -> str:
+    """Track family from the slug prefix: T… → 'training', else 'analysis'.
+    The slug is the single source of truth for track — no separate field."""
+    return "training" if slug[:1].upper() == "T" else "analysis"
 
 
 @dataclass(frozen=True)
