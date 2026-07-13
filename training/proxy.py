@@ -9,11 +9,13 @@ by the parity smoke test (plan Task 10).
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from typing import Protocol
 
 from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
 
 class Sampler(Protocol):
@@ -37,14 +39,44 @@ def build_app(samplers: dict[str, Sampler], api_key: str) -> FastAPI:
             messages=body["messages"],
             max_tokens=body.get("max_tokens", 8000),
             temperature=body.get("temperature", 0.0),
-            reasoning=bool((body.get("extra_body") or {}).get("reasoning", {}).get("enabled", False)),
+            # The OpenAI SDK merges extra_body into the top-level request JSON
+            # (_merge_mappings(json_data, options.extra_json)) before sending,
+            # so "reasoning" arrives as a top-level key — there is never an
+            # "extra_body" key on the wire.
+            reasoning=bool((body.get("reasoning") or {}).get("enabled", False)),
         )
-        return {
-            "id": "chatcmpl-proxy", "object": "chat.completion",
-            "created": int(time.time()), "model": model,
-            "choices": [{"index": 0, "finish_reason": "stop",
-                         "message": {"role": "assistant", "content": text}}],
-        }
+
+        if not body.get("stream"):
+            return {
+                "id": "chatcmpl-proxy", "object": "chat.completion",
+                "created": int(time.time()), "model": model,
+                "choices": [{"index": 0, "finish_reason": "stop",
+                             "message": {"role": "assistant", "content": text}}],
+            }
+
+        # Streaming: the eval harness (pipeline/generate.py) calls candidates
+        # with stream=True and consumes SSE deltas via the OpenAI SDK's
+        # SSEDecoder, which yields zero events from a plain JSON body. Sampling
+        # already happened above (sync); this generator only frames the
+        # already-computed text as a single-delta chunk followed by a
+        # finish_reason="stop" chunk and the terminal [DONE] — legal SSE, and
+        # all frames arrive immediately so the harness's per-chunk deadline
+        # logic is never starved.
+        created = int(time.time())
+
+        def _chunk(delta: dict, finish_reason: str | None) -> dict:
+            return {
+                "id": "chatcmpl-proxy", "object": "chat.completion.chunk",
+                "created": created, "model": model,
+                "choices": [{"index": 0, "delta": delta, "finish_reason": finish_reason}],
+            }
+
+        def _stream():
+            yield f"data: {json.dumps(_chunk({'role': 'assistant', 'content': text}, None))}\n\n"
+            yield f"data: {json.dumps(_chunk({}, 'stop'))}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(_stream(), media_type="text/event-stream")
 
     return app
 

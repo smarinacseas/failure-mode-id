@@ -45,13 +45,16 @@ from pathlib import Path
 
 
 def to_sample(row: dict) -> dict:
-    """One raw VerIH row → {messages, constraints}.
+    """One raw VerIH row → {messages, constraints, type}.
 
     messages: system (from sys_prompt, omitted if blank) + user (from
     user_prompt). constraints: a single-element list holding the parsed
     `gt` verifier spec verbatim (empty list if `gt` is absent/blank) —
     `gt`'s "func_name"/params are VerIH's own schema, not training/reward.py's
-    constraint "type" taxonomy (see module docstring).
+    constraint "type" taxonomy (see module docstring). type: VerIH's own
+    aligned/conflict tag (row["type"], e.g. "forbidden words:aligned"),
+    passed through losslessly (None if absent) — the training phase uses it
+    for conflict-split metrics.
     """
     messages = []
     if row.get("sys_prompt"):
@@ -59,7 +62,7 @@ def to_sample(row: dict) -> dict:
     messages.append({"role": "user", "content": row["user_prompt"]})
     gt = row.get("gt")
     constraints = [json.loads(gt)] if gt else []
-    return {"messages": messages, "constraints": constraints}
+    return {"messages": messages, "constraints": constraints, "type": row.get("type")}
 
 
 def load_verih(path: str, limit: int | None = None) -> list[dict]:

@@ -27,12 +27,25 @@ def test_to_sample_builds_system_user_messages_and_constraints():
         "func_name": "validate_forbidden_words",
         "forbidden_words": ["anticor", "frolicness", "necessarianism"],
     }]
+    assert s["type"] == "forbidden words:aligned"
 
 
 def test_to_sample_omits_system_message_when_sys_prompt_blank():
     row = {"sys_prompt": "", "user_prompt": "hi", "gt": json.dumps({"func_name": "validate_no_commas"})}
     s = to_sample(row)
     assert s["messages"] == [{"role": "user", "content": "hi"}]
+
+
+def test_to_sample_preserves_conflict_tag_and_defaults_to_none():
+    conflict_row = {
+        "sys_prompt": "", "user_prompt": "hi",
+        "gt": json.dumps({"func_name": "validate_no_commas"}),
+        "type": "conflict",
+    }
+    assert to_sample(conflict_row)["type"] == "conflict"
+
+    row_without_type = {"sys_prompt": "", "user_prompt": "hi", "gt": json.dumps({"func_name": "validate_no_commas"})}
+    assert to_sample(row_without_type)["type"] is None
 
 
 def test_load_verih_reads_json_array_and_applies_limit(tmp_path):
