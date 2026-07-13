@@ -228,6 +228,11 @@ outputs/
 data/complexconstraints.jsonl
 runs/
 
+# RLVR training run artifact: produced by training/train_rlvr.py, consumed by
+# training/iheval.py at runtime (tinker:// paths are ephemeral/server-specific
+# — tracking it just creates spurious per-run diffs).
+training/checkpoints.json
+
 # VerIH RLVR dataset (cloned from github.com/skai-research/VerIH, not HF Hub;
 # not our source — see training/data.py)
 data/verih/

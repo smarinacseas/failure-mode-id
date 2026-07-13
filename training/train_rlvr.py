@@ -16,8 +16,23 @@ does (SDK behavior discovered by reconciling against the installed package,
 not assumed), is documented inline below and summarized in the module-level
 CONFIG block.
 
+Durability (added after a live 402 killed a full run at step 151/225 with all
+151 steps lost — the only durable checkpoint was the base): every SAVE_EVERY
+steps we write BOTH a durable sampler checkpoint (save_weights_for_sampler,
+for intermediate eval) and a resumable training-state checkpoint (save_state,
+weights + optimizer), recording their paths in checkpoints.json atomically.
+On any exception OR Ctrl-C we attempt a durable `-partial` save before
+re-raising (that save may itself 402 — then checkpoints.json still holds the
+last periodic step's paths). With RESUME=1, startup reloads the recorded
+training state via create_training_client_from_state_with_optimizer (the exact
+rl_loop.py / sl_loop.py resume pattern) and continues from next_step, reusing
+the ORIGINAL base checkpoint (never re-saved — the fair baseline must stay the
+pre-training weights).
+
 Run:
     caffeinate -is uv run python -m training.train_rlvr
+Resume an interrupted run:
+    caffeinate -is env RESUME=1 uv run python -m training.train_rlvr
 
 All hyperparameters are env-var overridable (see CONFIG below) so a smoke
 run can shrink STEPS/PROMPTS_PER_STEP/MAX_TOKENS without editing code.
@@ -37,6 +52,7 @@ from tinker import types
 from tinker.types.tensor_data import TensorData
 from tinker_cookbook import renderers
 
+from training._rlvr_resume import batch_indices, resume_start_step
 from training.data import load_verih
 from training.verih_reward import has_think_block, rl_reward
 
@@ -82,6 +98,13 @@ LEARNING_RATE = float(os.environ.get("LEARNING_RATE", "1e-5"))
 TEMPERATURE = float(os.environ.get("TEMPERATURE", "1.0"))
 
 SEED = int(os.environ.get("SEED", "20260712"))
+
+# Durability cadence: save a durable sampler + resumable state checkpoint
+# every SAVE_EVERY completed steps (default 25 — one save per ~25 paid steps
+# bounds worst-case loss to <SAVE_EVERY steps). RESUME=1 reloads the recorded
+# state on startup and continues from next_step.
+SAVE_EVERY = int(os.environ.get("SAVE_EVERY", "25"))
+RESUME = os.environ.get("RESUME") == "1"
 
 DATA_PATH = os.environ.get("DATA_PATH", "data/verih/RLVR/dataset/verih/train.json")
 CHECKPOINTS_PATH = os.environ.get("CHECKPOINTS_PATH", "training/checkpoints.json")
@@ -144,11 +167,11 @@ def _batch_for_step(pool: list[dict], step: int, prompts_per_step: int) -> list[
     """Cycles through `pool` with wraparound so STEPS * PROMPTS_PER_STEP can
     exceed len(pool) without index errors — the pool was shuffled once at
     startup (seeded), so wraparound repeats rows in the same relative order
-    rather than reshuffling per lap. Acceptable for a pilot; a longer run
-    should reshuffle each epoch boundary."""
-    n = len(pool)
-    start = (step * prompts_per_step) % n
-    return [pool[(start + i) % n] for i in range(prompts_per_step)]
+    rather than reshuffling per lap. Index math (pure, resume-deterministic)
+    lives in training/_rlvr_resume.batch_indices so it can be tested offline;
+    that determinism is also what makes RESUME continue the data stream
+    exactly where an interrupted run left off."""
+    return [pool[i] for i in batch_indices(len(pool), step, prompts_per_step)]
 
 
 def _save_named_checkpoint(training_client, name: str) -> str:
@@ -170,14 +193,58 @@ def _save_named_checkpoint(training_client, name: str) -> str:
 
 
 def _write_checkpoints(path: str, data: dict) -> None:
-    Path(path).write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    """Atomic write (tmp file + os.replace) so a crash mid-write — including a
+    402 that strikes between periodic saves — can never leave a truncated,
+    unparseable checkpoints.json that would strand a resume."""
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_suffix(p.suffix + ".tmp")
+    tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    os.replace(tmp, p)
+
+
+def _read_checkpoints(path: str) -> dict:
+    """Load checkpoints.json, or {} if it doesn't exist yet."""
+    p = Path(path)
+    if not p.exists():
+        return {}
+    return json.loads(p.read_text(encoding="utf-8"))
 
 
 def main() -> None:
     from dotenv import load_dotenv
     load_dotenv()  # TINKER_API_KEY et al. live in .env (repo convention, cf. config.py)
     service = tinker.ServiceClient()  # reads TINKER_API_KEY
-    training_client = service.create_lora_training_client(base_model=BASE_MODEL, rank=LORA_RANK)
+
+    # RESUME handling. resume_start_step (pure, tested offline) reads the
+    # recorded next_step; resuming is true only when RESUME=1 AND a durable
+    # state checkpoint was recorded. On resume we rebuild the training client
+    # FROM that state via create_training_client_from_state_with_optimizer —
+    # the exact pattern rl_loop.py and sl_loop.py use (restores weights AND
+    # optimizer moments, so Adam continues rather than cold-starting) — and do
+    # NOT create a fresh LoRA client. On a fresh run we create the LoRA client
+    # normally.
+    existing = _read_checkpoints(CHECKPOINTS_PATH) if RESUME else {}
+    start_step = resume_start_step(existing, RESUME)
+    resuming = start_step > 0
+    if resuming:
+        checkpoints: dict = existing
+        training_client = service.create_training_client_from_state_with_optimizer(
+            checkpoints["resume_state_path"]
+        )
+        # REUSE the original base checkpoint path — never re-save base; the
+        # fair baseline must stay the pre-training weights (a re-save here
+        # would capture already-trained weights and silently corrupt the
+        # base-vs-ft comparison).
+        base_path = checkpoints["base"]
+        print(
+            f"RESUME: loaded state {checkpoints['resume_state_path']}, "
+            f"continuing from step {start_step}; base reused: {base_path}",
+            flush=True,
+        )
+    else:
+        checkpoints = {}
+        training_client = service.create_lora_training_client(base_model=BASE_MODEL, rank=LORA_RANK)
 
     # Tokenizer straight off the training client (TrainingClient.get_tokenizer
     # exists and avoids spinning up a throwaway SamplingClient just to read
@@ -192,12 +259,18 @@ def main() -> None:
     tokenizer = training_client.get_tokenizer()
     renderer = renderers.get_renderer("qwen3", tokenizer)
 
-    checkpoints: dict = {}
-    base_path = _save_named_checkpoint(training_client, BASE_CHECKPOINT_NAME)
-    checkpoints["base"] = base_path
-    _write_checkpoints(CHECKPOINTS_PATH, checkpoints)
-    print(f"base checkpoint saved: {base_path}")
+    if not resuming:
+        base_path = _save_named_checkpoint(training_client, BASE_CHECKPOINT_NAME)
+        checkpoints["base"] = base_path
+        checkpoints["steps"] = {}
+        _write_checkpoints(CHECKPOINTS_PATH, checkpoints)
+        print(f"base checkpoint saved: {base_path}", flush=True)
+    checkpoints.setdefault("steps", {})
 
+    # Pool is rebuilt from the SAME seeded shuffle every run, so on resume it
+    # is byte-identical — that (plus batch_indices' determinism in step) is
+    # what lets the loop simply start at start_step and continue the data
+    # stream where the interrupted run left off.
     samples = load_verih(DATA_PATH)
     random.Random(SEED).shuffle(samples)
     pool, n_skipped_untrainable, n_skipped_overlong = _build_pool(samples, renderer, MAX_PROMPT_TOKENS)
@@ -205,7 +278,8 @@ def main() -> None:
         f"pool={len(pool)} rows "
         f"(skipped {n_skipped_untrainable} non-aligned/conflict-or-no-func_name, "
         f"{n_skipped_overlong} over {MAX_PROMPT_TOKENS} prompt tokens; "
-        f"{len(samples)} rows total)"
+        f"{len(samples)} rows total)",
+        flush=True,
     )
     if not pool:
         raise RuntimeError("no trainable rows survived filtering — check DATA_PATH / gt schema")
@@ -216,7 +290,7 @@ def main() -> None:
     adam_params = types.AdamParams(learning_rate=LEARNING_RATE, beta1=0.9, beta2=0.95, eps=1e-8)
 
     printed_debug_sample = False
-    last_mean_reward = 0.0
+    last_mean_reward = float(checkpoints.get("last_mean_reward", 0.0))
 
     def _finalize(ft_name: str, partial: bool) -> None:
         ft_path = _save_named_checkpoint(training_client, ft_name)
@@ -238,11 +312,34 @@ def main() -> None:
             "partial": partial,
         }
         _write_checkpoints(CHECKPOINTS_PATH, checkpoints)
-        print(f"{'partial ' if partial else ''}ft checkpoint saved: {ft_path}")
-        print(f"checkpoints written to {CHECKPOINTS_PATH}: base={checkpoints['base']} ft={ft_path}")
+        print(f"{'partial ' if partial else ''}ft checkpoint saved: {ft_path}", flush=True)
+        print(
+            f"checkpoints written to {CHECKPOINTS_PATH}: base={checkpoints['base']} ft={ft_path}",
+            flush=True,
+        )
+
+    def _save_periodic(step: int) -> None:
+        """After a completed step (optim_step done), persist BOTH a durable
+        sampler checkpoint (for intermediate eval) and a resumable training
+        state (weights + optimizer), then write checkpoints.json atomically.
+        `steps` is keyed by the completed 0-indexed step; `next_step` = step+1
+        is where a RESUME picks up."""
+        next_step = step + 1
+        sampler_path = _save_named_checkpoint(training_client, f"{FT_CHECKPOINT_NAME}-step{step:04d}")
+        state_path = training_client.save_state(f"{FT_CHECKPOINT_NAME}-state-step{step:04d}").result().path
+        checkpoints.setdefault("steps", {})[str(step)] = sampler_path
+        checkpoints["resume_state_path"] = state_path
+        checkpoints["next_step"] = next_step
+        checkpoints["last_mean_reward"] = last_mean_reward
+        _write_checkpoints(CHECKPOINTS_PATH, checkpoints)
+        print(
+            f"[checkpoint] step {step}: sampler={sampler_path} state={state_path} "
+            f"(RESUME=1 resumes at next_step={next_step})",
+            flush=True,
+        )
 
     try:
-        for step in range(STEPS):
+        for step in range(start_step, STEPS):
             t_start = time.time()
             # Fresh, EPHEMERAL sampling client reflecting current weights —
             # see _save_named_checkpoint's docstring for why no `name=` here.
@@ -279,7 +376,10 @@ def main() -> None:
                     reward = rl_reward(text, gt)
 
                     if not printed_debug_sample:
-                        print(f"[step 0 sample] reward={reward} text[:300]={text[:300]!r}")
+                        print(
+                            f"[first-step sample] reward={reward} text[:300]={text[:300]!r}",
+                            flush=True,
+                        )
                         printed_debug_sample = True
 
                     n_samples_total += 1
@@ -344,12 +444,39 @@ def main() -> None:
                 f"step={step:04d} mean_reward={mean_reward:.4f} "
                 f"frac_format_ok={frac_format_ok:.4f} "
                 f"frac_degenerate_groups={frac_degenerate_groups:.4f} "
-                f"elapsed={elapsed:.1f}s"
+                f"elapsed={elapsed:.1f}s",
+                flush=True,
             )
-    except KeyboardInterrupt:
-        print("\ninterrupted — saving partial ft checkpoint before exiting (training compute is money)")
-        _finalize(PARTIAL_CHECKPOINT_NAME, partial=True)
-        raise SystemExit(130)
+
+            # Durable periodic checkpoint AFTER the optim_step for this step
+            # has completed, so the saved weights include this step's update.
+            if (step + 1) % SAVE_EVERY == 0:
+                _save_periodic(step)
+    except BaseException as exc:
+        # Broadened from KeyboardInterrupt-only: the live incident was an HTTP
+        # 402 raised from a sampling future — NOT a Ctrl-C — and the old guard
+        # let it kill the run with everything since the base lost. Now ANY
+        # exception (402, network, KeyboardInterrupt, assertion) triggers a
+        # best-effort durable `-partial` save before re-raising.
+        print(
+            f"\n{type(exc).__name__} during training — attempting durable partial save "
+            f"before re-raising (training compute is money)",
+            flush=True,
+        )
+        try:
+            _finalize(PARTIAL_CHECKPOINT_NAME, partial=True)
+        except Exception as save_exc:  # noqa: BLE001
+            # A 402 that killed training will also block the save. That's why
+            # #1's periodic saves exist: checkpoints.json still holds the last
+            # periodic step's resume_state_path + next_step, so RESUME=1 can
+            # recover to within SAVE_EVERY steps of the crash.
+            print(
+                f"partial save also FAILED ({type(save_exc).__name__}: {save_exc}); "
+                f"checkpoints.json retains the last periodic step "
+                f"(next_step={checkpoints.get('next_step')})",
+                flush=True,
+            )
+        raise
 
     _finalize(FT_CHECKPOINT_NAME, partial=False)
 
