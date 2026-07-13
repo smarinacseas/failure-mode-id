@@ -129,6 +129,8 @@ class TinkerSampler:
 
 
 def main() -> None:
+    from dotenv import load_dotenv
+    load_dotenv()  # TINKER_API_KEY et al. live in .env (repo convention, cf. config.py)
     import tinker
     import uvicorn
     from tinker_cookbook import renderers

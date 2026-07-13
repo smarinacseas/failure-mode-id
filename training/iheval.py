@@ -52,6 +52,8 @@ def score_conflict(samples: list[dict], sampler) -> float:
 
 
 def main() -> None:
+    from dotenv import load_dotenv
+    load_dotenv()  # TINKER_API_KEY et al. live in .env (repo convention, cf. config.py)
     import json
     import os
 

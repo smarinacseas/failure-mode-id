@@ -174,6 +174,8 @@ def _write_checkpoints(path: str, data: dict) -> None:
 
 
 def main() -> None:
+    from dotenv import load_dotenv
+    load_dotenv()  # TINKER_API_KEY et al. live in .env (repo convention, cf. config.py)
     service = tinker.ServiceClient()  # reads TINKER_API_KEY
     training_client = service.create_lora_training_client(base_model=BASE_MODEL, rank=LORA_RANK)
 
