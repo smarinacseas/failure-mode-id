@@ -307,6 +307,15 @@ def main() -> None:
                     target_tokens = [0] * ob_len + sampled_tokens
                     padded_logprobs = [0.0] * ob_len + logprobs
                     padded_advantages = [0.0] * ob_len + [advantage] * (model_input.length - ob_len)
+                    assert (
+                        model_input.length
+                        == len(target_tokens)
+                        == len(padded_logprobs)
+                        == len(padded_advantages)
+                    ), (
+                        f"model_input.length: {model_input.length}, len(target_tokens): {len(target_tokens)}, "
+                        f"len(padded_logprobs): {len(padded_logprobs)}, len(padded_advantages): {len(padded_advantages)}"
+                    )
                     datum = types.Datum(
                         model_input=model_input,
                         loss_fn_inputs={
