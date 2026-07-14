@@ -1,0 +1,19 @@
+{
+  "params": {
+    "limit": 80,
+    "max_tokens": 2048,
+    "temperature": 0.6
+  },
+  "base": {
+    "conflict": 0.35,
+    "aligned": 0.6375,
+    "n_conflict": 80,
+    "n_aligned": 80
+  },
+  "ft": {
+    "conflict": 0.3625,
+    "aligned": 0.65,
+    "n_conflict": 80,
+    "n_aligned": 80
+  }
+}
