@@ -26,21 +26,32 @@ is already assistant-only.
 from __future__ import annotations
 
 import re
-import sys
 from pathlib import Path
 
 # Import if_functions.py directly as a top-level module (no packaging hacks):
-# it's pure stdlib (json/re/typing), so adding its directory to sys.path and
-# doing a plain `import if_functions` works without needing the surrounding
-# verl.utils.reward_score package to be importable.
+# it's pure stdlib (json/re/typing), so loading it from its directory works
+# without the surrounding verl.utils.reward_score package being importable.
+#
+# CRITICAL: do NOT leave that directory on sys.path — it also contains a
+# `math.py` (and other files) that would SHADOW the stdlib `math` module for
+# the rest of the process. A plain `sys.path.insert(0, ...)` breaks any later
+# lazy `import math` (e.g. dotenv -> tempfile -> random -> `from math import
+# log`), which is exactly what crashed the live IHEval gate. We therefore load
+# `if_functions` by explicit file path via importlib and never mutate sys.path.
+import importlib.util as _ilu  # noqa: E402
+
 _REWARD_SCORE_DIR = (
     Path(__file__).resolve().parent.parent
     / "data" / "verih" / "RLVR" / "verl" / "utils" / "reward_score"
 )
-if str(_REWARD_SCORE_DIR) not in sys.path:
-    sys.path.insert(0, str(_REWARD_SCORE_DIR))
-
-import if_functions  # type: ignore  # noqa: E402
+_IF_FUNCTIONS_PATH = _REWARD_SCORE_DIR / "if_functions.py"
+_spec = _ilu.spec_from_file_location("verih_if_functions", _IF_FUNCTIONS_PATH)
+if _spec is None or _spec.loader is None:
+    raise ImportError(
+        f"cannot load VerIH if_functions from {_IF_FUNCTIONS_PATH} — is the "
+        "skai-research/VerIH dataset cloned into data/verih/? (see training/data.py)")
+if_functions = _ilu.module_from_spec(_spec)
+_spec.loader.exec_module(if_functions)
 
 IF_FUNCTIONS_MAP = if_functions.IF_FUNCTIONS_MAP
 

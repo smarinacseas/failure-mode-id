@@ -2,6 +2,20 @@ from pathlib import Path
 
 from training.verih_reward import has_think_block, native_score, rl_reward, strip_think
 
+
+def test_importing_verih_reward_does_not_pollute_sys_path():
+    """Regression: verih_reward loads VerIH's if_functions.py, whose directory
+    also contains a math.py, code.py, etc. Leaking that dir onto sys.path
+    SHADOWS stdlib for the rest of the process — a later lazy `import math`
+    (dotenv -> tempfile -> random -> `from math import log`) then resolves to
+    VerIH's math.py and crashes. This broke the live IHEval gate. verih_reward
+    must load if_functions by file path and never mutate sys.path."""
+    import sys
+    assert not any(p.endswith("reward_score") for p in sys.path), \
+        "VerIH reward_score dir must not be on sys.path (shadows stdlib math/code/etc.)"
+    # The stdlib symbols random.py imports must still resolve to real stdlib:
+    from math import log, exp  # noqa: F401 — would raise if math.py were shadowed
+
 # Real IF_FUNCTIONS_MAP entries (data/verih/RLVR/verl/utils/reward_score/if_functions.py):
 #   verify_keywords(text, keyword_list) -> bool          (all keywords present, case-insensitive)
 #   verify_letter_frequency(text, letter, N) -> bool      (raises ValueError if len(letter) != 1)
