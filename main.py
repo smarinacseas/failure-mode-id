@@ -75,6 +75,12 @@ def _parser() -> argparse.ArgumentParser:
                    help="Criterion-classifier fallback chain (frozen): comma list in "
                         "--judges syntax, walked per prompt (refusal/failed members "
                         "fall through). Default: the first judge.")
+    p.add_argument("--tiebreaker", default=None,
+                   help="Panel tie-break anchor judge KEY (frozen; E08 policy). When "
+                        "set, a 1-1 tie is broken by this judge's vote and "
+                        "undecidable/under-quorum criteria become EXCLUDE (dropped, "
+                        "never FAIL) per plan §0.3. Must be one of --judges. Default "
+                        "unset → legacy consensus (ties/no-quorum → FAIL; E01-E07).")
     p.add_argument("--sample-seed", type=int, default=None, dest="sample_seed",
                    help="Seeded stratified sampling (frozen): pick --limit prompts "
                         "spread across use cases / instruction types / prompt styles "
@@ -86,6 +92,14 @@ def _parser() -> argparse.ArgumentParser:
                         "(frozen; default: OpenRouter's own routing). Reasoning runs "
                         "want 'throughput' — thinking budgets on a slow provider mean "
                         "20+ minute calls.")
+    p.add_argument("--provider-quant", default=None, dest="provider_quant",
+                   help="Comma list of allowed candidate quantizations (frozen; e.g. "
+                        "'bf16,fp16'). Pins OpenRouter routing to matching providers and "
+                        "sets require_parameters, so an int-quantized endpoint can't "
+                        "silently serve the candidate (§0.2 provider-variance guard).")
+    p.add_argument("--seed", type=int, default=None,
+                   help="Candidate decode seed (frozen; §0.2 'seeds logged'). Best-effort "
+                        "on OpenRouter, but the requested seed is always recorded.")
     p.add_argument("--judge-mode", choices=("batch", "sequential"),
                    default=None, dest="judge_mode",
                    help="Judge transport (frozen; default batch): 'batch' grades via "
@@ -130,10 +144,17 @@ def _overrides(args: argparse.Namespace) -> dict:
         out["judges"] = (resolve_judge(args.judge),)
     if args.classifier is not None:
         out["classifier_chain"] = parse_judges(args.classifier)
+    if args.tiebreaker is not None:
+        out["tiebreaker_judge"] = args.tiebreaker
     if args.description is not None:
         out["description"] = args.description
     if args.provider_sort is not None:
         out["provider_sort"] = args.provider_sort
+    if args.provider_quant is not None:
+        out["provider_quantizations"] = tuple(
+            q.strip() for q in args.provider_quant.split(",") if q.strip())
+    if args.seed is not None:
+        out["seed"] = args.seed
     if args.sample_seed is not None:
         out["sample_seed"] = args.sample_seed
     if args.judge_mode is not None:

@@ -237,6 +237,79 @@ def test_legacy_string_freeze_repass_identical_judges_not_a_conflict(tmp_path, m
         resolve("E96-legacy", {"judges": parse_judges("claude-fable-5")})
 
 
+def test_extra_body_includes_quant_pin():
+    # §0.2 provider variance mitigation: restrict routing to bf16/fp16 providers
+    # (no int-quant endpoints). Deliberately NO require_parameters — that also
+    # demands provider support for the reasoning/seed params we send, which the
+    # bf16/fp16 Llama providers don't declare, 404-ing every route (dry-run
+    # 2026-07-15). The quantizations filter alone is the guard.
+    body = _cfg(provider_quantizations=("bf16", "fp16")).extra_body
+    assert body["provider"] == {"quantizations": ["bf16", "fp16"]}
+    assert "require_parameters" not in body["provider"]
+    # no pin → no provider block (byte-identical to pre-E08 behavior)
+    assert "provider" not in _cfg().extra_body
+
+
+def test_extra_body_merges_sort_and_quant():
+    body = _cfg(provider_sort="throughput", provider_quantizations=("bf16",)).extra_body
+    assert body["provider"] == {"sort": "throughput", "quantizations": ["bf16"]}
+
+
+def test_provider_quantizations_freezes_and_backcompat(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
+    cfg = resolve("E18-quant", {"limit": 3, "provider_quantizations": ("bf16", "fp16")})
+    assert cfg.provider_quantizations == ("bf16", "fp16")
+    assert resolve("E18-quant", {}).provider_quantizations == ("bf16", "fp16")  # reload
+    d = _cfg().to_json_dict()
+    d.pop("provider_quantizations", None)
+    assert RunConfig.from_json_dict("E99-test", d).provider_quantizations is None
+
+
+def test_seed_freezes_reloads_and_backcompat(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
+    cfg = resolve("E19-seed", {"limit": 3, "seed": 20260715})
+    assert cfg.seed == 20260715
+    assert resolve("E19-seed", {}).seed == 20260715
+    d = _cfg().to_json_dict()
+    d.pop("seed", None)
+    assert RunConfig.from_json_dict("E99-test", d).seed is None
+
+
+def test_tiebreaker_judge_defaults_none():
+    assert _cfg().tiebreaker_judge is None
+
+
+def test_tiebreaker_judge_valid_key_accepted():
+    cfg = _cfg(judges=("claude-opus-4-8", "claude-fable-5"),
+               tiebreaker_judge="claude-opus-4-8")
+    assert cfg.tiebreaker_judge == "claude-opus-4-8"
+
+
+def test_tiebreaker_judge_unknown_key_raises():
+    with pytest.raises(ValueError, match="tiebreaker"):
+        _cfg(judges=("claude-fable-5",), tiebreaker_judge="not-a-panel-member")
+
+
+def test_tiebreaker_judge_freezes_reloads_conflicts(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
+    judges = parse_judges("claude-opus-4-8,claude-fable-5")
+    cfg = resolve("E17-panel", {"limit": 3, "judges": judges,
+                                "tiebreaker_judge": "claude-opus-4-8"})
+    assert cfg.tiebreaker_judge == "claude-opus-4-8"
+    frozen = json.loads((tmp_path / "E17-panel" / "experiment.json").read_text())
+    assert frozen["params"]["tiebreaker_judge"] == "claude-opus-4-8"
+    assert resolve("E17-panel", {}).tiebreaker_judge == "claude-opus-4-8"  # bare reload
+    with pytest.raises(ConfigConflictError, match="tiebreaker_judge"):
+        resolve("E17-panel", {"tiebreaker_judge": "claude-fable-5"})
+
+
+def test_tiebreaker_judge_backcompat_defaults_none():
+    """Freezes older than the tiebreaker knob load as None (legacy consensus)."""
+    d = _cfg().to_json_dict()
+    d.pop("tiebreaker_judge", None)
+    assert RunConfig.from_json_dict("E99-test", d).tiebreaker_judge is None
+
+
 def test_family_overlap_detection():
     cfg = _cfg(candidates={"qwen-9b": "qwen/qwen3.5-9b"},
                judges=("claude-fable-5", {"key": "qwen-judge", "client": "openrouter",

@@ -16,9 +16,10 @@ from pipeline._io import read_jsonl
 from pipeline.generate import GenerationDeadlineExceeded
 
 
-def _chunk(content=None, reasoning=None, finish=None):
+def _chunk(content=None, reasoning=None, finish=None, provider=None):
     delta = SimpleNamespace(content=content, reasoning=reasoning)
-    return SimpleNamespace(choices=[SimpleNamespace(delta=delta, finish_reason=finish)])
+    return SimpleNamespace(choices=[SimpleNamespace(delta=delta, finish_reason=finish)],
+                           provider=provider)
 
 
 class _Stream:
@@ -81,6 +82,36 @@ def test_deadline_abort_invokes_on_reject_with_partial(monkeypatch):
     assert len(captured) == 1
     assert captured[0]["error"] == "deadline"
     assert "loop" in captured[0]["reasoning"]
+
+
+def test_generate_captures_serving_provider(monkeypatch):
+    """§0.2: record the serving provider per response. OpenRouter puts it inline
+    on the streamed chunks, so no extra /generation call is needed."""
+    _single_attempt(monkeypatch)
+    monkeypatch.setattr(config, "router", _router(lambda: _Stream(chunks=[
+        _chunk(content="Yellow", provider="Parasail"),
+        _chunk(content="", finish="stop"),
+    ])))
+    fields = generate._generate_one(make_cfg(), "prov/m", "p")
+    assert fields["response"] == "Yellow"
+    assert fields["provider"] == "Parasail"
+
+
+def test_generate_passes_seed_when_set_and_omits_when_none(monkeypatch):
+    _single_attempt(monkeypatch)
+    seen = {}
+
+    def create(**kwargs):
+        seen.clear()
+        seen.update(kwargs)
+        return _Stream(chunks=[_chunk(content="ok", finish="stop")])
+    monkeypatch.setattr(config, "router", SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create))))
+
+    generate._generate_one(make_cfg(seed=20260715), "prov/m", "p")
+    assert seen["seed"] == 20260715
+    generate._generate_one(make_cfg(), "prov/m", "p")           # seed None
+    assert "seed" not in seen
 
 
 def test_run_item_writes_rejected_sidecar(tmp_path, monkeypatch):
