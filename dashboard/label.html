@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ConstraintLens · Judge validation labeling</title>
+<style>
+  /* Fonts: reuse the dashboard's local woff2 files (latin subsets). */
+  @font-face { font-family: "Hanken Grotesk"; font-style: normal; font-weight: 400 700; font-display: swap;
+    src: url("fonts/5b348728-bf4b-44c4-ad4f-d0b25b652954.woff2") format("woff2"); }
+  @font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400; font-display: swap;
+    src: url("fonts/36716400-52e4-45a3-b6c4-e6f72c8d2762.woff2") format("woff2"); }
+  @font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 500; font-display: swap;
+    src: url("fonts/fc7bbec5-d11c-452e-97b6-d476e805055a.woff2") format("woff2"); }
+  @font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 600; font-display: swap;
+    src: url("fonts/1d3fa7cd-e2cd-43fe-871c-9987a5415449.woff2") format("woff2"); }
+  @font-face { font-family: "Newsreader"; font-style: normal; font-weight: 400 600; font-display: swap;
+    src: url("fonts/ec87eb3a-a688-4cc8-bdd7-ad1cf5c8e15e.woff2") format("woff2"); }
+
+  :root {
+    --paper: #faf8f2; --surface: #fbfaf5; --surface-2: #f4f2ea; --card: #ffffff;
+    --ink: #2a2722; --ink-2: #46423a; --muted: #6c6759; --faint: #8c8678;
+    --line: #e7e3d6; --line-2: #e4dfd1;
+    --accent: #b06a3c; --accent-bg: #efe2d4; --accent-ink: #8a5736;
+    --pass: #4f7a51; --pass-bg: #e6ecdf; --fail: #a8483b; --fail-bg: #f1e1d8;
+    --warn-bg: #efe6d1; --warn-ink: #977f3e;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+    --sans: "Hanken Grotesk", system-ui, sans-serif;
+    --serif: "Newsreader", Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.5; }
+  a { color: var(--accent-ink); }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 24px 120px; }
+
+  header.topbar { border-bottom: 1px solid var(--line); background: var(--surface); }
+  .topbar-inner { max-width: 980px; margin: 0 auto; padding: 13px 24px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .wordmark { font-family: var(--mono); font-weight: 600; font-size: 14px; letter-spacing: 0.04em; }
+  .wordmark .dim { color: var(--faint); font-weight: 400; }
+  .spacer { flex: 1; }
+  .runchip { font-family: var(--mono); font-size: 11.5px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; }
+
+  button { font-family: var(--sans); font-size: 13.5px; cursor: pointer; border-radius: 8px; border: 1px solid var(--line-2); background: var(--card); color: var(--ink-2); padding: 7px 14px; }
+  button:hover:not(:disabled) { border-color: var(--faint); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  button.primary { background: var(--ink); border-color: var(--ink); color: var(--paper); font-weight: 600; }
+  button.primary:hover:not(:disabled) { background: var(--ink-2); }
+  button.vote { font-size: 15px; font-weight: 700; padding: 12px 0; flex: 1; letter-spacing: 0.06em; font-family: var(--mono); }
+  button.vote.pass { color: var(--pass); }
+  button.vote.fail { color: var(--fail); }
+  button.vote.pass.selected { background: var(--pass); border-color: var(--pass); color: #fff; }
+  button.vote.fail.selected { background: var(--fail); border-color: var(--fail); color: #fff; }
+
+  .banner { margin: 18px 0 0; padding: 10px 14px; border-radius: 8px; font-size: 13.5px; border: 1px solid var(--line-2); background: var(--warn-bg); color: var(--warn-ink); }
+  .banner.error { background: var(--fail-bg); color: var(--fail); }
+  .banner.ok { background: var(--pass-bg); color: var(--pass); }
+  .banner.hidden { display: none; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 22px 0 0; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .stat .k { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); }
+  .stat .v { font-family: var(--serif); font-size: 26px; line-height: 1.2; margin-top: 2px; }
+  .stat .v small { font-size: 14px; color: var(--muted); font-family: var(--mono); }
+  .progress { height: 5px; border-radius: 3px; background: var(--line); margin-top: 14px; overflow: hidden; }
+  .progress > div { height: 100%; background: var(--accent); width: 0%; transition: width .2s; }
+
+  .controls { display: flex; align-items: center; gap: 10px; margin: 20px 0 12px; flex-wrap: wrap; }
+  .seg { display: flex; border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden; background: var(--card); }
+  .seg button { border: 0; border-radius: 0; font-size: 12.5px; padding: 6px 12px; color: var(--muted); }
+  .seg button.on { background: var(--surface-2); color: var(--ink); font-weight: 600; }
+  .navbtns { display: flex; gap: 6px; margin-left: auto; }
+  .kbd-hint { font-family: var(--mono); font-size: 10.5px; color: var(--faint); width: 100%; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 22px 24px; margin-top: 6px; }
+  .meta { display: flex; gap: 14px; flex-wrap: wrap; font-family: var(--mono); font-size: 11.5px; color: var(--muted); margin-bottom: 14px; }
+  .meta b { color: var(--ink-2); font-weight: 600; }
+  .sec-label { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); margin: 18px 0 6px; }
+  details.prompt { border: 1px solid var(--line-2); border-radius: 8px; background: var(--surface); }
+  details.prompt summary { cursor: pointer; padding: 9px 13px; font-size: 13px; color: var(--muted); font-family: var(--mono); }
+  details.prompt[open] summary { border-bottom: 1px solid var(--line-2); }
+  .prose { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.62; color: var(--ink-2); padding: 12px 14px; }
+  .response-box { border: 1px solid var(--line-2); border-radius: 8px; background: var(--surface); max-height: 430px; overflow-y: auto; }
+  .criterion { border-left: 3px solid var(--accent); background: var(--accent-bg); border-radius: 0 8px 8px 0; padding: 13px 16px; font-family: var(--serif); font-size: 17px; line-height: 1.5; }
+  .votes { display: flex; gap: 12px; margin-top: 20px; }
+  .clear-row { margin-top: 8px; text-align: right; }
+  .clear-row button { font-size: 11.5px; padding: 3px 9px; color: var(--faint); }
+
+  .reveal { margin-top: 18px; border-radius: 10px; border: 1px solid var(--line-2); overflow: hidden; }
+  .reveal .head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; font-family: var(--mono); font-size: 12px; }
+  .reveal.agree .head { background: var(--pass-bg); color: var(--pass); }
+  .reveal.disagree .head { background: var(--fail-bg); color: var(--fail); }
+  .reveal .body { padding: 12px 14px; font-size: 13.5px; color: var(--ink-2); background: var(--card); }
+  .reveal .body .jr { color: var(--muted); }
+  .blindnote { margin-top: 18px; font-family: var(--mono); font-size: 11.5px; color: var(--faint); border: 1px dashed var(--line-2); border-radius: 8px; padding: 10px 14px; }
+  .verdict-chip { font-weight: 600; padding: 1px 8px; border-radius: 5px; }
+  .verdict-chip.PASS { background: var(--pass); color: #fff; }
+  .verdict-chip.FAIL { background: var(--fail); color: #fff; }
+
+  .commitbar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--line); }
+  .commitbar-inner { max-width: 980px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .commit-status { font-family: var(--mono); font-size: 11.5px; color: var(--muted); flex: 1; min-width: 200px; overflow-wrap: anywhere; }
+  .userchip { font-family: var(--mono); font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .userchip img { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line-2); }
+  .signout { font-size: 11px; padding: 2px 8px; }
+
+  @media (max-width: 720px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .wrap { padding: 0 12px 140px; }
+    .card { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <span class="wordmark">ConstraintLens <span class="dim">· judge validation</span></span>
+    <span class="runchip" id="run-chip">—</span>
+    <span class="spacer"></span>
+    <span id="auth-area"></span>
+    <a href="./index.html" style="font-family:var(--mono);font-size:11.5px;">← dashboard</a>
+  </div>
+</header>
+
+<div class="wrap">
+  <div id="banner" class="banner hidden"></div>
+
+  <div class="stats">
+    <div class="stat"><div class="k">Labeled</div><div class="v"><span id="st-labeled">0</span><small> / <span id="st-total">0</span></small></div></div>
+    <div class="stat"><div class="k">Staged (uncommitted)</div><div class="v" id="st-staged">0</div></div>
+    <div class="stat"><div class="k">Committed</div><div class="v" id="st-committed">0</div></div>
+    <div class="stat"><div class="k">Agreement so far</div><div class="v" id="st-agree">—</div></div>
+  </div>
+  <div class="progress"><div id="progress-fill"></div></div>
+
+  <div class="controls">
+    <div class="seg" id="filter-seg">
+      <button data-f="all">All</button>
+      <button data-f="unlabeled" class="on">Unlabeled</button>
+      <button data-f="labeled">Labeled</button>
+      <button data-f="disagree">Disagreements</button>
+    </div>
+    <div class="navbtns">
+      <button id="btn-prev" title="Previous (←)">←</button>
+      <span id="pos" style="font-family:var(--mono);font-size:12px;color:var(--muted);align-self:center;">0 / 0</span>
+      <button id="btn-next" title="Next (→)">→</button>
+    </div>
+    <span class="kbd-hint">keys: <b>p</b> pass · <b>f</b> fail · <b>x</b> clear · <b>←/→</b> navigate</span>
+  </div>
+
+  <div class="card" id="card"><div style="color:var(--muted);font-family:var(--mono);font-size:13px;">Loading…</div></div>
+</div>
+
+<div class="commitbar">
+  <div class="commitbar-inner">
+    <span class="commit-status" id="commit-status">Labels are staged locally (saved in this browser) until you commit.</span>
+    <button class="primary" id="btn-commit" disabled>Commit 0 labels</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================================
+ * CONFIG — edit before deploying (see labeling/SETUP.md).
+ * ==========================================================================*/
+const CONFIG = {
+  owner: "smarinacseas",
+  repo: "failure-mode-id",
+  // Side branch that receives label commits. runs/ is gitignored on main, so
+  // labels live on their own branch; pull them back with labeling/pull.py.
+  // The branch is created automatically on first commit if it doesn't exist.
+  labelsBranch: "labels",
+  defaultRun: "E08-llama3-2-3b-cc75",
+  // Only these GitHub logins may commit (the proxy enforces this server-side
+  // too — keep the two lists in sync).
+  allowlist: ["smarinacseas"],
+  // GitHub OAuth app client id (public) — from github.com/settings/developers.
+  oauthClientId: "REPLACE_WITH_CLIENT_ID",
+  // Deployed Cloudflare Worker that holds the client secret (proxy/oauth-worker).
+  proxyUrl: "REPLACE_WITH_WORKER_URL", // e.g. https://constraintlens-oauth.<acct>.workers.dev
+};
+/* ==========================================================================*/
+
+const RUN = new URLSearchParams(location.search).get("run") || CONFIG.defaultRun;
+const LABELS_PATH = `runs/${RUN}/judge_validation.json`;
+const API = "https://api.github.com";
+const DRAFT_KEY = `cl-labels-draft:${RUN}`;
+const TOKEN_KEY = "cl-gh-token";
+const LOGIN_KEY = "cl-gh-login";
+// Original judge_validation.json key order — commits must round-trip exactly
+// this schema so `main.py validate --mode score` accepts the file.
+const ROW_KEYS = ["judge", "model", "id", "criterion_index", "criterion_text",
+                  "prompt_text", "response_excerpt", "judge_verdict", "judge_reason", "human"];
+
+const S = {
+  rows: [],            // bundle rows (with full_response)
+  remoteHuman: {},     // key -> PASS/FAIL committed on the labels branch
+  remoteExists: false,
+  staged: {},          // key -> PASS/FAIL/"" staged locally
+  filter: "unlabeled",
+  idx: 0,              // index into filtered()
+  token: sessionStorage.getItem(TOKEN_KEY) || null,
+  login: sessionStorage.getItem(LOGIN_KEY) || null,
+  committing: false,
+};
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const rowKey = (r) => [r.judge, r.model, r.id, r.criterion_index].join("§");
+const normVerdict = (v) => { const s = String(v ?? "").trim().toUpperCase(); return s === "PASS" || s === "FAIL" ? s : ""; };
+// Effective human verdict: staged edit wins over what's committed remotely.
+const humanOf = (r) => { const k = rowKey(r); return k in S.staged ? S.staged[k] : (S.remoteHuman[k] || ""); };
+const isAllowed = () => !!S.login && CONFIG.allowlist.some(u => u.toLowerCase() === S.login.toLowerCase());
+const configured = () => !CONFIG.oauthClientId.startsWith("REPLACE") && !CONFIG.proxyUrl.startsWith("REPLACE");
+
+/* ---------- UTF-8 <-> base64 (GitHub contents API) ---------- */
+function b64encodeUtf8(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+function b64decodeUtf8(b64) {
+  const bin = atob(b64.replace(/\n/g, ""));
+  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+/* ---------- GitHub API ---------- */
+async function gh(path, opts = {}) {
+  const headers = { "Accept": "application/vnd.github+json", ...(opts.headers || {}) };
+  if (S.token) headers["Authorization"] = `Bearer ${S.token}`;
+  const res = await fetch(`${API}${path}`, { ...opts, headers });
+  return res;
+}
+
+async function fetchRemoteLabels() {
+  const res = await gh(`/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${LABELS_PATH}?ref=${encodeURIComponent(CONFIG.labelsBranch)}`);
+  if (res.status === 404) return null; // branch or file doesn't exist yet
+  if (!res.ok) throw new Error(`GitHub read failed (${res.status})`);
+  const j = await res.json();
+  return { sha: j.sha, rows: JSON.parse(b64decodeUtf8(j.content)) };
+}
+
+async function ensureLabelsBranch() {
+  const ref = await gh(`/repos/${CONFIG.owner}/${CONFIG.repo}/git/ref/${encodeURIComponent("heads/" + CONFIG.labelsBranch)}`);
+  if (ref.ok) return;
+  if (ref.status !== 404) throw new Error(`Branch check failed (${ref.status})`);
+  const repo = await gh(`/repos/${CONFIG.owner}/${CONFIG.repo}`);
+  if (!repo.ok) throw new Error(`Repo lookup failed (${repo.status})`);
+  const def = (await repo.json()).default_branch;
+  const defRef = await gh(`/repos/${CONFIG.owner}/${CONFIG.repo}/git/ref/${encodeURIComponent("heads/" + def)}`);
+  if (!defRef.ok) throw new Error(`Default branch lookup failed (${defRef.status})`);
+  const sha = (await defRef.json()).object.sha;
+  const mk = await gh(`/repos/${CONFIG.owner}/${CONFIG.repo}/git/refs`, {
+    method: "POST",
+    body: JSON.stringify({ ref: `refs/heads/${CONFIG.labelsBranch}`, sha }),
+  });
+  if (!mk.ok) throw new Error(`Could not create branch ${CONFIG.labelsBranch} (${mk.status})`);
+}
+
+/* Build the exact judge_validation.json content for committing: original row
+ * order and schema (full_response stripped), staged + remote human merged. */
+function buildCommitRows(remoteRows) {
+  const remoteByKey = {};
+  for (const r of remoteRows || []) remoteByKey[rowKey(r)] = r;
+  return S.rows.map(bundleRow => {
+    const k = rowKey(bundleRow);
+    const base = remoteByKey[k] || bundleRow;
+    const out = {};
+    for (const key of ROW_KEYS) out[key] = base[key] ?? bundleRow[key] ?? "";
+    out.human = k in S.staged ? S.staged[k] : normVerdict(base.human);
+    return out;
+  });
+}
+
+async function commitLabels() {
+  if (S.committing) return;
+  const staged = Object.keys(S.staged).length;
+  if (!staged) return;
+  S.committing = true;
+  renderCommitBar();
+  try {
+    setStatus("Committing…");
+    await ensureLabelsBranch();
+    let attempt = 0;
+    while (true) {
+      attempt++;
+      const remote = await fetchRemoteLabels();
+      const rows = buildCommitRows(remote ? remote.rows : null);
+      const filled = rows.filter(r => r.human).length;
+      const body = {
+        message: `label: ${RUN} judge validation (${filled}/${rows.length} human verdicts)`,
+        content: b64encodeUtf8(JSON.stringify(rows, null, 2)),
+        branch: CONFIG.labelsBranch,
+      };
+      if (remote) body.sha = remote.sha;
+      const res = await gh(`/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${LABELS_PATH}`, {
+        method: "PUT", body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        // Promote staged -> committed.
+        for (const r of rows) if (r.human) S.remoteHuman[rowKey(r)] = r.human; else delete S.remoteHuman[rowKey(r)];
+        S.staged = {};
+        S.remoteExists = true;
+        saveDraft();
+        setStatus(`Committed ${filled}/${rows.length} labels to ${CONFIG.labelsBranch} ✓  — pull locally with labeling/pull.py, then run validate --mode score.`);
+        break;
+      }
+      if ((res.status === 409 || res.status === 422) && attempt < 3) continue; // sha race — refetch and retry
+      const err = await res.json().catch(() => ({}));
+      throw new Error(`Commit failed (${res.status}): ${err.message || "unknown error"}`);
+    }
+  } catch (e) {
+    setStatus(`✗ ${e.message}`, true);
+  } finally {
+    S.committing = false;
+    renderAll();
+  }
+}
+
+/* ---------- OAuth ---------- */
+function signIn() {
+  const state = crypto.randomUUID();
+  sessionStorage.setItem("cl-oauth-state", state);
+  sessionStorage.setItem("cl-oauth-run", RUN);
+  const redirect = location.origin + location.pathname;
+  const u = new URL("https://github.com/login/oauth/authorize");
+  u.searchParams.set("client_id", CONFIG.oauthClientId);
+  u.searchParams.set("redirect_uri", redirect);
+  u.searchParams.set("scope", "public_repo"); // use "repo" if the repo is private
+  u.searchParams.set("state", state);
+  location.href = u.toString();
+}
+
+function signOut() {
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(LOGIN_KEY);
+  S.token = null; S.login = null;
+  renderAll();
+}
+
+async function handleOAuthCallback() {
+  const params = new URLSearchParams(location.search);
+  const code = params.get("code");
+  if (!code) return;
+  const run = sessionStorage.getItem("cl-oauth-run") || CONFIG.defaultRun;
+  history.replaceState({}, "", `${location.pathname}?run=${encodeURIComponent(run)}`);
+  const expected = sessionStorage.getItem("cl-oauth-state");
+  sessionStorage.removeItem("cl-oauth-state");
+  if (!expected || params.get("state") !== expected) {
+    banner("Sign-in failed: OAuth state mismatch. Try again.", "error");
+    return;
+  }
+  try {
+    const res = await fetch(`${CONFIG.proxyUrl.replace(/\/$/, "")}/exchange`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error === "not_allowed"
+      ? `@${j.login} is not on the labeling allowlist.`
+      : (j.error_description || j.error || `proxy returned ${res.status}`));
+    S.token = j.access_token; S.login = j.login;
+    sessionStorage.setItem(TOKEN_KEY, S.token);
+    sessionStorage.setItem(LOGIN_KEY, S.login);
+    banner(`Signed in as @${S.login}.`, "ok");
+  } catch (e) {
+    banner(`Sign-in failed: ${e.message}`, "error");
+  }
+}
+
+/* ---------- drafts ---------- */
+function saveDraft() { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(S.staged)); } catch {} }
+function loadDraft(validKeys) {
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}");
+    for (const [k, v] of Object.entries(d)) {
+      if (!validKeys.has(k)) continue;
+      const nv = normVerdict(v);
+      if (nv || v === "") S.staged[k] = nv;
+    }
+  } catch {}
+}
+
+/* ---------- state helpers ---------- */
+function setLabel(r, verdict) {
+  const k = rowKey(r);
+  if (verdict === "" && !S.remoteHuman[k]) delete S.staged[k];
+  else if (verdict === S.remoteHuman[k]) delete S.staged[k]; // matches committed — nothing staged
+  else S.staged[k] = verdict;
+  saveDraft();
+}
+// Drop staged entries that duplicate what's already committed remotely.
+function pruneStaged() {
+  for (const [k, v] of Object.entries(S.staged))
+    if ((S.remoteHuman[k] || "") === v) delete S.staged[k];
+  saveDraft();
+}
+
+function filtered() {
+  return S.rows.filter(r => {
+    const h = humanOf(r);
+    if (S.filter === "unlabeled") return !h;
+    if (S.filter === "labeled") return !!h;
+    if (S.filter === "disagree") return h && h !== normVerdict(r.judge_verdict);
+    return true;
+  });
+}
+
+/* ---------- rendering ---------- */
+function banner(msg, kind = "") {
+  const el = $("banner");
+  el.className = `banner ${kind}`;
+  el.textContent = msg;
+}
+function setStatus(msg, isErr = false) {
+  const el = $("commit-status");
+  el.textContent = msg;
+  el.style.color = isErr ? "var(--fail)" : "";
+}
+
+function renderStats() {
+  const total = S.rows.length;
+  let labeled = 0, agree = 0, committed = 0;
+  for (const r of S.rows) {
+    const h = humanOf(r);
+    if (h) { labeled++; if (h === normVerdict(r.judge_verdict)) agree++; }
+    if (S.remoteHuman[rowKey(r)]) committed++;
+  }
+  $("st-labeled").textContent = labeled;
+  $("st-total").textContent = total;
+  $("st-staged").textContent = Object.keys(S.staged).length;
+  $("st-committed").textContent = committed;
+  $("st-agree").textContent = labeled ? `${Math.round(100 * agree / labeled)}%` : "—";
+  $("progress-fill").style.width = total ? `${100 * labeled / total}%` : "0%";
+}
+
+function renderAuth() {
+  const el = $("auth-area");
+  if (S.login) {
+    el.innerHTML = `<span class="userchip"><img src="https://github.com/${esc(S.login)}.png?size=44" alt=""/>@${esc(S.login)}${isAllowed() ? "" : " <span style='color:var(--fail)'>(read-only)</span>"} <button class="signout" id="btn-signout">sign out</button></span>`;
+    $("btn-signout").onclick = signOut;
+  } else {
+    el.innerHTML = `<button id="btn-signin" ${configured() ? "" : "disabled title='Set oauthClientId + proxyUrl in label.html first'"}>Sign in with GitHub</button>`;
+    $("btn-signin").onclick = signIn;
+  }
+}
+
+function renderCommitBar() {
+  const n = Object.keys(S.staged).length;
+  const btn = $("btn-commit");
+  btn.textContent = S.committing ? "Committing…" : `Commit ${n} label${n === 1 ? "" : "s"}`;
+  btn.disabled = S.committing || n === 0 || !S.token || !isAllowed();
+  if (!S.token && n > 0) setStatus(`${n} label${n === 1 ? "" : "s"} staged locally — sign in to commit.`);
+  else if (S.token && !isAllowed()) setStatus(`@${S.login} is not on the allowlist — labels stay local.`);
+}
+
+function renderCard() {
+  const list = filtered();
+  const card = $("card");
+  if (S.idx >= list.length) S.idx = Math.max(0, list.length - 1);
+  $("pos").textContent = `${list.length ? S.idx + 1 : 0} / ${list.length}`;
+  if (!list.length) {
+    card.innerHTML = `<div style="color:var(--muted);font-family:var(--mono);font-size:13px;padding:30px 0;text-align:center;">No rows match this filter${S.filter === "unlabeled" ? " — everything is labeled 🎉" : ""}.</div>`;
+    return;
+  }
+  const r = list[S.idx];
+  const globalIdx = S.rows.indexOf(r) + 1;
+  const h = humanOf(r);
+  const jv = normVerdict(r.judge_verdict);
+  const committedV = S.remoteHuman[rowKey(r)] || "";
+
+  // BLIND: judge identity, verdict and reason render only after a human verdict.
+  let revealHtml;
+  if (h) {
+    const agree = h === jv;
+    revealHtml = `
+      <div class="reveal ${agree ? "agree" : "disagree"}">
+        <div class="head"><span>${agree ? "✓ agrees with judge" : "✗ disagrees with judge"}</span>
+          <span>judge <b>${esc(r.judge)}</b> said <span class="verdict-chip ${esc(jv)}">${esc(jv)}</span></span>
+          <span style="margin-left:auto">${committedV === h ? "committed" : "staged"}</span></div>
+        <div class="body"><span class="jr">judge reason:</span> ${esc(r.judge_reason)}</div>
+      </div>
+      <div class="clear-row"><button data-act="clear">clear my verdict (x)</button></div>`;
+  } else {
+    revealHtml = `<div class="blindnote">Blind mode — the judge's verdict and reasoning stay hidden until you vote.</div>`;
+  }
+
+  card.innerHTML = `
+    <div class="meta">
+      <span>row <b>${globalIdx}</b>/${S.rows.length}</span>
+      <span>prompt <b>${esc(r.id)}</b></span>
+      <span>criterion <b>#${esc(r.criterion_index)}</b></span>
+      <span>model <b>${esc(r.model)}</b></span>
+    </div>
+    <div class="sec-label">Prompt</div>
+    <details class="prompt"><summary>show full prompt (${r.prompt_text.length.toLocaleString()} chars)</summary>
+      <div class="prose">${esc(r.prompt_text)}</div></details>
+    <div class="sec-label">Model response (full)</div>
+    <div class="response-box"><div class="prose">${esc(r.full_response || r.response_excerpt)}</div></div>
+    <div class="sec-label">Criterion — does the response satisfy it?</div>
+    <div class="criterion">${esc(r.criterion_text)}</div>
+    <div class="votes">
+      <button class="vote pass ${h === "PASS" ? "selected" : ""}" data-act="PASS">PASS (p)</button>
+      <button class="vote fail ${h === "FAIL" ? "selected" : ""}" data-act="FAIL">FAIL (f)</button>
+    </div>
+    ${revealHtml}`;
+
+  card.querySelectorAll("[data-act]").forEach(b => b.onclick = () => act(b.dataset.act));
+}
+
+function renderAll() { renderStats(); renderAuth(); renderCommitBar(); renderCard(); }
+
+/* ---------- actions ---------- */
+function act(a) {
+  const list = filtered();
+  if (!list.length) return;
+  const r = list[S.idx];
+  if (a === "PASS" || a === "FAIL") {
+    setLabel(r, a);
+    // On the unlabeled filter the row leaves the list; keep idx pointing at
+    // the next unlabeled row (same position) so flow is vote→next→vote.
+    if (S.filter !== "unlabeled") {/* stay on row to show reveal */}
+  } else if (a === "clear") {
+    setLabel(r, "");
+  }
+  renderAll();
+}
+
+function nav(delta) {
+  const n = filtered().length;
+  if (!n) return;
+  S.idx = (S.idx + delta + n) % n;
+  renderCard();
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.target.closest("input,textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === "ArrowLeft") { nav(-1); }
+  else if (e.key === "ArrowRight") { nav(1); }
+  else if (e.key === "p" || e.key === "P") act("PASS");
+  else if (e.key === "f" || e.key === "F") act("FAIL");
+  else if (e.key === "x" || e.key === "X") act("clear");
+});
+
+$("btn-prev").onclick = () => nav(-1);
+$("btn-next").onclick = () => nav(1);
+$("btn-commit").onclick = commitLabels;
+$("filter-seg").querySelectorAll("button").forEach(b => b.onclick = () => {
+  S.filter = b.dataset.f;
+  $("filter-seg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+  S.idx = 0;
+  renderCard();
+});
+
+window.addEventListener("beforeunload", (e) => {
+  if (Object.keys(S.staged).length) { e.preventDefault(); e.returnValue = ""; }
+});
+
+/* ---------- boot ---------- */
+(async function init() {
+  $("run-chip").textContent = RUN;
+  await handleOAuthCallback();
+  try {
+    const res = await fetch(`./labeling/${encodeURIComponent(RUN)}.json`, { cache: "no-store" });
+    if (!res.ok) throw new Error(`labeling bundle not found (${res.status}) — run labeling/sync.py and redeploy`);
+    const bundle = await res.json();
+    S.rows = bundle.rows;
+  } catch (e) {
+    banner(`Could not load labeling data: ${e.message}`, "error");
+    $("card").innerHTML = "";
+    return;
+  }
+  // Pull committed labels from the labels branch (works unauthenticated on a
+  // public repo; harmless 404 if the branch/file doesn't exist yet).
+  try {
+    const remote = await fetchRemoteLabels();
+    if (remote) {
+      S.remoteExists = true;
+      for (const r of remote.rows) {
+        const v = normVerdict(r.human);
+        if (v) S.remoteHuman[rowKey(r)] = v;
+      }
+    }
+  } catch (e) {
+    banner(`Could not read committed labels from GitHub (${e.message}) — starting from the bundle.`, "");
+  }
+  loadDraft(new Set(S.rows.map(rowKey)));
+  pruneStaged();
+  renderAll();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+# Cloudflare Worker config for the ConstraintLens OAuth proxy.
+# Deploy: `npx wrangler deploy` from this directory (see labeling/SETUP.md).
+
+name = "constraintlens-oauth"
+main = "worker.js"
+compatibility_date = "2026-07-15"
+
+[vars]
+# OAuth app client id (public — the secret is NOT set here; use
+# `npx wrangler secret put GITHUB_CLIENT_SECRET`).
+GITHUB_CLIENT_ID = "REPLACE_WITH_CLIENT_ID"
+# GitHub logins allowed to obtain a token through this proxy.
+ALLOWED_USERS = "smarinacseas"
+# Origins allowed to call /exchange. Keep localhost only while testing.
+ALLOWED_ORIGINS = "https://smarinacseas.github.io,http://localhost:8000"

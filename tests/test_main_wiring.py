@@ -70,6 +70,25 @@ def test_sample_seed_flag_flows_to_cfg(tmp_path, monkeypatch):
     assert captured["sample_seed"] == 42
 
 
+def test_tiebreaker_flag_flows_to_cfg(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
+    captured = {}
+
+    def fake_grade_run(cfg, monitor=None):
+        captured["tiebreaker_judge"] = cfg.tiebreaker_judge
+    monkeypatch.setattr(main.grade, "run", fake_grade_run)
+    monkeypatch.setattr(main, "build_monitor", _noop_monitor_factory())
+
+    assert main.main(["grade", "--experiment", "E93-tb", "--limit", "5",
+                      "--judges", "claude-opus-4-8,claude-fable-5",
+                      "--tiebreaker", "claude-opus-4-8"]) == 0
+    assert captured["tiebreaker_judge"] == "claude-opus-4-8"
+
+    # default: no tiebreaker → None → legacy consensus (E01-E07 behavior).
+    assert main.main(["grade", "--experiment", "E93-none", "--limit", "5"]) == 0
+    assert captured["tiebreaker_judge"] is None
+
+
 def test_judge_mode_flag_flows_to_cfg_and_defaults_batch(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "RUNS_DIR", tmp_path)
     captured = {}

@@ -1,0 +1,283 @@
+{
+  "generated_at": "2026-07-15T20:59:24.055213+00:00",
+  "source_run": "E08-llama3-2-3b-cc75",
+  "detector": {
+    "window": 4000,
+    "ngram": 40,
+    "min_repeats": 20
+  },
+  "verdict_note": "any repetition loop counts as a failure (user ruling 2026-07-09); degenerate_output diagnoses are judge-assigned and broader than mechanical loops — the detector census is the like-for-like signal here",
+  "prompt_ids": [
+    "CIF-009",
+    "CIF-011",
+    "CIF-012",
+    "CIF-016",
+    "CIF-026",
+    "CIF-031",
+    "CIF-047",
+    "CIF-054",
+    "CIF-056",
+    "CIF-058",
+    "CIF-060",
+    "CIF-062",
+    "CIF-072"
+  ],
+  "degenerate_criteria_per_prompt": {
+    "CIF-009": 5,
+    "CIF-011": 2,
+    "CIF-012": 25,
+    "CIF-016": 11,
+    "CIF-026": 2,
+    "CIF-031": 2,
+    "CIF-047": 10,
+    "CIF-054": 7,
+    "CIF-056": 14,
+    "CIF-058": 7,
+    "CIF-060": 13,
+    "CIF-062": 1,
+    "CIF-072": 8
+  },
+  "n_degenerate_criteria": 107,
+  "provider_pin_probe": null,
+  "baseline": {
+    "temperature": 0.6,
+    "seed": 20260715,
+    "max_tokens": 1536,
+    "tallies": {
+      "n_responses": 13,
+      "n_loop_content": 0,
+      "n_loop_reasoning": 0,
+      "n_loop_any": 0,
+      "n_loop_escaped": 0,
+      "n_loop_died": 0,
+      "n_nonstop_finish": 11,
+      "finish_reasons": {
+        "length": 11,
+        "stop": 2
+      },
+      "providers": {
+        "Parasail": 13
+      }
+    },
+    "by_prompt": {
+      "CIF-009": {
+        "finish_reason": "length",
+        "provider": "Parasail",
+        "content_chars": 3499,
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        },
+        "reasoning_loop": null,
+        "loop_any": false,
+        "nonstop_finish": true,
+        "stored_loop_failure": null
+      },
+      "CIF-011": {
+        "finish_reason": "length",
+        "provider": "Parasail",
+        "content_chars": 6897,
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        },
+        "reasoning_loop": null,
+        "loop_any": false,
+        "nonstop_finish": true,
+        "stored_loop_failure": null
+      },
+      "CIF-012": {
+        "finish_reason": "length",
+        "provider": "Parasail",
+        "content_chars": 3114,
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        },
+        "reasoning_loop": null,
+        "loop_any": false,
+        "nonstop_finish": true,
+        "stored_loop_failure": null
+      },
+      "CIF-016": {
+        "finish_reason": "length",
+        "provider": "Parasail",
+        "content_chars": 3831,
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        },
+        "reasoning_loop": null,
+        "loop_any": false,
+        "nonstop_finish": true,
+        "stored_loop_failure": null
+      },
+      "CIF-026": {
+        "finish_reason": "length",
+        "provider": "Parasail",
+        "content_chars": 4288,
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        },
+        "reasoning_loop": null,
+        "loop_any": false,
+        "nonstop_finish": true,
+        "stored_loop_failure": null
+      },
+      "CIF-031": {
+        "finish_reason": "length",
+        "provider": "Parasail",
+        "content_chars": 8325,
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        },
+        "reasoning_loop": null,
+        "loop_any": false,
+        "nonstop_finish": true,
+        "stored_loop_failure": null
+      },
+      "CIF-047": {
+        "finish_reason": "length",
+        "provider": "Parasail",
+        "content_chars": 2841,
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        },
+        "reasoning_loop": null,
+        "loop_any": false,
+        "nonstop_finish": true,
+        "stored_loop_failure": null
+      },
+      "CIF-054": {
+        "finish_reason": "length",
+        "provider": "Parasail",
+        "content_chars": 4620,
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        },
+        "reasoning_loop": null,
+        "loop_any": false,
+        "nonstop_finish": true,
+        "stored_loop_failure": null
+      },
+      "CIF-058": {
+        "finish_reason": "stop",
+        "provider": "Parasail",
+        "content_chars": 1011,
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        },
+        "reasoning_loop": null,
+        "loop_any": false,
+        "nonstop_finish": false,
+        "stored_loop_failure": null
+      },
+      "CIF-056": {
+        "finish_reason": "length",
+        "provider": "Parasail",
+        "content_chars": 2769,
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        },
+        "reasoning_loop": null,
+        "loop_any": false,
+        "nonstop_finish": true,
+        "stored_loop_failure": null
+      },
+      "CIF-062": {
+        "finish_reason": "stop",
+        "provider": "Parasail",
+        "content_chars": 3252,
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        },
+        "reasoning_loop": null,
+        "loop_any": false,
+        "nonstop_finish": false,
+        "stored_loop_failure": null
+      },
+      "CIF-060": {
+        "finish_reason": "length",
+        "provider": "Parasail",
+        "content_chars": 5100,
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        },
+        "reasoning_loop": null,
+        "loop_any": false,
+        "nonstop_finish": true,
+        "stored_loop_failure": null
+      },
+      "CIF-072": {
+        "finish_reason": "length",
+        "provider": "Parasail",
+        "content_chars": 6483,
+        "content_loop": {
+          "looping": false,
+          "period": null,
+          "onset": null
+        },
+        "reasoning_loop": null,
+        "loop_any": false,
+        "nonstop_finish": true,
+        "stored_loop_failure": null
+      }
+    }
+  },
+  "arms": {
+    "t02": {
+      "temperature": 0.2,
+      "complete": false,
+      "tallies": {
+        "n_responses": 0,
+        "n_loop_content": 0,
+        "n_loop_reasoning": 0,
+        "n_loop_any": 0,
+        "n_loop_escaped": 0,
+        "n_loop_died": 0,
+        "n_nonstop_finish": 0,
+        "finish_reasons": {},
+        "providers": {}
+      },
+      "rejected_attempts": 0,
+      "by_prompt": {}
+    },
+    "t06": {
+      "temperature": 0.6,
+      "complete": false,
+      "tallies": {
+        "n_responses": 0,
+        "n_loop_content": 0,
+        "n_loop_reasoning": 0,
+        "n_loop_any": 0,
+        "n_loop_escaped": 0,
+        "n_loop_died": 0,
+        "n_nonstop_finish": 0,
+        "finish_reasons": {},
+        "providers": {}
+      },
+      "rejected_attempts": 0,
+      "by_prompt": {}
+    }
+  }
+}

@@ -24,8 +24,9 @@ from pathlib import Path
 
 import config
 from config import DATA_JSONL, JUDGE_MAX_TOKENS, RESULTS_PATH, ROOT
+from judging import panel as panel_policy
 from pipeline import _taxonomy
-from pipeline._consensus import agreement_stats, consensus_verdict, vote_of
+from pipeline._consensus import agreement_stats, vote_of
 from pipeline._decode_health import decode_health_block
 from pipeline._experiment import (
     SCHEMA_VERSION,
@@ -116,16 +117,23 @@ def _build_prompt_entry(rec: dict, responses: dict, grades: dict, tags: dict, mo
 
 def _build_panel_prompt_entry(rec: dict, responses: dict, grades_by_judge: dict,
                               tags: dict, models: list[str], judges: list[str],
-                              cells_out: list[dict]) -> dict:
+                              cells_out: list[dict], tiebreaker: str | None = None,
+                              coverage_out: list[dict] | None = None) -> dict:
     """Same shape as _build_prompt_entry, but results[model] carries the
     consensus verdict + vote split. Appends one judge->vote map per
-    (criterion, model) to cells_out for the agreement stats.
+    (criterion, model) to cells_out for the agreement stats. When `coverage_out`
+    is given, also records the full per-judge map per (criterion, model) for the
+    E08 completeness gate.
+
+    `tiebreaker` selects the consensus policy (panel_policy.dispatch_consensus):
+    a judge key → E08 policy (Opus tie-break; undecidable/under-quorum criteria
+    become EXCLUDE, flagged and dropped from pass-rate denominators); None →
+    legacy majority (E01-E07, byte-identical).
 
     `judges` must be iterated in cfg.judges order (the caller's list, built
-    from cfg.judge_keys) — consensus_verdict's reason-tie-break depends on a
-    stably-ordered per_judge dict (Task 6)."""
+    from cfg.judge_keys) — the reason-tie-break depends on a stably-ordered
+    per_judge dict (Task 6)."""
     criteria_texts = rec["criteria"]
-    n = len(criteria_texts)
     tag_by_idx = {t["index"]: t for t in tags[rec["id"]]}
     criteria_list: list[dict] = []
     for i, ctext in enumerate(criteria_texts, start=1):
@@ -140,10 +148,18 @@ def _build_panel_prompt_entry(rec: dict, responses: dict, grades_by_judge: dict,
                 v = next((x for x in verdicts if x.get("index") == i), None)
                 if v is not None:
                     per_judge[j] = v
-            cv = consensus_verdict(per_judge, len(judges))
+            cv = panel_policy.dispatch_consensus(tiebreaker, per_judge, len(judges))
             cells_out.append({j: vote_of(v) for j, v in per_judge.items()})
-            per_model[key] = {"pass": cv["verdict"] == "PASS",
-                              "reason": cv["reason"], "votes": cv["votes"]}
+            entry = {"pass": cv["verdict"] == "PASS",
+                     "reason": cv["reason"], "votes": cv["votes"]}
+            if cv["verdict"] == panel_policy.EXCLUDE:
+                # EXCLUDE is neither pass nor fail: flag it so pass-rate
+                # denominators and the cause classifier skip it (§0.3.4).
+                entry["excluded"] = True
+            per_model[key] = entry
+            if coverage_out is not None:
+                coverage_out.append({"prompt_id": rec["id"], "criterion_index": i,
+                                     "model": key, "per_judge": dict(per_judge)})
         criteria_list.append({
             "text": ctext, "verifiability": tag["verifiability"],
             "gameable": tag["gameable"], "reward_hack": tag.get("reward_hack", ""),
@@ -152,9 +168,12 @@ def _build_panel_prompt_entry(rec: dict, responses: dict, grades_by_judge: dict,
     responses_per_model = {key: responses[key][rec["id"]] for key in models}
     criteria_passed, full_pass = {}, {}
     for key in models:
-        passed = sum(1 for c in criteria_list if c["results"][key]["pass"])
-        criteria_passed[key] = f"{passed}/{n}"
-        full_pass[key] = passed == n
+        # Scored = non-excluded criteria; for legacy runs nothing is excluded so
+        # this is byte-identical to the old `passed/n`, `passed == n`.
+        scored = [c for c in criteria_list if not c["results"][key].get("excluded")]
+        passed = sum(1 for c in scored if c["results"][key]["pass"])
+        criteria_passed[key] = f"{passed}/{len(scored)}"
+        full_pass[key] = bool(scored) and passed == len(scored)
     return {
         "id": rec["id"], "use_case": rec["use_case"],
         "instruction_type": rec["instruction_type"], "prompt_style": rec["prompt_style"],
@@ -183,13 +202,17 @@ def _summary(prompts: list[dict], models: list[str]) -> dict:
 
     for p in prompts:
         for m in models:
-            n_pass = sum(1 for c in p["criteria"] if c["results"][m]["pass"])
-            n_tot = len(p["criteria"])
+            # EXCLUDE'd criteria (E08 panel policy) are neither pass nor fail —
+            # they leave the denominators entirely. Legacy runs never set the
+            # flag, so `scored` == every criterion (byte-identical).
+            scored = [c for c in p["criteria"] if not c["results"][m].get("excluded")]
+            n_pass = sum(1 for c in scored if c["results"][m]["pass"])
+            n_tot = len(scored)
             crit_pass[m] += n_pass
             crit_total[m] += n_tot
             if p["full_pass"][m]:
                 full_pass_n[m] += 1
-            for c in p["criteria"]:
+            for c in scored:
                 _bump(by_it, p["instruction_type"], m, c["results"][m]["pass"])
                 _bump(by_ps, p["prompt_style"], m, c["results"][m]["pass"])
                 _bump(by_uc, p["use_case"], m, c["results"][m]["pass"])
@@ -213,6 +236,22 @@ def _summary(prompts: list[dict], models: list[str]) -> dict:
         "by_use_case": _flatten(by_uc),
         "by_verifiability": _flatten(by_ver),
     }
+
+
+def _exclusions(prompts: list[dict], models: list[str]) -> dict:
+    """The EXCLUDE report (§0.3.4): every (prompt, criterion, model) the panel
+    could not decide — undecidable ties and under-quorum cells — with the
+    reason. Published, not buried: these are dropped from pass rates, so the
+    count is part of reading the census honestly."""
+    rows: list[dict] = []
+    for p in prompts:
+        for i, c in enumerate(p["criteria"], start=1):
+            for m in models:
+                r = c["results"][m]
+                if r.get("excluded"):
+                    rows.append({"prompt_id": p["id"], "criterion_index": i,
+                                 "model": m, "reason": r["reason"]})
+    return {"n_excluded": len(rows), "rows": rows}
 
 
 def _sync_dashboard(mon) -> None:
@@ -315,7 +354,7 @@ def _failure_analysis_block(cfg: RunConfig, records: list[dict],
         """The panel's PASS/FAIL/ABSTAIN vote split for one diagnosed criterion
         (spec §3): the generalization of the old second-judge strings to any
         panel size. Grading-artifact FAILs abstain (vote_of, inside
-        consensus_verdict) so judge-pipeline noise never reads as a real second
+        dispatch_consensus) so judge-pipeline noise never reads as a real second
         opinion — a 2-judge refusal shows as one FAIL + one abstain, not
         both_fail. Judges iterate in cfg.judges order (reason-tie determinism)."""
         per_judge: dict[str, dict] = {}
@@ -324,7 +363,8 @@ def _failure_analysis_block(cfg: RunConfig, records: list[dict],
             v = next((x for x in (verdicts or []) if x.get("index") == index), None)
             if v is not None:
                 per_judge[s.key] = v
-        return consensus_verdict(per_judge, len(cfg.judges))["votes"]
+        return panel_policy.dispatch_consensus(
+            cfg.tiebreaker_judge, per_judge, len(cfg.judges))["votes"]
 
     rows: list[dict] = []
     cells = 0
@@ -495,8 +535,12 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
     panel = None
     if len(judges) >= 2:
         cells: list[dict] = []
+        # coverage_out collects per-judge maps for the completeness gate; only
+        # needed under the E08 policy, so build it only then.
+        coverage: list[dict] | None = [] if cfg.tiebreaker_judge else None
         p_prompts = [_build_panel_prompt_entry(rec, responses, grades_by_judge, tags,
-                                               models, judges, cells)
+                                               models, judges, cells,
+                                               cfg.tiebreaker_judge, coverage)
                      for rec in eligible]
         panel = {
             "judges": judges,
@@ -504,6 +548,15 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
             "prompts": p_prompts,
             "agreement": agreement_stats(cells, judges),
         }
+        # E08 panel policy (§0.3): publish the tie-break anchor, the EXCLUDE
+        # report, and the completeness gate. Absent for legacy runs, so E01-E07
+        # panel blocks stay byte-identical.
+        if cfg.tiebreaker_judge:
+            panel["policy"] = {"kind": "e08_panel",
+                               "tiebreaker": cfg.tiebreaker_judge,
+                               "quorum": panel_policy.QUORUM}
+            panel["exclusions"] = _exclusions(p_prompts, models)
+            panel["completeness"] = panel_policy.completeness_report(coverage, judges)
 
     # Default (top-level) view: the panel when one exists (>=2 judges), else
     # the first judge — back-compat for single-judge readers.

@@ -1,0 +1,91 @@
+# E08 — Baseline census: Llama-3.2-3B-Instruct on Complex Constraints (CC-75)
+# ---------------------------------------------------------------------------
+# SPEC OF RECORD (human-readable). This file documents the resolved E08
+# decisions; it is NOT loaded by code. The canonical machine truth is the
+# frozen manifest at runs/E08-llama3.2-3b-cc75/experiment.json, written on the
+# run's first invocation from the CLI flags below. Keep the two consistent.
+#
+# Executor note: per the "reuse pipeline" architecture decision (2026-07-15),
+# E08 runs through the existing main.py pipeline in the runs/ convention rather
+# than a standalone experiments/E08/ harness. The plan's §0.3 panel policy
+# (Opus tie-break / EXCLUDE / completeness) lives in judging/panel.py and is
+# switched on by the frozen tiebreaker_judge param.
+
+run_id: E08-llama3-2-3b-cc75   # plan wrote "E08-llama3.2-3b-cc75"; the repo slug
+                               # regex forbids '.', so 3.2 → 3-2 (path-safe)
+dataset: data/complexconstraints.jsonl   # CC-75, 75 prompts / ~1,500 criteria
+
+# --- Models (all pinned; verified resolvable on OpenRouter 2026-07-15) -------
+candidate:
+  key: llama-3b
+  id: meta-llama/llama-3.2-3b-instruct
+  transport: openrouter
+  # §0.2 provider variance mitigation — enforced via RunConfig.extra_body:
+  provider_pin:
+    quantizations: [bf16, fp16]   # NO int-quantized endpoints
+    # NB: no require_parameters — it also demands provider support for the
+    # reasoning/seed request params, which the bf16/fp16 Llama providers don't
+    # declare, 404-ing every route (dry-run 2026-07-15). The quantizations
+    # filter alone is the guard.
+  # Verified 2026-07-15: the pin routes successfully (provider "Parasail",
+  # quantization null = native precision, not int-quantized). Fallback if a
+  # future pin proves infeasible: local vLLM for the candidate, judges stay on
+  # OpenRouter; note the switch in run metadata.
+  metadata_capture:
+    provider: per-response         # OpenRouter stamps it inline on each chunk;
+                                   # stored in runs/<slug>/responses/<key>.jsonl
+    quantization: not-exposed      # OpenRouter's streaming API + /generation return
+                                   # null for the pinned providers; the bf16/fp16
+                                   # guarantee is the frozen require_parameters pin
+
+judges:                            # all via OpenRouter (no Anthropic batch discount, §0.3.7)
+  - key: opus48
+    id: anthropic/claude-opus-4.8
+    role: anchor / tie-breaker     # <-- tiebreaker_judge
+  - key: gemini-pro
+    id: google/gemini-3.1-pro-preview
+    role: panel
+    resolved_from: google/gemini-pro-latest   # -latest alias → this snapshot (2026-07-15)
+    resolution_date: 2026-07-15
+  - key: gpt56sol
+    id: openai/gpt-5.6-sol
+    role: panel
+
+tiebreaker_judge: opus48
+
+# --- Decode config (§0.2; deliberate divergence from E07's reasoning-on) -----
+decode:
+  reasoning: off
+  temperature: 0.6
+  max_new_tokens: 1536
+  k: 1
+  seed: 20260715                   # logged for reproducibility (Task 3)
+
+# --- Panel policy (§0.3; implemented in judging/panel.py) --------------------
+panel_policy:
+  verdict_vocab: [PASS, FAIL, ABSTAIN]     # per judge per criterion
+  consensus: majority of non-abstaining judges
+  tie_break: opus48 anchors 1-1 splits; if opus48 abstains and the other two
+    split → EXCLUDE (panel_undecidable), never FAIL
+  completeness_gate: every criterion needs >=2 non-abstaining verdicts;
+    stragglers get targeted re-grades (EXCLUDE/panel_incomplete until met)
+  retry: up to 3x with backoff; one retry may use a neutral re-instruction;
+    persistent failure → ABSTAIN with raw output logged
+  refusal_is_fail: false
+
+# --- Exact run invocation ---------------------------------------------------
+# (first run freezes these into runs/E08-llama3.2-3b-cc75/experiment.json)
+cli: |
+  caffeinate -is uv run python main.py all \
+    --experiment E08-llama3-2-3b-cc75 \
+    --limit 75 \
+    --candidates llama-3b=meta-llama/llama-3.2-3b-instruct \
+    --judges opus48=anthropic/claude-opus-4.8,gemini-pro=google/gemini-3.1-pro-preview,gpt56sol=openai/gpt-5.6-sol \
+    --tiebreaker opus48 \
+    --reasoning off --temperature 0.6 --max-tokens 1536 \
+    --provider-quant bf16,fp16 --seed 20260715
+
+# judge_mode: default "batch". With an all-OpenRouter panel the Anthropic-batch
+# path is empty, so all three judges grade concurrently on the JUDGE_WORKERS
+# pool — faster than "sequential" (one streamed call per cell).
+# Cost estimate: ~$30-60 for the full 3-judge census pass (§0.3.7).

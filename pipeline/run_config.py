@@ -23,7 +23,8 @@ SLUG_RE = re.compile(r"^([ET])(\d{2,})-[a-z0-9]+(-[a-z0-9]+)*$")
 _PARAM_FIELDS = (
     "candidates", "judges", "classifier_chain", "max_tokens", "temperature",
     "reasoning", "timeout_s", "limit", "description", "provider_sort",
-    "sample_seed", "judge_mode",
+    "sample_seed", "judge_mode", "tiebreaker_judge", "provider_quantizations",
+    "seed",
 )
 
 PROVIDER_SORTS = ("throughput", "latency", "price")
@@ -167,6 +168,22 @@ class RunConfig:
     judge_mode: str = "batch"
     # Classify fallback chain (frozen). None -> (first judge,). Walked per prompt; refusal advances, one retry then advance (spec §4).
     classifier_chain: tuple[JudgeSpec, ...] | None = None
+    # E08 panel policy (frozen). None -> legacy consensus (_consensus.consensus_verdict:
+    # ties/no-quorum resolve to FAIL; E01-E07 behavior, byte-identical). A judge key ->
+    # judging.panel policy: that judge anchors 1-1 tie-breaks, undecidable/under-quorum
+    # criteria become EXCLUDE (dropped from metrics, never FAIL), and the completeness
+    # gate applies (plan §0.3.3-5). Must name a panel member.
+    tiebreaker_judge: str | None = None
+    # OpenRouter candidate provider pin (frozen; §0.2 provider-variance mitigation).
+    # None -> OpenRouter's default routing (any quantization). A tuple like
+    # ("bf16","fp16") restricts routing to providers serving those quantizations
+    # and sets require_parameters so providers that can't honor the filter are
+    # dropped — the guard against a silently int-quantized candidate endpoint.
+    provider_quantizations: tuple[str, ...] | None = None
+    # Candidate decode seed (frozen; §0.2 "seeds logged"). None -> no seed sent.
+    # Best-effort on OpenRouter (provider-dependent), but the requested seed is
+    # always recorded in the manifest so a re-run documents what it asked for.
+    seed: int | None = None
 
     def __post_init__(self) -> None:
         if self.judge_mode not in JUDGE_MODES:
@@ -180,6 +197,15 @@ class RunConfig:
         chain = self.classifier_chain if self.classifier_chain is not None else (self.judges[0],)
         object.__setattr__(self, "classifier_chain",
                            tuple(JudgeSpec.from_value(j) for j in chain))
+        if self.tiebreaker_judge is not None and self.tiebreaker_judge not in self.judge_keys:
+            raise ValueError(
+                f"tiebreaker_judge {self.tiebreaker_judge!r} must be one of the panel "
+                f"judge keys {self.judge_keys}; the tie-break anchor has to be a judge "
+                "that actually grades (plan §0.3.3).")
+        # JSON round-trips tuples to lists; normalize so freeze/reload compares equal.
+        if self.provider_quantizations is not None:
+            object.__setattr__(self, "provider_quantizations",
+                               tuple(self.provider_quantizations))
 
     @property
     def judge(self) -> JudgeSpec:
@@ -235,10 +261,20 @@ class RunConfig:
     @property
     def extra_body(self) -> dict:
         """OpenRouter extra_body for candidate calls (reasoning toggle +
-        optional provider routing preference)."""
+        optional provider routing preference + optional quantization pin)."""
         body: dict = {"reasoning": {"enabled": self.reasoning}}
+        provider: dict = {}
         if self.provider_sort:
-            body["provider"] = {"sort": self.provider_sort}
+            provider["sort"] = self.provider_sort
+        if self.provider_quantizations:
+            # The quantizations filter alone restricts routing to providers that
+            # serve these precisions — the §0.2 "no int-quant endpoint" guard.
+            # Do NOT add require_parameters here: it also demands provider support
+            # for every request param (reasoning, seed), which the bf16/fp16 Llama
+            # providers don't declare → "no endpoints found" 404 (dry-run 2026-07-15).
+            provider["quantizations"] = list(self.provider_quantizations)
+        if provider:
+            body["provider"] = provider
         return body
 
     # --- serialization (slug is the filename's job, not the payload's) ---
@@ -263,6 +299,11 @@ class RunConfig:
         d.setdefault("judge_mode", "batch")
         # Back-compat: freezes older than the classifier_chain knob (pre-panel).
         d.setdefault("classifier_chain", None)
+        # Back-compat: freezes older than the tiebreaker_judge knob (pre-E08).
+        d.setdefault("tiebreaker_judge", None)
+        # Back-compat: freezes older than the provider quant pin / decode seed (pre-E08).
+        d.setdefault("provider_quantizations", None)
+        d.setdefault("seed", None)
         try:
             kwargs = {f: d[f] for f in _PARAM_FIELDS}
         except KeyError as e:
@@ -346,6 +387,9 @@ def _defaults() -> dict:
         "provider_sort": None,
         "sample_seed": None,
         "judge_mode": "batch",
+        "tiebreaker_judge": None,
+        "provider_quantizations": None,
+        "seed": None,
     }
 
 

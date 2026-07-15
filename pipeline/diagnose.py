@@ -26,9 +26,9 @@ from config import (
     DIAGNOSE_MAX_TOKENS,
     anthropic,
 )
+from judging import panel as panel_policy
 from pipeline import _taxonomy
 from pipeline._batch_guard import BatchStaleGuard
-from pipeline._consensus import consensus_verdict
 from pipeline._io import append_jsonl, read_jsonl, retry
 from pipeline._json_extract import extract_json_array
 from pipeline._judge_llm import call_json, call_json_chain
@@ -83,7 +83,12 @@ def _failed_cells(cfg: RunConfig, records: list[dict],
                     v = next((x for x in g.get(rid, []) if x.get("index") == i), None)
                     if v is not None:
                         per_judge[jk] = v
-                cv = consensus_verdict(per_judge, len(cfg.judges))
+                cv = panel_policy.dispatch_consensus(
+                    cfg.tiebreaker_judge, per_judge, len(cfg.judges))
+                # Only genuine consensus FAILs are diagnosed. Legacy: skip
+                # panel_no_quorum (no real verdict). E08 policy: EXCLUDE verdicts
+                # (undecidable / under-quorum) have verdict != "FAIL", so they
+                # fall out here too — the classifier never sees them (§0.3.4).
                 if cv["verdict"] == "FAIL" and cv["reason"] != "panel_no_quorum":
                     failed.append(i)
             if not failed:

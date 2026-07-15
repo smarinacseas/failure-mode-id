@@ -102,6 +102,9 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
             extra_body=cfg.extra_body,
             timeout=cfg.timeout_s,
             stream=True,
+            # §0.2: log the decode seed (best-effort on OpenRouter). Omit the
+            # kwarg entirely when unset so pre-E08 runs are byte-identical.
+            **({"seed": cfg.seed} if cfg.seed is not None else {}),
         )
 
         deadline_hit = threading.Event()
@@ -129,6 +132,7 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
         content_parts: list[str] = []
         reasoning_parts: list[str] = []
         finish = None
+        provider = None
         try:
             for chunk in stream:
                 elapsed = time.monotonic() - started
@@ -140,6 +144,11 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
                         f"{sum(len(p) for p in reasoning_parts)} reasoning chars, "
                         f"{sum(len(p) for p in content_parts)} content chars so far)"
                     )
+                # OpenRouter stamps the serving backend on every chunk (§0.2);
+                # capture it once. Absent for proxy:// candidates → stays None.
+                if provider is None:
+                    provider = (getattr(chunk, "provider", None)
+                                or (getattr(chunk, "model_extra", None) or {}).get("provider"))
                 choices = getattr(chunk, "choices", None) or []
                 if not choices:
                     continue
@@ -200,6 +209,8 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
                 }
                 if reasoning:
                     fields["reasoning"] = reasoning
+                if provider:
+                    fields["provider"] = provider
                 return fields
             _reject("empty_completion", finish, content_parts, reasoning_parts)
             raise RuntimeError(
@@ -209,6 +220,8 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
         fields = {"response": text, "finish_reason": finish}
         if reasoning:
             fields["reasoning"] = reasoning
+        if provider:
+            fields["provider"] = provider
         return fields
 
     return retry(_call, label=f"candidate:{send_model}")
