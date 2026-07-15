@@ -3107,7 +3107,7 @@
             <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:20px;flex-wrap:wrap">
               <h1 style="margin:0;font-family:'Newsreader',Georgia,serif;font-size:25px;font-weight:500;letter-spacing:-0.005em">Failure analysis</h1>
               <span style="font-size:12.5px;color:var(--ink-3,#878d99)">{{ faBlurb }}</span>
-              <span onclick="{{ goReference }}" style="font-size:12px;color:var(--accent,#b06a3c);cursor:pointer;font-weight:600">Failure-mode reference →</span>
+              <span onclick="{{ goReference }}" style="font-size:12px;color:var(--accent,#b06a3c);cursor:pointer;font-weight:600" style-hover="text-decoration:underline">Failure-mode reference →</span>
             </div>
             <sc-if value="{{ faUnavailable }}" hint-placeholder-val="{{ false }}">
               <div style="padding:80px 0;text-align:center;color:var(--ink-3,#8c8678);font-family:'IBM Plex Mono',monospace;font-size:12.5px">
@@ -3122,7 +3122,7 @@
                 <sc-for list="{{ faPareto }}" as="pc" hint-placeholder-count="6">
                   <div style="display:grid;grid-template-columns:260px 1fr 46px;gap:12px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line,#e7e3d6)">
                     <div>
-                      <div onclick="{{ pc.onRef }}" title="Open in failure-mode reference" style="font-size:12.5px;font-weight:600;color:var(--ink,#2a2722);cursor:pointer;text-decoration:underline dotted var(--ink-4,#a8a294);text-underline-offset:3px;display:inline-block">{{ pc.label }}</div>
+                      <div onclick="{{ pc.onRef }}" title="Open in failure-mode reference" style="font-size:12.5px;font-weight:600;color:var(--ink,#2a2722);cursor:pointer;text-decoration:underline dotted var(--ink-4,#a8a294);text-underline-offset:3px;display:inline-block" style-hover="text-decoration-style:solid !important;text-decoration-color:var(--accent,#b06a3c) !important;color:var(--accent,#b06a3c) !important">{{ pc.label }}</div>
                       <div style="font-size:11px;color:var(--ink-3,#8c8678)">{{ pc.note }}</div>
                     </div>
                     <div>
@@ -3188,7 +3188,7 @@
                   </tr></thead>
                   <tbody><sc-for list="{{ faMatrix }}" as="mr" hint-placeholder-count="6">
                     <tr style="border-top:1px solid var(--line,#e7e3d6)">
-                      <td onclick="{{ mr.onRef }}" title="Open in failure-mode reference" style="font-size:12.5px;padding:6px 10px 6px 0;white-space:nowrap;cursor:pointer;text-decoration:underline dotted var(--ink-4,#a8a294);text-underline-offset:3px">{{ mr.label }}</td>
+                      <td onclick="{{ mr.onRef }}" title="Open in failure-mode reference" style="font-size:12.5px;padding:6px 10px 6px 0;white-space:nowrap;cursor:pointer;text-decoration:underline dotted var(--ink-4,#a8a294);text-underline-offset:3px" style-hover="text-decoration-style:solid !important;text-decoration-color:var(--accent,#b06a3c) !important;color:var(--accent,#b06a3c) !important">{{ mr.label }}</td>
                       <sc-for list="{{ mr.cells }}" as="mv" hint-placeholder-count="4"><td style="{{ mv.css }};padding:6px 10px">{{ mv.v }}</td></sc-for>
                     </tr>
                   </sc-for></tbody>
@@ -3201,7 +3201,7 @@
                   </tr></thead>
                   <tbody><sc-for list="{{ faMatrixUse }}" as="ur" hint-placeholder-count="6">
                     <tr style="border-top:1px solid var(--line,#e7e3d6)">
-                      <td onclick="{{ ur.onRef }}" title="Open in failure-mode reference" style="font-size:12.5px;padding:6px 10px 6px 0;white-space:nowrap;cursor:pointer;text-decoration:underline dotted var(--ink-4,#a8a294);text-underline-offset:3px">{{ ur.label }}</td>
+                      <td onclick="{{ ur.onRef }}" title="Open in failure-mode reference" style="font-size:12.5px;padding:6px 10px 6px 0;white-space:nowrap;cursor:pointer;text-decoration:underline dotted var(--ink-4,#a8a294);text-underline-offset:3px" style-hover="text-decoration-style:solid !important;text-decoration-color:var(--accent,#b06a3c) !important;color:var(--accent,#b06a3c) !important">{{ ur.label }}</td>
                       <sc-for list="{{ ur.cells }}" as="uv" hint-placeholder-count="7"><td style="{{ uv.css }};padding:6px 10px">{{ uv.v }}</td></sc-for>
                     </tr>
                   </sc-for></tbody>
@@ -3216,9 +3216,10 @@
                     <div style="position:relative">
                       <button onclick="{{ fm.onToggle }}" style="{{ fm.btnStyle }}">{{ fm.label }} <span>{{ fm.caret }}</span></button>
                       <sc-if value="{{ fm.isOpen }}" hint-placeholder-val="{{ false }}">
-                        <div style="position:absolute;top:110%;left:0;z-index:30;background:var(--raise,#fff);border:1px solid var(--border,#e4dfd1);border-radius:9px;padding:5px;min-width:200px;box-shadow:0 8px 22px rgba(0,0,0,.12)">
+                        <div data-glide-container="" style="position:absolute;top:110%;left:0;z-index:30;background:var(--raise,#fff);border:1px solid var(--border,#e4dfd1);border-radius:9px;padding:5px;min-width:200px;box-shadow:0 8px 22px rgba(0,0,0,.12)">
+                          <div data-glider="" style="position:absolute;left:0;top:0;height:0;width:0;background:color-mix(in oklab,var(--accent,#b06a3c) 20%,transparent);opacity:0;pointer-events:none;z-index:0;border-radius:6px"></div>
                           <sc-for list="{{ fm.options }}" as="fo" hint-placeholder-count="5">
-                            <div onclick="{{ fo.onClick }}" style="{{ fo.rowStyle }}"><span>{{ fo.label }}</span><span>{{ fo.check }}</span></div>
+                            <div onclick="{{ fo.onClick }}" data-glide-row="" style="{{ fo.rowStyle }}"><span>{{ fo.label }}</span><span>{{ fo.check }}</span></div>
                           </sc-for>
                         </div>
                       </sc-if>
@@ -3228,13 +3229,15 @@
                 <sc-if value="{{ faTableEmpty }}" hint-placeholder-val="{{ false }}">
                   <div style="padding:26px 0;text-align:center;color:var(--ink-3,#8c8678);font-size:12.5px">No diagnosed failures match these filters.</div>
                 </sc-if>
-                <sc-for list="{{ faTableRows }}" as="fr" hint-placeholder-count="10">
-                  <div onclick="{{ fr.onClick }}" style="padding:11px 2px;border-top:1px solid var(--line,#e7e3d6);cursor:pointer">
+                <div data-glide-container="" style="position:relative">
+                  <div data-glider="" style="position:absolute;left:0;top:0;height:0;width:100%;background:color-mix(in oklab,var(--accent,#b06a3c) 20%,transparent);opacity:0;pointer-events:none;z-index:0;border-radius:8px"></div>
+                  <sc-for list="{{ faTableRows }}" as="fr" hint-placeholder-count="10">
+                    <div onclick="{{ fr.onClick }}" data-glide-row="" style="padding:11px 9px;border-top:1px solid var(--line,#e7e3d6);cursor:pointer;position:relative;z-index:1;border-radius:8px">
                     <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
                       <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:700">{{ fr.id }}</span>
                       <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-3,#8c8678)">{{ fr.idx }}</span>
                       <span style="font-size:11.5px;color:var(--ink-2,#6c6759)">{{ fr.model }}</span>
-                      <span onclick="{{ fr.onRefCause }}" title="Open in failure-mode reference" style="font-size:11.5px;font-weight:600;color:var(--accent,#b06a3c);cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">{{ fr.cause }}</span>
+                      <span onclick="{{ fr.onRefCause }}" title="Open in failure-mode reference" style="font-size:11.5px;font-weight:600;color:var(--accent,#b06a3c);cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px" style-hover="text-decoration-style:solid !important">{{ fr.cause }}</span>
                       <span style="font-size:10.5px;color:var(--ink-4,#a8a294)">conf: {{ fr.confidence }}</span>
                       <span style="{{ fr.concCss }}">{{ fr.conc }}</span>
                     </div>
@@ -3243,6 +3246,7 @@
                     <div style="font-size:11.5px;color:var(--ink-3,#8c8678)">{{ fr.rationale }}</div>
                   </div>
                 </sc-for>
+                </div>
               </div>
             </sc-if>
           </div>
@@ -3267,7 +3271,7 @@
             <sc-if value="{{ refLoaded }}" hint-placeholder-val="{{ false }}">
               <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:18px">
                 <sc-for list="{{ refJump }}" as="rj" hint-placeholder-count="11">
-                  <button onclick="{{ rj.onClick }}" style="{{ rj.btnStyle }}">{{ rj.label }}</button>
+                  <button onclick="{{ rj.onClick }}" style="{{ rj.btnStyle }}" style-hover="background:var(--accent-bg,#efe2d4) !important;border-color:var(--accent-line,#e0cab2) !important;color:var(--ink,#2a2722) !important">{{ rj.label }}</button>
                 </sc-for>
               </div>
               <sc-for list="{{ refTrainable }}" as="rm" hint-placeholder-count="8">
@@ -3303,7 +3307,7 @@
                     <div style="font-size:11px;color:var(--ink-3,#8c8678);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:5px">Citations</div>
                     <sc-for list="{{ rm.citations }}" as="ct" hint-placeholder-count="3">
                       <div style="font-size:12px;padding:3px 0">
-                        <a href="{{ ct.url }}" target="_blank" rel="noopener" style="color:var(--ink,#2a2722);border-bottom:1px dotted currentColor;text-decoration:none">{{ ct.title }}</a>
+                        <a href="{{ ct.url }}" target="_blank" rel="noopener" style="color:var(--ink,#2a2722);border-bottom:1px dotted currentColor;text-decoration:none" style-hover="color:var(--accent,#b06a3c) !important">{{ ct.title }}</a>
                         <span style="color:var(--ink-4,#a8a294)"> — {{ ct.meta }}</span>
                         <div style="color:var(--ink-3,#8c8678);font-size:11.5px">{{ ct.relevance }}</div>
                       </div>
