@@ -55,7 +55,31 @@
       "path": "./E07-reasoning-full75.json",
       "n_prompts": 75,
       "n_models": 3
+    },
+    {
+      "id": "E08-llama3-2-3b-cc75",
+      "label": "E08-llama3-2-3b-cc75",
+      "date": "2026-07-15",
+      "path": "./E08-llama3-2-3b-cc75.json",
+      "n_prompts": 75,
+      "n_models": 1
+    },
+    {
+      "id": "E80-drysmoke-3p",
+      "label": "E80-drysmoke-3p",
+      "date": "2026-07-15",
+      "path": "./E80-drysmoke-3p.json",
+      "n_prompts": 3,
+      "n_models": 1
+    },
+    {
+      "id": "E91-panel-smoke",
+      "label": "E91-panel-smoke",
+      "date": "2026-07-11",
+      "path": "./E91-panel-smoke.json",
+      "n_prompts": 2,
+      "n_models": 3
     }
   ],
-  "synced_at": "2026-07-11T19:38:23.344197+00:00"
+  "synced_at": "2026-07-15T19:55:47.719273+00:00"
 }
