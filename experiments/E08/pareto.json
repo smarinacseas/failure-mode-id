@@ -1,0 +1,192 @@
+{
+  "experiment": "E08-llama3-2-3b-cc75",
+  "candidate": "meta-llama/llama-3.2-3b-instruct",
+  "schema": "e08-pareto-1",
+  "generated_from": "dashboard/E08-llama3-2-3b-cc75.json (results schema 3.3)",
+  "verdict_basis": "panel (opus48 + gemini-pro + gpt56sol; Opus-4.8 tie-break; §0.3 policy)",
+  "diagnose_chain": [
+    "claude-fable-5",
+    "claude-opus-4-8"
+  ],
+  "diagnose_label_provenance": {
+    "claude-fable-5": 849,
+    "claude-opus-4-8": 43,
+    "note": "95.2% of labels from claude-fable-5; human hand-check deferred (see report)"
+  },
+  "taxonomy_version": 1,
+  "n_criteria": 1559,
+  "n_passed": 667,
+  "n_failed_criteria": 892,
+  "criterion_pass_rate_pct": 42.78,
+  "full_prompt_pass_rate_pct": 0.0,
+  "pareto": [
+    {
+      "cause": "execution_slip",
+      "count": 310,
+      "share_pct": 34.75,
+      "archetype": "precision",
+      "by_instruction_type": {
+        "Negative": 94,
+        "Conditional": 59,
+        "Multistep": 103,
+        "Implicit": 54
+      },
+      "by_use_case": {
+        "Logistics, Scheduling & Event Planning": 162,
+        "Professional & Workplace Communication": 19,
+        "Data Processing, Formatting & Math": 114,
+        "Educational Planning & Curriculum Development": 11,
+        "Health, Dietary & Personal Care Planning": 1,
+        "Technical Design & Product Management": 3
+      },
+      "gate_e_t": "CAUSE_B"
+    },
+    {
+      "cause": "constraint_unaddressed",
+      "count": 257,
+      "share_pct": 28.81,
+      "archetype": "coverage",
+      "by_instruction_type": {
+        "Multistep": 68,
+        "Conditional": 94,
+        "Implicit": 22,
+        "Negative": 73
+      },
+      "by_use_case": {
+        "Professional & Workplace Communication": 47,
+        "Logistics, Scheduling & Event Planning": 97,
+        "Data Processing, Formatting & Math": 87,
+        "Educational Planning & Curriculum Development": 23,
+        "Health, Dietary & Personal Care Planning": 3
+      },
+      "gate_e_t": "CAUSE_A",
+      "note": "reasoning-off collapse of E07 never_surfaced + dropped (no trace to separate them)"
+    },
+    {
+      "cause": "constraint_misread",
+      "count": 111,
+      "share_pct": 12.44,
+      "archetype": "comprehension",
+      "by_instruction_type": {
+        "Multistep": 28,
+        "Conditional": 45,
+        "Negative": 28,
+        "Implicit": 10
+      },
+      "by_use_case": {
+        "Professional & Workplace Communication": 7,
+        "Logistics, Scheduling & Event Planning": 49,
+        "Data Processing, Formatting & Math": 38,
+        "Educational Planning & Curriculum Development": 12,
+        "Technical Design & Product Management": 5
+      }
+    },
+    {
+      "cause": "degenerate_output",
+      "count": 107,
+      "share_pct": 12.0,
+      "archetype": "decode/termination",
+      "by_instruction_type": {
+        "Conditional": 24,
+        "Implicit": 39,
+        "Negative": 23,
+        "Multistep": 21
+      },
+      "by_use_case": {
+        "Data Processing, Formatting & Math": 44,
+        "Logistics, Scheduling & Event Planning": 44,
+        "Creative Writing": 7,
+        "Professional & Workplace Communication": 4,
+        "Educational Planning & Curriculum Development": 8
+      },
+      "note": "reasoning-off: truncation at 1536-token cap, not repetition (1 mechanical loop) — budget-suspect"
+    },
+    {
+      "cause": "input_misread",
+      "count": 82,
+      "share_pct": 9.19,
+      "archetype": "comprehension",
+      "by_instruction_type": {
+        "Conditional": 21,
+        "Negative": 30,
+        "Multistep": 24,
+        "Implicit": 7
+      },
+      "by_use_case": {
+        "Logistics, Scheduling & Event Planning": 32,
+        "Professional & Workplace Communication": 15,
+        "Data Processing, Formatting & Math": 31,
+        "Educational Planning & Curriculum Development": 3,
+        "Technical Design & Product Management": 1
+      }
+    },
+    {
+      "cause": "constraint_sacrificed",
+      "count": 20,
+      "share_pct": 2.24,
+      "archetype": "conflict-arbitration",
+      "by_instruction_type": {
+        "Conditional": 3,
+        "Multistep": 11,
+        "Negative": 6
+      },
+      "by_use_case": {
+        "Professional & Workplace Communication": 3,
+        "Logistics, Scheduling & Event Planning": 15,
+        "Technical Design & Product Management": 2
+      }
+    },
+    {
+      "cause": "other",
+      "count": 4,
+      "share_pct": 0.45,
+      "archetype": "other",
+      "by_instruction_type": {
+        "Multistep": 3,
+        "Negative": 1
+      },
+      "by_use_case": {
+        "Professional & Workplace Communication": 3,
+        "Educational Planning & Curriculum Development": 1
+      }
+    },
+    {
+      "cause": "judge_suspect",
+      "count": 1,
+      "share_pct": 0.11,
+      "archetype": "excluded",
+      "by_instruction_type": {
+        "Negative": 1
+      },
+      "by_use_case": {
+        "Professional & Workplace Communication": 1
+      },
+      "note": "excluded from interpretation (suspected benchmark bug)",
+      "excluded_from_interpretation": true
+    }
+  ],
+  "gate_e_t_binding": {
+    "status": "proposed — ratify in experiments/T01/PREREG.md at Gate E->T",
+    "CAUSE_A_coverage": {
+      "cause": "constraint_unaddressed",
+      "count": 257,
+      "share_pct": 28.81
+    },
+    "CAUSE_B_precision": {
+      "cause": "execution_slip",
+      "count": 310,
+      "share_pct": 34.75
+    },
+    "combined": {
+      "count": 567,
+      "share_pct": 63.57
+    },
+    "decision_rule": "top-two map cleanly onto coverage/precision archetypes; keeps H1 primary (no amendment)"
+  },
+  "caveats": [
+    "95.2% of labels (849/892) from a single classifier (claude-fable-5); human hand-check deferred.",
+    "reasoning off -> traces absent -> coverage failures collapse into constraint_unaddressed.",
+    "max_tokens=1536: 12/75 non-stop finishes; degenerate_output is budget-suspect truncation, not repetition.",
+    "single candidate, single 75-prompt census; cross-family comparison to E07 is directional only."
+  ]
+}
