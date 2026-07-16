@@ -79,21 +79,31 @@ def _write_jsonl(recs: list[dict], path: Path) -> None:
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")
 
 
-def main() -> None:
+def main(only_cause: str | None = None) -> None:
     cc75 = REPO_ROOT / "data" / "complexconstraints.jsonl"
     ifeval_dir = REPO_ROOT / "data" / "verih" / "Eval" / "evals" / "ifeval" / "inputs"
     ifeval = sorted(ifeval_dir.glob("*.jsonl")) if ifeval_dir.exists() else []
+    if not cc75.exists() or not ifeval:
+        raise RuntimeError(
+            "contamination reference corpora missing (CC-75 and/or IFEval). "
+            "Restore data/complexconstraints.jsonl and data/verih/.../ifeval/inputs "
+            "before regenerating — the external 13-gram screen must not be a no-op.")
     external, report = load_reference_ngrams([cc75, *ifeval])
     print("external contamination screen:")
     for line in report:
         print(f"  {line}")
 
-    for cause, seed in _CAUSE_SEED.items():
+    causes = {only_cause: _CAUSE_SEED[only_cause]} if only_cause else _CAUSE_SEED
+    for cause, seed in causes.items():
         train, hold = build_pool(cause, N_TRAIN, N_HOLD, seed, external)
         _write_jsonl(train, T01_DIR / "data" / "train" / f"{cause}.jsonl")
         _write_jsonl(hold, T01_DIR / "data" / "holdout" / f"{cause}.jsonl")
-    print(f"wrote pools under {T01_DIR / 'data'}/{{train,holdout}}/")
+    print(f"wrote {'/'.join(causes)} pools under {T01_DIR / 'data'}/{{train,holdout}}/")
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--cause", choices=("coverage", "precision"), default=None,
+                    help="regenerate only this cause's pools (default: both)")
+    main(ap.parse_args().cause)

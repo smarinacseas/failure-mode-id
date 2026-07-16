@@ -12,7 +12,7 @@ from base import check
 def test_coverage_prompt_draws_from_coverage_pool():
     r = compose_prompt("coverage", random.Random(0), "COV-001")
     assert r["cause"] == "coverage"
-    assert 5 <= len(r["specs"]) <= len(COVERAGE_TYPES)  # 5-6 after GT2 yield tune
+    assert 6 <= len(r["specs"]) <= len(COVERAGE_TYPES)  # 6-7 after 2026-07-16 recal
     assert all(s["type"] in COVERAGE_TYPES for s in r["specs"])
 
 

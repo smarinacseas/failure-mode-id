@@ -31,6 +31,13 @@ END_PHRASES = [
     "I look forward to your response.",
     "Best regards.",
 ]
+START_PHRASES = [
+    "Here is the information you requested.",
+    "Please review the details below.",
+    "This document outlines the key points.",
+    "The following summary covers the essentials.",
+    "Thank you for reaching out to us.",
+]
 REPEAT_PHRASES = ["for your review", "as discussed", "per our agreement",
                   "to be confirmed", "action required"]
 ORDER_SEQUENCES = [
@@ -97,19 +104,26 @@ def _count_phrase(op: str, n: int, unit: str) -> str:
 # --- coverage generators (CAUSE_A) -------------------------------------------
 
 def gen_keyword_include(rng):
-    kws = rng.sample(KEYWORDS, rng.randint(4, 6))  # more to track (calibration)
+    # 7-10 (was 4-6): coverage recalibration 2026-07-16 — base 3B passed
+    # keyword_include ~65% at 4-6; requiring ALL of more keywords lowers per-
+    # criterion base pass into band while the strong teacher still tracks them.
+    kws = rng.sample(KEYWORDS, rng.randint(7, 10))
     return (f"Make sure to mention {_and_list(kws)} somewhere in the response.",
             {"type": "keyword_include", "keywords": kws})
 
 
 def gen_keyword_exclude(rng):
-    kws = rng.sample(AVOID_WORDS, rng.randint(1, 2))
+    # 3-5 (was 1-2): recalibration 2026-07-16 — base passed ~90% at 1-2 forbidden
+    # words; more forbidden words raises the chance the base slips one in.
+    kws = rng.sample(AVOID_WORDS, rng.randint(3, 5))
     return (f"Avoid the word{'s' if len(kws) > 1 else ''} {_and_list(kws)} entirely.",
             {"type": "keyword_exclude", "keywords": kws})
 
 
 def gen_required_sections(rng):
-    secs = rng.sample(SECTIONS, rng.randint(3, 5))  # more to track (calibration)
+    # 6-8 (was 3-5): recalibration 2026-07-16 — base passed ~95% at 3-5 headers;
+    # requiring ALL of more section headers (each its own line) lowers base pass.
+    secs = rng.sample(SECTIONS, rng.randint(6, 8))
     return (f"Organize the response under these section headers, each on its own "
             f"line: {_and_list(secs)}.",
             {"type": "required_sections", "sections": secs})
@@ -142,6 +156,13 @@ def gen_end_phrase(rng):
     phrase = rng.choice(END_PHRASES)
     return (f"End the response with exactly this sentence: {phrase}",
             {"type": "end_phrase", "phrase": phrase})
+
+
+def gen_start_phrase(rng):
+    # recalibration 2026-07-16: a stricter coverage type — exact opening sentence.
+    phrase = rng.choice(START_PHRASES)
+    return (f"Begin the response with exactly this sentence: {phrase}",
+            {"type": "start_phrase", "phrase": phrase})
 
 
 # --- precision generators (CAUSE_B) ------------------------------------------
@@ -216,6 +237,7 @@ GENERATORS = {
     "no_commas": gen_no_commas,
     "title": gen_title,
     "end_phrase": gen_end_phrase,
+    "start_phrase": gen_start_phrase,
     "word_count": gen_word_count,
     "sentence_count": gen_sentence_count,
     "paragraph_count": gen_paragraph_count,

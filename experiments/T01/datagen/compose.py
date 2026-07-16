@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import random
 
-from archetypes import COVERAGE_TYPES, PRECISION_TYPES
+from archetypes import COVERAGE_SAMPLE_TYPES, PRECISION_TYPES
 from constraints import TASKS, generate_instance
 
 
@@ -31,11 +31,13 @@ def _assemble(stem: str, texts: list[str], archetype: str) -> str:
 
 def compose_prompt(archetype: str, rng: random.Random, prompt_id: str | None = None) -> dict:
     if archetype == "coverage":
-        # 5-6 (was 7-8): GT2 teacher-yield kill-switch — a strong teacher can't
-        # reliably 100%-pass 7-8 all-or-nothing constraints (correlated fails on
-        # no_commas/casing). Per-criterion difficulty is ~k-independent, so the
-        # 3B calibration (~75%) holds while the teacher's all-pass yield rises.
-        pool, k = COVERAGE_TYPES, rng.randint(5, 6)
+        # 6-7 (recalibration 2026-07-16, was 5-6): the base 3B sat at ~83% mean
+        # criterion-pass (out of the 30-70% band) — per-criterion difficulty was
+        # too low, so we (a) hardened the count-based generators (keyword_include,
+        # required_sections, keyword_exclude), (b) dropped the near-free binaries
+        # (no_placeholders, title) and added start_phrase, and (c) raised k here.
+        # Teacher-yield (GT2) is re-checked on regeneration; k capped at 7 = |COVERAGE_SAMPLE_TYPES|.
+        pool, k = COVERAGE_SAMPLE_TYPES, rng.randint(6, 7)
     elif archetype == "precision":
         pool, k = PRECISION_TYPES, rng.randint(3, 4)
     else:
