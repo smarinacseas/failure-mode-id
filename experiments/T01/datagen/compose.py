@@ -21,21 +21,19 @@ from constraints import TASKS, generate_instance
 
 def _assemble(stem: str, texts: list[str], archetype: str) -> str:
     if archetype == "coverage":
-        n_buried = max(1, len(texts) // 2)
-        buried, listed = texts[:n_buried], texts[n_buried:]
-        body = f"{stem} {' '.join(buried)}"
-        if listed:
-            body += "\n\nAlso keep in mind:\n" + "\n".join(f"- {t}" for t in listed)
-        return body
-    # precision: state the exact requirements plainly
+        # Bury EVERY requirement in prose (no bullet checklist) — an un-scannable
+        # wall of requirements is the coverage failure mode we train against;
+        # a bulleted list makes them too easy to track (calibration 2026-07-15).
+        return f"{stem} {' '.join(texts)}"
+    # precision: state the exact requirements plainly as a checklist
     return f"{stem}\n\nRequirements:\n" + "\n".join(f"- {t}" for t in texts)
 
 
 def compose_prompt(archetype: str, rng: random.Random, prompt_id: str | None = None) -> dict:
     if archetype == "coverage":
-        pool, k = COVERAGE_TYPES, rng.randint(6, len(COVERAGE_TYPES))
+        pool, k = COVERAGE_TYPES, rng.randint(7, len(COVERAGE_TYPES))
     elif archetype == "precision":
-        pool, k = PRECISION_TYPES, rng.randint(2, 4)
+        pool, k = PRECISION_TYPES, rng.randint(3, 4)
     else:
         raise ValueError(f"unknown archetype: {archetype!r} (coverage|precision)")
 

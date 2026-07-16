@@ -94,7 +94,7 @@ def _count_phrase(op: str, n: int, unit: str) -> str:
 # --- coverage generators (CAUSE_A) -------------------------------------------
 
 def gen_keyword_include(rng):
-    kws = rng.sample(KEYWORDS, rng.randint(2, 4))
+    kws = rng.sample(KEYWORDS, rng.randint(4, 6))  # more to track (calibration)
     return (f"Make sure to mention {_and_list(kws)} somewhere in the response.",
             {"type": "keyword_include", "keywords": kws})
 
@@ -106,7 +106,7 @@ def gen_keyword_exclude(rng):
 
 
 def gen_required_sections(rng):
-    secs = rng.sample(SECTIONS, rng.randint(2, 4))
+    secs = rng.sample(SECTIONS, rng.randint(3, 5))  # more to track (calibration)
     return (f"Organize the response under these section headers, each on its own "
             f"line: {_and_list(secs)}.",
             {"type": "required_sections", "sections": secs})
@@ -150,29 +150,30 @@ def gen_word_count(rng):
 
 
 def gen_sentence_count(rng):
-    spec = _count_spec(rng, "sentence_count", 3, 9)
-    return (f"Write {_count_phrase(spec['op'], spec['n'], 'sentences')}.", spec)
+    # exact counts are the execution weak spot — the difficulty lever (calibration)
+    n = rng.randint(4, 9)
+    return (f"Write {_count_phrase('exact', n, 'sentences')}.",
+            {"type": "sentence_count", "op": "exact", "n": n})
 
 
 def gen_paragraph_count(rng):
-    spec = _count_spec(rng, "paragraph_count", 2, 5)
-    return (f"Structure the response into {_count_phrase(spec['op'], spec['n'], 'paragraphs')}.",
-            spec)
+    n = rng.randint(2, 5)
+    return (f"Structure the response into {_count_phrase('exact', n, 'paragraphs')}.",
+            {"type": "paragraph_count", "op": "exact", "n": n})
 
 
 def gen_item_count(rng):
-    spec = _count_spec(rng, "item_count", 3, 7)
-    return (f"Include {_count_phrase(spec['op'], spec['n'], 'bullet points')} "
+    n = rng.randint(3, 7)
+    return (f"Include {_count_phrase('exact', n, 'bullet points')} "
             f"(lines beginning with '- ' or '1.').",
-            spec)
+            {"type": "item_count", "op": "exact", "n": n})
 
 
 def gen_keyword_frequency(rng):
     kw = rng.choice(FREQ_WORDS)
-    op = rng.choice(["exact", "min", "max"])
     n = rng.randint(2, 4)
-    return (f"Use the word '{kw}' {_count_phrase(op, n, 'times')}.",
-            {"type": "keyword_frequency", "keyword": kw, "op": op, "n": n})
+    return (f"Use the word '{kw}' {_count_phrase('exact', n, 'times')}.",
+            {"type": "keyword_frequency", "keyword": kw, "op": "exact", "n": n})
 
 
 def gen_caps_word_frequency(rng):
