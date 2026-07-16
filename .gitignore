@@ -241,3 +241,6 @@ data/verih/
 docs/superpowers/
 .superpowers/
 .claude/
+
+# T1.3 training outputs — adapters + probe logs live on the /workspace volume, never git
+/results/
