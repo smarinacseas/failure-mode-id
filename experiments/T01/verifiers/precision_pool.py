@@ -128,3 +128,28 @@ def exact_repetition(response: str, spec: dict) -> CheckResult:
     if n != want:
         return CheckResult(False, f"phrase count={n}, wanted exactly {want}")
     return CheckResult(True, f"phrase appears exactly {want} times")
+
+
+# --- ported from IFEval (Apache-2.0; see NOTICE) -----------------------------
+
+_WORD_RE = re.compile(r"[A-Za-z][A-Za-z'\-]*")
+
+
+@register("keyword_frequency")
+def keyword_frequency(response: str, spec: dict) -> CheckResult:
+    n = len(re.findall(r"\b" + re.escape(spec["keyword"]) + r"\b", response, re.IGNORECASE))
+    return _compare(n, spec)
+
+
+@register("paragraph_count")
+def paragraph_count(response: str, spec: dict) -> CheckResult:
+    paras = [p for p in re.split(r"\n\s*\n", response.strip()) if p.strip()]
+    return _compare(len(paras), spec)
+
+
+@register("caps_word_frequency")
+def caps_word_frequency(response: str, spec: dict) -> CheckResult:
+    # single-letter caps words (I, A) count, matching IFEval; whitespace/regex
+    # tokenizer instead of nltk.word_tokenize (dependency-free) — see NOTICE.
+    n = sum(1 for w in _WORD_RE.findall(response) if w.isupper())
+    return _compare(n, spec)

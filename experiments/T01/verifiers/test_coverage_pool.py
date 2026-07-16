@@ -110,3 +110,66 @@ def test_no_placeholders_lowercase_bracket_is_not_a_placeholder():
     # near-miss: bracketed lowercase / numeric text is legitimate, not a template slot
     assert check("See item [3] and the aside [details below].",
                  spec("no_placeholders")).passed is True
+
+
+# --- casing (ported from IFEval change_case:*, langdetect dropped) ------------
+
+def test_casing_all_upper_passes():
+    assert check("THIS IS ALL CAPS 123.", spec("casing", mode="upper")).passed is True
+
+
+def test_casing_upper_with_lowercase_fails():
+    assert check("This Has lowercase.", spec("casing", mode="upper")).passed is False
+
+
+def test_casing_all_lower_passes():
+    assert check("this is all lowercase 123.", spec("casing", mode="lower")).passed is True
+
+
+def test_casing_lower_with_uppercase_fails():
+    assert check("This Has Caps.", spec("casing", mode="lower")).passed is False
+
+
+# --- no_commas (ported from IFEval punctuation:no_comma) ----------------------
+
+def test_no_commas_clean_passes():
+    assert check("No commas here at all.", spec("no_commas")).passed is True
+
+
+def test_no_commas_present_fails():
+    assert check("Yes, there are commas.", spec("no_commas")).passed is False
+
+
+def test_no_commas_semicolons_ok():
+    assert check("Semicolons; are fine.", spec("no_commas")).passed is True
+
+
+# --- title (ported from IFEval detectable_format:title) ----------------------
+
+def test_title_present_passes():
+    assert check("<<My Great Title>>\nThe body.", spec("title")).passed is True
+
+
+def test_title_absent_fails():
+    assert check("No title here, just prose.", spec("title")).passed is False
+
+
+def test_title_empty_brackets_fails():
+    assert check("<< >> body", spec("title")).passed is False
+
+
+# --- end_phrase (ported from IFEval startend:end_checker) --------------------
+
+def test_end_phrase_correct_ending_passes():
+    assert check("A long answer. That's all folks.",
+                 spec("end_phrase", phrase="That's all folks.")).passed is True
+
+
+def test_end_phrase_wrong_ending_fails():
+    assert check("That's all folks. But wait, there is more.",
+                 spec("end_phrase", phrase="That's all folks.")).passed is False
+
+
+def test_end_phrase_tolerates_trailing_whitespace():
+    assert check("Some text. The end.   ",
+                 spec("end_phrase", phrase="The end.")).passed is True

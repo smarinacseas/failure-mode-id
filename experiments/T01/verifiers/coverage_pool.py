@@ -66,3 +66,43 @@ def no_placeholders(response: str, spec: dict) -> CheckResult:
     if hits:
         return CheckResult(False, f"unfilled placeholders: {hits}")
     return CheckResult(True, "no unfilled placeholders")
+
+
+# --- ported from IFEval (Apache-2.0; see NOTICE) -----------------------------
+# Semantics preserved; the langdetect "response is English" clause on the casing
+# checks is dropped (dependency-free reward path — our prompts are English).
+
+_TITLE_RE = re.compile(r"<<([^\n]+)>>")
+
+
+@register("casing")
+def casing(response: str, spec: dict) -> CheckResult:
+    mode = spec["mode"]
+    if mode == "upper":
+        ok = response.isupper()
+    elif mode == "lower":
+        ok = response.islower()
+    else:
+        raise ValueError(f"unknown casing mode: {mode!r} (expected 'upper'/'lower')")
+    return CheckResult(ok, f"casing {mode}: isupper={response.isupper()} islower={response.islower()}")
+
+
+@register("no_commas")
+def no_commas(response: str, spec: dict) -> CheckResult:
+    return (CheckResult(False, "response contains a comma") if "," in response
+            else CheckResult(True, "no commas"))
+
+
+@register("title")
+def title(response: str, spec: dict) -> CheckResult:
+    if any(m.strip() for m in _TITLE_RE.findall(response)):
+        return CheckResult(True, "non-empty <<title>> present")
+    return CheckResult(False, "no non-empty <<title>> present")
+
+
+@register("end_phrase")
+def end_phrase(response: str, spec: dict) -> CheckResult:
+    want = spec["phrase"].strip().lower()
+    if response.strip().strip('"').lower().endswith(want):
+        return CheckResult(True, "ends with the required phrase")
+    return CheckResult(False, f"does not end with {spec['phrase']!r}")

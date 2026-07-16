@@ -107,3 +107,60 @@ def test_exact_repetition_correct_count_passes():
 def test_exact_repetition_wrong_count_fails_and_reports_actual():
     r = check("thank you", spec("exact_repetition", phrase="thank you", count=2))
     assert r.passed is False and "1" in r.detail
+
+
+# --- keyword_frequency (ported from IFEval keywords:frequency) ---------------
+
+def test_keyword_frequency_exact_passes():
+    assert check("data data data points",
+                 spec("keyword_frequency", keyword="data", op="exact", n=3)).passed is True
+
+
+def test_keyword_frequency_word_boundary_excludes_substrings():
+    # "database" must NOT count as an occurrence of the word "data"
+    assert check("database has data once",
+                 spec("keyword_frequency", keyword="data", op="exact", n=1)).passed is True
+
+
+def test_keyword_frequency_off_by_one_fails():
+    assert check("data data",
+                 spec("keyword_frequency", keyword="data", op="exact", n=3)).passed is False
+
+
+def test_keyword_frequency_min_passes():
+    assert check("data data data",
+                 spec("keyword_frequency", keyword="data", op="min", n=2)).passed is True
+
+
+# --- paragraph_count (ported from IFEval length_constraints:number_paragraphs)
+
+def test_paragraph_count_exact_passes():
+    assert check("Para one.\n\nPara two.\n\nPara three.",
+                 spec("paragraph_count", op="exact", n=3)).passed is True
+
+
+def test_paragraph_count_single_newline_is_one_paragraph():
+    assert check("line one\nline two",
+                 spec("paragraph_count", op="exact", n=1)).passed is True
+
+
+def test_paragraph_count_off_by_one_fails():
+    assert check("Para one.\n\nPara two.",
+                 spec("paragraph_count", op="exact", n=3)).passed is False
+
+
+# --- caps_word_frequency (ported from IFEval change_case:capital_word_frequency)
+
+def test_caps_word_frequency_exact_passes():
+    # NASA, FBI are the two all-caps words (avoid "I"/"A", which also count)
+    assert check("We saw NASA and FBI today.",
+                 spec("caps_word_frequency", op="exact", n=2)).passed is True
+
+
+def test_caps_word_frequency_min_passes():
+    assert check("NASA FBI CIA", spec("caps_word_frequency", op="min", n=2)).passed is True
+
+
+def test_caps_word_frequency_none_fails_exact():
+    assert check("no caps words here",
+                 spec("caps_word_frequency", op="exact", n=2)).passed is False
