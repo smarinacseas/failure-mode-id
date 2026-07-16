@@ -80,8 +80,11 @@ def _and_list(items: list[str]) -> str:
     return f"{', '.join(items[:-1])}, and {items[-1]}"
 
 
-def _count_spec(rng: random.Random, type_name: str, lo: int, hi: int) -> dict:
-    op = rng.choice(["exact", "min", "max"])
+def _count_spec(rng: random.Random, type_name: str, lo: int, hi: int,
+                exact_p: float = 0.5) -> dict:
+    # exact counts are much harder than min/max; exact_p tunes how often we demand
+    # exact — calibrated 2026-07-15 to land the base model in the 30-70% band.
+    op = "exact" if rng.random() < exact_p else rng.choice(["min", "max"])
     return {"type": type_name, "op": op, "n": rng.randint(lo, hi)}
 
 
@@ -144,36 +147,35 @@ def gen_end_phrase(rng):
 # --- precision generators (CAUSE_B) ------------------------------------------
 
 def gen_word_count(rng):
-    spec = _count_spec(rng, "word_count", 60, 180)
+    spec = _count_spec(rng, "word_count", 60, 180, exact_p=0.0)  # exact word count ~impossible
     return (f"The response must contain {_count_phrase(spec['op'], spec['n'], 'words')}.",
             spec)
 
 
 def gen_sentence_count(rng):
-    # exact counts are the execution weak spot — the difficulty lever (calibration)
-    n = rng.randint(4, 9)
-    return (f"Write {_count_phrase('exact', n, 'sentences')}.",
-            {"type": "sentence_count", "op": "exact", "n": n})
+    # ~50% exact (hard), ~50% min/max — the execution weak spot, calibrated
+    spec = _count_spec(rng, "sentence_count", 4, 9)
+    return (f"Write {_count_phrase(spec['op'], spec['n'], 'sentences')}.", spec)
 
 
 def gen_paragraph_count(rng):
-    n = rng.randint(2, 5)
-    return (f"Structure the response into {_count_phrase('exact', n, 'paragraphs')}.",
-            {"type": "paragraph_count", "op": "exact", "n": n})
+    spec = _count_spec(rng, "paragraph_count", 2, 5)
+    return (f"Structure the response into {_count_phrase(spec['op'], spec['n'], 'paragraphs')}.",
+            spec)
 
 
 def gen_item_count(rng):
-    n = rng.randint(3, 7)
-    return (f"Include {_count_phrase('exact', n, 'bullet points')} "
+    spec = _count_spec(rng, "item_count", 3, 7)
+    return (f"Include {_count_phrase(spec['op'], spec['n'], 'bullet points')} "
             f"(lines beginning with '- ' or '1.').",
-            {"type": "item_count", "op": "exact", "n": n})
+            spec)
 
 
 def gen_keyword_frequency(rng):
     kw = rng.choice(FREQ_WORDS)
-    n = rng.randint(2, 4)
-    return (f"Use the word '{kw}' {_count_phrase('exact', n, 'times')}.",
-            {"type": "keyword_frequency", "keyword": kw, "op": "exact", "n": n})
+    spec = _count_spec(rng, "keyword_frequency", 2, 4)
+    spec["keyword"] = kw
+    return (f"Use the word '{kw}' {_count_phrase(spec['op'], spec['n'], 'times')}.", spec)
 
 
 def gen_caps_word_frequency(rng):
