@@ -104,24 +104,26 @@ export HF_HOME=/workspace/.hf
 
 The RunPod PyTorch template already ships a CUDA-matched `torch`. Use the pod's
 base `python`/`pip` (the repo's `uv run` convention is a local-Mac thing —
-`python main.py …` works anywhere the deps are installed). Install **vLLM first**
-(it pins torch/CUDA), then the rest:
+`python main.py …` works anywhere the deps are installed).
+
+**No vLLM.** Gate GT0 proved vLLM forces an incompatible torch/CUDA downgrade (a
+4-round spiral); training runs on stock `model.generate()`
+(`GRPOConfig(use_vllm=False)` — PREREG amendment 2026-07-16). Install the frozen
+GT0 lock directly — do **not** `pip install vllm`:
 
 ```bash
 # on the POD, in /workspace/failure-mode-id:
 python -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
-pip install -q vllm                                   # pins torch/CUDA; do this first
-pip install -q -r experiments/T01/requirements.txt    # trl, peft, transformers, stats…
+pip install -q -r requirements-t01.txt    # frozen GT0 lock — torch 2.5.1+cu121, trl 1.8.0, NO vllm
 ```
 
-If `pip install vllm` changes torch and CUDA then reports unavailable, that's the
-version-conflict the smoke test is designed to catch — see the note in
-`requirements.txt`.
+The frozen lock *is* the resolution of the earlier torch/CUDA/vLLM conflict — it
+reproduces the exact GT0-validated env; the smoke test (next step) revalidates it.
 
 ## 6 · Download weights + smoke test → **Gate GT0** (~5–10 min)
 
 The smoke test downloads Llama-3.2-3B (~6 GB, cached to `$HF_HOME`), runs 5
-generations, takes one LoRA step, and imports trl+vllm:
+generations, takes one LoRA step, and imports trl (vLLM intentionally absent):
 
 ```bash
 # on the POD, in /workspace/failure-mode-id:
@@ -165,6 +167,6 @@ OPENROUTER_API_KEY=…
 HF_TOKEN=…
 EOF
 export HF_TOKEN=$(grep HF_TOKEN .env | cut -d= -f2) HF_HOME=/workspace/.hf
-pip install -q vllm && pip install -q -r experiments/T01/requirements.txt
+pip install -q -r requirements-t01.txt     # frozen GT0 lock — NO vllm (see §5)
 python experiments/T01/smoke_test.py     # → GT0 SMOKE: PASS
 ```
