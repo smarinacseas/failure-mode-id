@@ -1,0 +1,32 @@
+# T01 training env — TRL stack (see PREREG.md §5; plan Phase T1.0).
+#
+# Install ON TOP OF a RunPod PyTorch 2.x / CUDA 12.x pod (torch already present).
+# vLLM is installed SEPARATELY in POD_SETUP.md because it pins torch/CUDA and a
+# bulk install can clobber the pod's working torch — do it deliberately, then
+# install this file. The Gate GT0 smoke test (smoke_test.py) is the env check:
+# if a version combination is incompatible it fails there, loudly, before any
+# spend on data-gen or training.
+#
+# Floors, not hard pins — trl>=0.15 is what carries GRPOTrainer; the rest track
+# it. If the smoke test flags a conflict, tighten the offending line and note it
+# in the run metadata (never adjust silently — PREREG §9).
+
+transformers>=4.48
+trl>=0.15            # SFTTrainer + GRPOTrainer (the RL arms live here)
+peft>=0.14           # LoRA r=16 a=32 attn+MLP, identical across all 4 arms
+accelerate>=1.2
+datasets>=3.2
+bitsandbytes>=0.45   # optional quantization (plan lists it; not required for a 3B on A100)
+
+huggingface_hub>=0.27
+openai>=1.59         # SFT teacher (Day 2) + Tier-2 judging via OpenRouter (reuse repo config.py)
+python-dotenv>=1.0
+
+# stats (Phase T1.6): McNemar, cluster bootstrap
+numpy>=1.26
+scipy>=1.13
+statsmodels>=0.14
+pandas>=2.2
+
+# vLLM is NOT listed here — install it first, matching the pod's torch:
+#   pip install vllm    (see POD_SETUP.md, step 6)
