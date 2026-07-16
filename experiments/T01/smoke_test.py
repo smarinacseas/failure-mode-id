@@ -71,10 +71,17 @@ def main() -> int:
     opt.zero_grad()
     print(f"  LoRA optimizer step OK (loss={loss.item():.3f})")
 
-    # 5. stack imports (installed, not exercised here — GRPO/vLLM run in T1.3+)
+    # 5. training/rollout stack. trl is the training core (required now); vllm is
+    #    only needed for T1.3 GRPO rollouts + T1.4 batched eval, so a missing vllm
+    #    is a NOTE, not a GT0 failure — the env is reproduced for T1.1–T1.2 either way.
     import trl
-    import vllm
-    print(f"trl {trl.__version__} | vllm {vllm.__version__}")
+    print(f"trl {trl.__version__}")
+    try:
+        import vllm
+        print(f"vllm {vllm.__version__}")
+    except Exception as e:  # noqa: BLE001
+        print(f"  NOTE: vllm not importable ({type(e).__name__}) — install it "
+              f"(matched to this torch) before T1.3: pip install vllm")
 
     print("GT0 SMOKE: PASS")
     return 0

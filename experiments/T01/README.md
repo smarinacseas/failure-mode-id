@@ -35,8 +35,8 @@ experiments/T01/
 ## Phase status
 
 - [x] **Gate E→T** — causes bound, PREREG committed.
-- [ ] **T1.0** — scaffolding + pod env → **Gate GT0** (env reproduces, smoke passes). ← *here*
-- [ ] T1.1 — verifier library → Gate GT1
+- [x] **T1.0** — scaffolding + pod env → **Gate GT0 PASSED** (training core validated on the A100; exact env locked in `/requirements-t01.txt`; vLLM still to install before T1.3).
+- [~] **T1.1** — verifier library → Gate GT1 (core coverage+precision pools + GRPO reward done, TDD; a `casing` verifier + the 20-hand-written-response check remain). ← *here*
 - [ ] T1.2 — data generation → Gate GT2
 - [ ] T1.3 — training (4 arms) → Gate GT3
 - [ ] T1.4 — Tier-1 eval → Gate GT4
