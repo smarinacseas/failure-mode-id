@@ -31,7 +31,11 @@ def _assemble(stem: str, texts: list[str], archetype: str) -> str:
 
 def compose_prompt(archetype: str, rng: random.Random, prompt_id: str | None = None) -> dict:
     if archetype == "coverage":
-        pool, k = COVERAGE_TYPES, rng.randint(7, len(COVERAGE_TYPES))
+        # 5-6 (was 7-8): GT2 teacher-yield kill-switch — a strong teacher can't
+        # reliably 100%-pass 7-8 all-or-nothing constraints (correlated fails on
+        # no_commas/casing). Per-criterion difficulty is ~k-independent, so the
+        # 3B calibration (~75%) holds while the teacher's all-pass yield rises.
+        pool, k = COVERAGE_TYPES, rng.randint(5, 6)
     elif archetype == "precision":
         pool, k = PRECISION_TYPES, rng.randint(3, 4)
     else:
