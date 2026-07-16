@@ -49,7 +49,14 @@ pool: start_phrase 7.5, keyword_include 38.6, end_phrase 47.3, keyword_exclude
 - Parity target_n recomputed = min(new coverage accepted, 270 precision); SFT
   manifests regenerated. (Down-sample amendment's target_n=204 is **superseded**.)
 - GRPO LR re-probed on the hardened coverage pool (the 7.5e-6 pick was made on the
-  easy pool): <pending — confirm or revise>.
+  easy pool): **7.5e-6 confirmed** — reward now starts ~0.48–0.51 (was 0.77; real
+  headroom), 7.5e-6 has the largest windowed reward gain (0.478→0.509) and lowest
+  end-std (0.124), KL bounded, format_ok 1.0, 0% cap-hit, ~232 tok/s, full 50
+  steps. NOTE: over 50 probe steps reward is roughly flat/noisy (not a clean climb
+  as on the easy pool) — ambiguous at probe scale (≪ the §9 150-step stall bar;
+  full coverage-RL run is ~300 steps) and directionally consistent with H1 (GRPO's
+  advantage predicted smaller for coverage). Watch against the §9 stall switch on
+  the full run.
 
 **Unchanged.** Estimand, hypotheses (§§3–4), sample sizes, seeds (§7), analysis
 (§6), precision pools/holdout/SFT, and the 2-epoch schedule. Coverage remains
