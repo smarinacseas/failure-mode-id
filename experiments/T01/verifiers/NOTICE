@@ -1,0 +1,29 @@
+This directory's verifier logic ports constraint-type semantics from IFEval
+(the Instruction-Following Eval), Copyright The Google Research Authors,
+licensed under the Apache License, Version 2.0
+(http://www.apache.org/licenses/LICENSE-2.0). The source it was ported from is
+vendored in this repo at data/verih/Eval/evals/ifeval/utils/instructions.py.
+
+Ported into coverage_pool.py / precision_pool.py (IFEval instruction id → our
+verifier type):
+  change_case:english_capital / english_lowercase   -> casing
+  punctuation:no_comma                              -> no_commas
+  detectable_format:title                           -> title
+  startend:end_checker                              -> end_phrase
+  keywords:frequency                                -> keyword_frequency
+  length_constraints:number_paragraphs              -> paragraph_count
+  change_case:capital_word_frequency                -> caps_word_frequency
+plus the semantics of keywords:existence/forbidden_words, detectable_content:
+number_placeholders, detectable_format:multiple_sections, and length_constraints:
+number_words/number_sentences (our keyword_include/exclude, no_placeholders,
+required_sections, word_count/sentence_count).
+
+Deliberate deviations from IFEval, to keep the on-pod GRPO reward path
+dependency-free (no nltk / langdetect):
+  1. the casing checks drop IFEval's langdetect "response is English" clause
+     (our composed prompts are English by construction);
+  2. caps_word_frequency uses a regex word tokenizer, not nltk.word_tokenize.
+
+NOT from IFEval — original checks for the E08 execution_slip / coverage failure
+modes: arithmetic_result (embedded computation whose result must appear) and
+ordering (items must appear in a required order).

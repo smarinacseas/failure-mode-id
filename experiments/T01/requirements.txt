@@ -1,0 +1,29 @@
+# T01 direct deps (human-readable "what we depend on"). The EXACT working env —
+# frozen on the A100 after Gate GT0 — is the lock at /requirements-t01.txt;
+# install THAT to reproduce (torch 2.5.1+cu121, trl 1.8.0, transformers 4.46.3,
+# peft 0.19.1, accelerate 1.14.0, …). Where this file and the lock differ, the
+# lock wins — these are floors, deliberately loose.
+#
+# Reproduce on a fresh pod (POD_SETUP.md): the RunPod PyTorch template supplies
+# torch+cu121; then `pip install -r requirements-t01.txt`. NOTE: vLLM is NOT in
+# the current lock — install it separately, matched to torch 2.5.1+cu121, before
+# T1.3 (GRPO rollouts) / T1.4 (batched eval).
+
+trl                  # SFT + GRPO trainers — resolved to 1.8.0 on the pod
+transformers         # pinned DOWN by trl 1.8.0 to 4.46.3 — do NOT force >=4.48
+peft                 # LoRA r=16 α=32 attn+MLP, identical across all 4 arms
+accelerate
+datasets
+bitsandbytes         # optional quantization (not needed for a 3B on A100)
+
+huggingface_hub
+openai               # SFT teacher (Day 2) + Tier-2 judging via OpenRouter
+python-dotenv
+
+# stats (Phase T1.6): McNemar, cluster bootstrap
+numpy
+scipy
+statsmodels
+pandas
+
+# vllm — install separately, matched to the pod's torch (see header); needed T1.3+

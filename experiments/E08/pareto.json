@@ -1,0 +1,205 @@
+{
+  "experiment": "E08-llama3-2-3b-cc75",
+  "candidate": "meta-llama/llama-3.2-3b-instruct",
+  "schema": "e08-pareto-1",
+  "generated_from": "dashboard/E08-llama3-2-3b-cc75.json (results schema 3.3, post truncation-repair)",
+  "verdict_basis": "panel (opus48 + gemini-pro + gpt56sol; Opus-4.8 tie-break; §0.3 policy)",
+  "diagnose_chain": [
+    "claude-fable-5",
+    "claude-opus-4-8"
+  ],
+  "diagnose_label_provenance": {
+    "claude-fable-5": 839,
+    "claude-opus-4-8": 43,
+    "note": "95.1% of labels from claude-fable-5; human hand-check deferred (see report)"
+  },
+  "truncation_repair": {
+    "applied": true,
+    "date": "2026-07-15",
+    "new_max_tokens": 8192,
+    "frozen_max_tokens": 1536,
+    "repaired_ids_finish_clean": 9,
+    "still_degenerate": [
+      "CIF-047",
+      "CIF-054",
+      "CIF-056"
+    ],
+    "note": "12 prompts hit the 1536 cap; 9 finish cleanly at 8192, 3 are genuine over-generation kept as degenerate_output"
+  },
+  "taxonomy_version": 1,
+  "n_criteria": 1559,
+  "n_passed": 677,
+  "n_failed_criteria": 882,
+  "criterion_pass_rate_pct": 43.43,
+  "full_prompt_pass_rate_pct": 0.0,
+  "pareto": [
+    {
+      "cause": "execution_slip",
+      "count": 321,
+      "share_pct": 36.39,
+      "archetype": "precision",
+      "by_instruction_type": {
+        "Negative": 94,
+        "Conditional": 59,
+        "Multistep": 117,
+        "Implicit": 51
+      },
+      "by_use_case": {
+        "Logistics, Scheduling & Event Planning": 172,
+        "Professional & Workplace Communication": 19,
+        "Data Processing, Formatting & Math": 114,
+        "Health, Dietary & Personal Care Planning": 1,
+        "Educational Planning & Curriculum Development": 12,
+        "Technical Design & Product Management": 3
+      },
+      "gate_e_t": "CAUSE_B"
+    },
+    {
+      "cause": "constraint_unaddressed",
+      "count": 254,
+      "share_pct": 28.8,
+      "archetype": "coverage",
+      "by_instruction_type": {
+        "Multistep": 73,
+        "Conditional": 94,
+        "Negative": 69,
+        "Implicit": 18
+      },
+      "by_use_case": {
+        "Professional & Workplace Communication": 43,
+        "Logistics, Scheduling & Event Planning": 102,
+        "Data Processing, Formatting & Math": 85,
+        "Health, Dietary & Personal Care Planning": 3,
+        "Educational Planning & Curriculum Development": 21
+      },
+      "gate_e_t": "CAUSE_A",
+      "note": "reasoning-off collapse of E07 never_surfaced + dropped (no trace to separate them)"
+    },
+    {
+      "cause": "constraint_misread",
+      "count": 127,
+      "share_pct": 14.4,
+      "archetype": "comprehension",
+      "by_instruction_type": {
+        "Multistep": 35,
+        "Conditional": 45,
+        "Negative": 32,
+        "Implicit": 15
+      },
+      "by_use_case": {
+        "Professional & Workplace Communication": 11,
+        "Logistics, Scheduling & Event Planning": 57,
+        "Data Processing, Formatting & Math": 40,
+        "Educational Planning & Curriculum Development": 14,
+        "Technical Design & Product Management": 5
+      }
+    },
+    {
+      "cause": "degenerate_output",
+      "count": 86,
+      "share_pct": 9.75,
+      "archetype": "decode/termination",
+      "by_instruction_type": {
+        "Implicit": 31,
+        "Negative": 26,
+        "Conditional": 24,
+        "Multistep": 5
+      },
+      "by_use_case": {
+        "Creative Writing": 7,
+        "Logistics, Scheduling & Event Planning": 25,
+        "Data Processing, Formatting & Math": 44,
+        "Professional & Workplace Communication": 5,
+        "Educational Planning & Curriculum Development": 5
+      },
+      "note": "86 labels: 32 in the 3 genuinely over-generating prompts (CIF-047/054/056, truncate at any budget), rest judge-perceived degeneracy in complete answers"
+    },
+    {
+      "cause": "input_misread",
+      "count": 73,
+      "share_pct": 8.28,
+      "archetype": "comprehension",
+      "by_instruction_type": {
+        "Conditional": 21,
+        "Negative": 30,
+        "Multistep": 15,
+        "Implicit": 7
+      },
+      "by_use_case": {
+        "Logistics, Scheduling & Event Planning": 23,
+        "Professional & Workplace Communication": 15,
+        "Data Processing, Formatting & Math": 31,
+        "Educational Planning & Curriculum Development": 3,
+        "Technical Design & Product Management": 1
+      }
+    },
+    {
+      "cause": "constraint_sacrificed",
+      "count": 16,
+      "share_pct": 1.81,
+      "archetype": "conflict-arbitration",
+      "by_instruction_type": {
+        "Conditional": 3,
+        "Multistep": 8,
+        "Negative": 5
+      },
+      "by_use_case": {
+        "Professional & Workplace Communication": 2,
+        "Logistics, Scheduling & Event Planning": 12,
+        "Technical Design & Product Management": 2
+      }
+    },
+    {
+      "cause": "other",
+      "count": 4,
+      "share_pct": 0.45,
+      "archetype": "other",
+      "by_instruction_type": {
+        "Multistep": 3,
+        "Negative": 1
+      },
+      "by_use_case": {
+        "Professional & Workplace Communication": 3,
+        "Educational Planning & Curriculum Development": 1
+      }
+    },
+    {
+      "cause": "judge_suspect",
+      "count": 1,
+      "share_pct": 0.11,
+      "archetype": "excluded",
+      "by_instruction_type": {
+        "Negative": 1
+      },
+      "by_use_case": {
+        "Professional & Workplace Communication": 1
+      },
+      "note": "excluded from interpretation (suspected benchmark bug)",
+      "excluded_from_interpretation": true
+    }
+  ],
+  "gate_e_t_binding": {
+    "status": "proposed — ratify in experiments/T01/PREREG.md at Gate E->T",
+    "CAUSE_A_coverage": {
+      "cause": "constraint_unaddressed",
+      "count": 254,
+      "share_pct": 28.8
+    },
+    "CAUSE_B_precision": {
+      "cause": "execution_slip",
+      "count": 321,
+      "share_pct": 36.39
+    },
+    "combined": {
+      "count": 575,
+      "share_pct": 65.19
+    },
+    "decision_rule": "top-two map cleanly onto coverage/precision archetypes; keeps H1 primary (no amendment)"
+  },
+  "caveats": [
+    "95.1% of labels (839/882) from a single classifier (claude-fable-5); human hand-check deferred.",
+    "reasoning off -> traces absent -> coverage failures collapse into constraint_unaddressed.",
+    "truncation repaired: 9/12 under-budgeted prompts re-drawn at 8192 and finish clean; 3 remain genuinely degenerate.",
+    "single candidate, single 75-prompt census; cross-family comparison to E07 is directional only."
+  ]
+}
