@@ -69,8 +69,16 @@ def make_dashboard():
         for _ in range(count):
             pid = f"P{n:03d}"
             # 8 criteria; the 3rd (1-based) carries a distinctive marker so the
-            # 1-based join can be pinned down.
-            criteria = [{"text": f"CRIT-{pid}-c{j}"} for j in range(1, 9)]
+            # 1-based join can be pinned down. Every row's criterion_index is
+            # "3", so criteria[2] is the joined criterion — it must be a
+            # consensus-FAIL for llama-3b (the join lands on a real failure).
+            criteria = [
+                {
+                    "text": f"CRIT-{pid}-c{j}",
+                    "results": {"llama-3b": {"pass": (j != 3)}},
+                }
+                for j in range(1, 9)
+            ]
             prompts.append({
                 "id": pid,
                 "prompt_text": f"PROMPT-TEXT-{pid} please schedule the shifts.",
@@ -267,6 +275,22 @@ def test_answer_key_shape(tmp_path):
     assert set(key["rows"].keys()) == {str(i) for i in range(1, 41)}
     sample_row = key["rows"]["1"]
     assert set(sample_row) == {"id", "criterion_index", "root_cause"}
+
+
+def test_build_aborts_when_join_lands_on_passing_criterion(tmp_path):
+    dash = make_dashboard()
+    # Force every joined criterion to a PASS — the 1-based consensus-FAIL
+    # invariant is now violated for all sampled rows, so build must abort.
+    for p in dash["prompts"]:
+        for crit in p["criteria"]:
+            crit["results"]["llama-3b"]["pass"] = True
+    responses = {r["id"]: r["response"] for r in make_responses(dash)}
+    with pytest.raises(hc.HandCheckError):
+        hc.build_worksheet(
+            dash, responses, rule="r", seed=20260715, out_dir=tmp_path / "hc",
+            expected_pool_sizes=FIXTURE_EXPECTED,
+            timestamp="2026-07-15T00:00:00+00:00",
+        )
 
 
 def test_build_refuses_to_overwrite(tmp_path):

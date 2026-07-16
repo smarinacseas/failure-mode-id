@@ -23,6 +23,15 @@ exists, so the labeller cannot tune the rule to the answers.
 
 Data source of record: dashboard/E08-llama3-2-3b-cc75.json (tracked).
 Integrity input: runs/E08-llama3-2-3b-cc75/responses/llama-3b.jsonl.
+
+Criterion indexing convention: failure_analysis rows carry a 1-based
+`criterion_index` (a string), so the join to the prompt's criterion list is
+`criteria[int(criterion_index) - 1]`. This is verified, not assumed — the
+1-based join lands on a consensus-FAIL criterion for all 882 real rows,
+whereas the 0-based reading lands on a fail for only 585. `build` re-asserts
+that invariant on every sampled row (see `assert_consensus_fail`) so the base
+convention is self-enforcing against future schema drift rather than a
+one-off investigation.
 """
 from __future__ import annotations
 
@@ -120,6 +129,15 @@ def response_for(row: dict, pidx: dict[str, dict]) -> str:
     return pidx[row["id"]]["responses"][MODEL]
 
 
+def criterion_pass_for(row: dict, pidx: dict[str, dict]):
+    """The consensus pass/fail for the joined (1-based) criterion, or None if
+    the results structure is absent."""
+    prompt = pidx[row["id"]]
+    idx = int(row["criterion_index"]) - 1
+    crit = prompt["criteria"][idx]
+    return crit.get("results", {}).get(MODEL, {}).get("pass")
+
+
 # --- Guards --------------------------------------------------------------
 
 def assert_pool_sizes(rows: list[dict], expected: dict[str, int] = EXPECTED_POOL_SIZES) -> None:
@@ -142,6 +160,31 @@ def assert_pool_sizes(rows: list[dict], expected: dict[str, int] = EXPECTED_POOL
 
 
 # --- Sample frame + integrity -------------------------------------------
+
+def assert_consensus_fail(sampled: list[dict], pidx: dict[str, dict]) -> None:
+    """Every sampled row's 1-based join must land on a consensus-FAIL criterion.
+
+    A row diagnoses a *failure*, so `criteria[int(criterion_index)-1]` must have
+    `results.llama-3b.pass is False`. Anything else (a pass, or a missing
+    results block) means the 1-based convention no longer holds for this export
+    — abort rather than build a worksheet against a mis-joined frame.
+    """
+    violations = []
+    for n, row in enumerate(sampled, start=1):
+        pass_val = criterion_pass_for(row, pidx)
+        if pass_val is not False:
+            violations.append(
+                f"row {n} (id={row['id']} criterion_index={row['criterion_index']} "
+                f"root_cause={row['root_cause']}): joined criterion pass={pass_val!r}"
+            )
+    if violations:
+        raise HandCheckError(
+            "Consensus-FAIL invariant broken — the 1-based criterion join no "
+            "longer lands on a failed criterion, so the index convention or the "
+            "dashboard export has drifted. Offending rows:\n  "
+            + "\n  ".join(violations)
+        )
+
 
 def build_frame(rows: list[dict]) -> dict[str, list[dict]]:
     """The three strata pools, each sorted by (id, criterion_index).
@@ -309,6 +352,10 @@ def build_worksheet(
 
     # 3. stratified sample
     sampled = stratified_sample(rows, seed=seed)
+
+    # 4. self-enforcing 1-based join check: every sampled row must land on a
+    #    consensus-FAIL criterion.
+    assert_consensus_fail(sampled, pidx)
 
     ts = timestamp or datetime.now(timezone.utc).isoformat()
     worksheet = render_worksheet(sampled, pidx, rule, seed, vocab, ts)
