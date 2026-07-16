@@ -9,8 +9,9 @@ training method**: is GRPO's advantage over SFT larger for precision failures
   `CAUSE_B`=precision 36.4%). Primary: `Interaction > 0` (H1).
 - **Pod setup:** [`POD_SETUP.md`](POD_SETUP.md) — RunPod A100 → Gate GT0.
 - **Plan of record:** `docs/superpowers/plans/2026-07-15-e08-t01-lamma.md` (Part II).
-- **Stack:** TRL (SFT + GRPO), PEFT LoRA (r=16, α=32, attn+MLP), vLLM rollouts,
-  on a single A100 80 GB.
+- **Stack:** TRL (SFT + GRPO), PEFT LoRA (r=16, α=32, attn+MLP), `generate()`
+  rollouts (**no vLLM** — GT0 env freeze; PREREG amendment 2026-07-16), on a
+  single A100 80 GB.
 
 ## Layout
 
@@ -18,7 +19,7 @@ training method**: is GRPO's advantage over SFT larger for precision failures
 experiments/T01/
   PREREG.md            pre-registration (frozen at Gate E→T)
   POD_SETUP.md         pod bring-up → Gate GT0
-  requirements.txt     TRL training stack (vLLM installed separately, see POD_SETUP)
+  requirements.txt     TRL training stack (frozen lock: /requirements-t01.txt; no vLLM)
   smoke_test.py        Gate GT0 env validator (load · 5 gens · 1 LoRA step · imports)
   config/              frozen per-phase configs
   verifiers/           check(response, spec) -> {pass, detail}; coverage + precision pools (T1.1)
@@ -35,7 +36,7 @@ experiments/T01/
 ## Phase status
 
 - [x] **Gate E→T** — causes bound, PREREG committed.
-- [x] **T1.0** — scaffolding + pod env → **Gate GT0 PASSED** (training core validated on the A100; exact env locked in `/requirements-t01.txt`; vLLM still to install before T1.3).
+- [x] **T1.0** — scaffolding + pod env → **Gate GT0 PASSED** (training core validated on the A100; exact env locked in `/requirements-t01.txt`; **no vLLM** — GRPO trains on `generate()`, PREREG amendment 2026-07-16).
 - [~] **T1.1** — verifier library → Gate GT1 (core coverage+precision pools + GRPO reward done, TDD; a `casing` verifier + the 20-hand-written-response check remain). ← *here*
 - [ ] T1.2 — data generation → Gate GT2
 - [ ] T1.3 — training (4 arms) → Gate GT3

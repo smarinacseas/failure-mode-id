@@ -206,4 +206,71 @@ record `{arm, prompt_id, decode_idx, cause_pool, criterion_id, pass}`.
 
 ## Amendment log (append-only; date every entry)
 
-*(none yet — the design above is frozen as of the Gate E→T commit)*
+### 2026-07-16 — T1.3 operational config, GT3 pass bar, and no-vLLM training backend
+
+**Context.** T1.3 execution on the rented A100 surfaced items the frozen design
+(§§3–7) and the Plan of Record (Part II — **local-only / gitignored under
+`docs/superpowers/`, not present on the training host**) did not fully pin down,
+plus one environment change forced at Gate GT0. Inlined here so this tracked
+PREREG is self-sufficient on the training host. **None of this alters the
+estimand, hypotheses, sample sizes, seeds, or analysis in §§3–7** — these are
+execution details and one speed-only backend change.
+
+**(a) GT3 pass bar (positive criterion; §9 gave only the failure kill-switch).**
+GT3 passes when **all four arms show learning**: SFT arms (SA, SB) — training
+loss clearly decreasing across the 2 epochs; GRPO arms (RA, RB) — mean batch
+reward trending up (NOT flat by ~150 steps). The §9 GRPO-stall kill-switch
+(→ both RL cells to RFT) is unchanged and remains the only sanctioned failure path.
+
+**(b) GRPO probe sweep — resolves the k-vs-sweep tension.** `num_generations`
+(k) is **frozen at 6** (§5 design table) and is **NOT** a sweep axis. The one
+per-*method* probe (~50 prompts, 3-hr cap) sweeps **LR only**, within the
+pre-registered GRPO range **5e-6–1e-5**; pick the LR with the healthiest reward
+trend, then freeze for both RL arms (no per-arm tuning). **KL/β is not
+pre-registered:** use the TRL GRPO default (β=0.04); change it only if the
+default run is unstable (reward collapse / KL blow-up), and if so freeze + log
+the value. (Supersedes an operator instruction that mistakenly listed
+`num_generations`/KL as sweep axes.)
+
+**(c) Implementation defaults absent from the §5 table (probe-validated, then
+frozen).** Execution parameters, not design; the interaction estimand is immune
+to them. Frozen once the probe confirms memory fit + stable training:
+- **LoRA (both methods, identical):** target_modules = all attention+MLP linears
+  (`q,k,v,o_proj`, `gate,up,down_proj`); lora_dropout 0.05; bias none.
+- **SFT:** **completion-only loss** (mask the user prompt; train on scaffold +
+  `===FINAL===` + answer per §5); max_seq_len 4096 (report token-length dist +
+  truncation rate at probe; bump to 8192 if truncation >1%); effective batch 16
+  (per-device 4 × grad-accum 4); LR 1e-4 cosine, warmup 0.03; bf16 + gradient
+  checkpointing.
+- **GRPO:** max_prompt_length 512; max_completion_length 1536 (must fit
+  scaffold+answer before `===FINAL===`; report cap-hit rate at probe); rollout
+  temp 0.9; β 0.04.
+- **Reward wiring:** grade `extract_final(completion)` with
+  `verifiers/reward.py::constraint_reward`. That fn is `(response, specs) ->
+  float`; TRL wants `(prompts, completions, **kwargs) -> list[float]`, so the
+  GRPO dataset carries a per-prompt `specs` column and the adapter returns
+  `[constraint_reward(extract_final(c), specs_i, max_chars=M) for c in
+  completions]`. `max_chars M` activates the pre-registered length cap; set from
+  the teacher-answer length distribution (dock genuine padding only), probe-tunable.
+- **Checkpoints/durability:** output_dir
+  `/workspace/failure-mode-id/results/adapters/T01-{arm}/` (persistent volume);
+  save every 50 steps + epoch end; save_total_limit 3; resume-safe state (per the
+  T01-pilot durable-checkpoint pattern).
+
+**(d) Training rollout backend — no vLLM (Gate GT0 environment freeze).** The
+GT0 dependency resolution produced a working, frozen training env (torch
+2.5.1+cu121, TRL 1.8.0, transformers 4.46.3, peft 0.19.1) in which **vLLM cannot
+be installed without forcing an incompatible torch/CUDA downgrade**. GRPO
+rollouts therefore run on the stock **`model.generate()`** backend
+(`GRPOConfig(use_vllm=False)`), optionally with
+`use_transformers_continuous_batching=True` (no vLLM). This **supersedes** the
+vLLM-rollout assumption in Part II §T1.0 and any training-side note predating
+GT0. **Speed-only — no effect on the sampling distribution, estimand, or any
+result** (generate() and vLLM draw from the same policy at temp 0.9). The Tier-1
+**eval** decode (§5, "via vLLM") is a **separate T1.4 concern**: if vLLM is used
+there it runs in an **isolated venv** never mixed into the training env, and may
+equally fall back to generate(). Decided at T1.4.
+
+**Provenance.** The Plan of Record named in the header (Part II) is a local-only
+planning artifact (gitignored under `docs/superpowers/`); its load-bearing T1.3
+values are inlined above so this tracked PREREG stands alone on the training host.

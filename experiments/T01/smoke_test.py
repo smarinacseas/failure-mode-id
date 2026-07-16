@@ -71,17 +71,18 @@ def main() -> int:
     opt.zero_grad()
     print(f"  LoRA optimizer step OK (loss={loss.item():.3f})")
 
-    # 5. training/rollout stack. trl is the training core (required now); vllm is
-    #    only needed for T1.3 GRPO rollouts + T1.4 batched eval, so a missing vllm
-    #    is a NOTE, not a GT0 failure — the env is reproduced for T1.1–T1.2 either way.
+    # 5. training stack. trl is the training core (required). vllm is NOT used for
+    #    training — GRPO rollouts run on model.generate() (use_vllm=False, PREREG
+    #    amendment 2026-07-16), and it can't coexist with this torch/CUDA pin anyway.
+    #    So a missing vllm is the EXPECTED state, not a GT0 failure.
     import trl
     print(f"trl {trl.__version__}")
     try:
         import vllm
-        print(f"vllm {vllm.__version__}")
+        print(f"vllm {vllm.__version__} (present, but unused in training)")
     except Exception as e:  # noqa: BLE001
-        print(f"  NOTE: vllm not importable ({type(e).__name__}) — install it "
-              f"(matched to this torch) before T1.3: pip install vllm")
+        print(f"  NOTE: vllm absent ({type(e).__name__}) — expected; training uses "
+              f"generate(), do NOT install vllm (it breaks the torch/CUDA pin)")
 
     print("GT0 SMOKE: PASS")
     return 0
