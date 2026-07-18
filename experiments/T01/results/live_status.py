@@ -326,9 +326,22 @@ def ra_gate_block(w: dict) -> list[str]:
                   f"mean(reward[41:50])={gate['mean_reward_41_50']}, **Δ={d:+.4f}** (clear positive slope). "
                   f"end-window std {gate['end_window_std']}.", ""]
         else:
-            L += [f"> **🛑 GATE RESULT — PAUSE (flat-or-declining).** mean(reward[1:10])={gate['mean_reward_1_10']} → "
-                  f"mean(reward[41:50])={gate['mean_reward_41_50']}, **Δ={d:+.4f}**. end-window std "
-                  f"{gate['end_window_std']}. Per the pre-committed rule, RA is halted for operator review.", ""]
+            ra = gate.get("robust_analysis", {})
+            L += [f"> **🛑 GATE RESULT — PAUSE (FLAT, no learning at 50-step scale).** The pre-committed window "
+                  f"delta is **Δ={d:+.4f}** (mean[1:10]={gate['mean_reward_1_10']} → mean[41:50]={gate['mean_reward_41_50']}), "
+                  f"but that is only **{abs(d)/gate['end_window_std']:.2f}× the noise SD** ({gate['end_window_std']}) — a "
+                  f"single-window artifact.", ">"]
+            if ra:
+                L += [f"> **Robust estimators over all 50 steps confirm flat:** OLS slope "
+                      f"**{ra['ols_slope_per_step']:+.5f}/step (t={ra['ols_t']})**; halves "
+                      f"mean[1:25]={ra['halves_mean_1_25']} vs mean[26:50]={ra['halves_mean_26_50']} "
+                      f"(**Δ{ra['halves_delta']:+.4f}**); overall mean {ra['overall_mean']} ± {ra['overall_std']}. "
+                      f"Not declining like the probe (Δ{ra['probe_reference_delta']}), but **not the clear positive "
+                      f"slope the rule requires to proceed.**", ">"]
+            L += [f"> **Action:** per the pre-committed *flat-or-declining → PAUSE* rule, **RA is halted at step 56; "
+                  f"checkpoint-50 preserved** (`results/adapters/T01-RA/checkpoint-50`), GPU freed. "
+                  f"⚠️ **Operator decision required before resuming.** (My watcher's naive `delta>0→proceed` label "
+                  f"was overridden — the rule needs a *clear* slope, not any positive delta.)", ""]
     elif w.get("gate_delta") is not None:
         d = w["gate_delta"]
         L += [f"> **Gate window forming (step {w['max_step']}/50):** interim "
@@ -389,7 +402,11 @@ def health_flags(arms: list[dict]) -> list[str]:
                 flags.append(f"⚠️ **{arm}: mean completion {lenN:.0f}** approaching cap {EXPECT['len_drift_hi']} (drift).")
     gate = read_json(LOGS / "RA_gate_step50.json")
     if gate and gate["suggested_verdict"].startswith("FLAT"):
-        flags.insert(0, f"🛑 **RA step-50 gate → PAUSE** (Δ={gate['delta']:+.4f}). Decision point — operator review required.")
+        ra = gate.get("robust_analysis", {})
+        flags.insert(0, f"🛑 **RA step-50 gate → PAUSE (FLAT — no learning at 50-step scale).** Window Δ={gate['delta']:+.4f} "
+                        f"is {abs(gate['delta'])/gate['end_window_std']:.2f}× noise; OLS slope {ra.get('ols_slope_per_step','?')}/step "
+                        f"(t={ra.get('ols_t','?')}), halves Δ{ra.get('halves_delta','?')}. **RA halted at step 56, checkpoint-50 "
+                        f"preserved, GPU freed. Operator decision required before resuming or moving to RB.**")
     elif gate:
         flags.insert(0, f"✅ **RA step-50 gate → PROCEED** (Δ={gate['delta']:+.4f}).")
     return flags or ["_None. All arms within expected ranges._"]
