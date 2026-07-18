@@ -24,6 +24,12 @@ Environment: A100-SXM4-80GB · torch 2.8.0+cu128 · trl 1.8.0 · transformers 5.
 - data: `data/train/{coverage,precision}.jsonl` (+ per-prompt `specs` JSON column)
 - **LR = 7.5e-6** (probe pick: steepest reward slope +0.00097/step AND lowest end-std 0.104;
   within pre-registered 5e-6–1e-5 range; frozen for BOTH RL arms, no per-arm tuning)
+  — **RE-CONFIRMED on the hardened coverage pool** (2026-07-16): the re-probe does not
+  discriminate (all 3 LRs flat/declining, within noise), so no revision; 7.5e-6 kept.
+  See `t1_3_grpo_probe.md` § "Re-probe on the HARDENED coverage pool".
+- **Pre-committed RA step-50 check** (committed before the real run): at step 50 of the real
+  RA run compute `mean(reward[0:10])` vs `mean(reward[40:50])`; if flat-or-declining, PAUSE
+  and report; if clear positive slope, proceed. Monitoring gate only — LR stays 7.5e-6.
 - backend: `GRPOConfig(use_vllm=False)` — stock `model.generate()` (amendment (d), no vLLM)
 - num_generations k=6 FROZEN (amendment (b), NOT swept) · rollout temp=0.9 · β=0.04 (TRL default)
 - max_completion_length=1536 (probe cap-hit = 0%) · reward length cap M=2800 chars

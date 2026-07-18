@@ -5,6 +5,15 @@
 
 ---
 
+> **Superseded in part (2026-07-16, same day) by the coverage recalibration.** The
+> coverage difficulty recal regenerated the coverage SFT pool, dropping coverage
+> accepted **204 → 123** and therefore `target_n` from min(204,270)=204 to
+> **min(123,270)=123 per cause**. This entry records the *original* T1.2 down-sample
+> decision and its regime-independent mechanism; the counts below (204 / 68% coverage
+> yield) are the **pre-recal** state. Operative manifests now: SA coverage 123/123,
+> SB precision 123/270 (seed 20260715). See
+> `DRAFT_amendment_2026-07-16_coverage-recal.md`.
+
 ### 2026-07-16 — SFT training-set down-sample to cross-cause parity
 
 **Decision, and when it was made.** Before any real-arm training (SA/SB/RA/RB)
@@ -40,5 +49,6 @@ draw from the same cause's data; only the SFT cell size is equalized across rows
 
 **Provenance.** Manifests: `data/sft_manifests/SA.json` (target_n 204, seed
 20260715, source yield 68.0%), `data/sft_manifests/SB.json` (target_n 204, seed
-20260715, source yield 90.0%). Generator + determinism/parity/isolation tests:
+20260715, source yield 90.0%) (pre-recal; current manifest files are SA 123/123, SB
+123/270). Generator + determinism/parity/isolation tests:
 `datagen/downsample_sft.py`, `datagen/test_downsample_sft.py`.

@@ -12,7 +12,11 @@ criterion-pass was **out of the PREREG §5 30–70% band**: 86.4% at the GRPO
 rollout regime (temp 0.9) and ~75% at the eval regime (temp 0.6) — measured
 before any real-arm training. Per the pre-committed T1.3 STOP rule (verifier
 component >0.70 ⇒ recalibrate before real arms), CAUSE_A is recalibrated.
-Precision (CAUSE_B) was in band (61.1% temp 0.9 / <pending>) and is **untouched**.
+Precision (CAUSE_B) was in band at the rollout regime (61.1% temp 0.9, k=6;
+`results/probe/base_difficulty.json`) — below the >0.70 recalibration trigger — so it
+is **untouched**. No temp-0.6 acceptance measurement is taken for precision: the
+acceptance-regime protocol (`recalibration_stopping_rule.md`) governs only the cause
+being recalibrated (coverage).
 
 **Stopping rule (committed before any acceptance number was read).** Acceptance
 regime = eval regime **temp 0.6, k=3, N=60, seed 20260715** (matches §5 Tier-1
@@ -45,18 +49,25 @@ pool: start_phrase 7.5, keyword_include 38.6, end_phrase 47.3, keyword_exclude
 
 **Downstream (forced by the recount).**
 - Coverage SFT teacher data **regenerated** from the new train pool (teacher_gen
-  --cause coverage). New accepted count = <pending> (was 204); GT2 yield re-checked.
-- Parity target_n recomputed = min(new coverage accepted, 270 precision); SFT
-  manifests regenerated. (Down-sample amendment's target_n=204 is **superseded**.)
+  --cause coverage). New accepted count = **123** (was 204); GT2 yield **41.0% —
+  PASS (≥30%)** (~3.0 attempts/prompt; teacher tokens 319.2k prompt + 1.455M completion).
+  Pre-recal 204-record file archived at `results/probe/coverage_sft_pre-recal_204.jsonl`.
+- Parity target_n recomputed = min(123 coverage, 270 precision) = **123** (was 204);
+  SFT manifests regenerated (SA coverage 123/123 identity, SB precision 123/270,
+  seed 20260715). The sft-parity amendment's target_n=204 is **superseded**.
 - GRPO LR re-probed on the hardened coverage pool (the 7.5e-6 pick was made on the
-  easy pool): **7.5e-6 confirmed** — reward now starts ~0.48–0.51 (was 0.77; real
-  headroom), 7.5e-6 has the largest windowed reward gain (0.478→0.509) and lowest
-  end-std (0.124), KL bounded, format_ok 1.0, 0% cap-hit, ~232 tok/s, full 50
-  steps. NOTE: over 50 probe steps reward is roughly flat/noisy (not a clean climb
-  as on the easy pool) — ambiguous at probe scale (≪ the §9 150-step stall bar;
-  full coverage-RL run is ~300 steps) and directionally consistent with H1 (GRPO's
-  advantage predicted smaller for coverage). Watch against the §9 stall switch on
-  the full run.
+  easy pool): **7.5e-6 re-confirmed, no revision** — reward now starts ~0.435 (was
+  ~0.77; real headroom), but the re-probe **does not discriminate**: on the hardened
+  pool all three LRs are flat-to-declining over 50 steps and within noise (windowed
+  Δ mean[40:50]−mean[0:10]: 5e-6 −0.018, 7.5e-6 −0.032, 1e-5 −0.037; windowed
+  end-std 0.196 / 0.202 / 0.188), so there is no signal to revise 7.5e-6 (mid-range,
+  single frozen LR both arms, no per-arm tuning). Health flag carried to the STOP
+  report: **no reward learning at the 50-step probe scale on hardened coverage**
+  (contrast the easy pool's +0.08 climb; length did not drift up). A **pre-committed
+  RA step-50 windowed-trend check** is added: at step 50 of the real RA run compute
+  mean(reward[0:10]) vs mean(reward[40:50]) — if flat-or-declining, PAUSE and report;
+  if clear positive slope, proceed. Full analysis + table: `t1_3_grpo_probe.md`
+  § "Re-probe on the HARDENED coverage pool".
 
 **Unchanged.** Estimand, hypotheses (§§3–4), sample sizes, seeds (§7), analysis
 (§6), precision pools/holdout/SFT, and the 2-epoch schedule. Coverage remains
