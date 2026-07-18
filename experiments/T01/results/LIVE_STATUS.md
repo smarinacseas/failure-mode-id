@@ -1,6 +1,6 @@
 # T1.3 — LIVE STATUS (auto-generated, read-only)
 
-_Generated: **2026-07-18 21:29:30 UTC** · batch start ≈ 2026-07-18 21:09:31 · source: `results/logs/` (volume) + `config/t1_3_frozen.md`. Regenerate: `python experiments/T01/results/live_status.py`._
+_Generated: **2026-07-18 21:39:14 UTC** · batch start ≈ 2026-07-18 21:09:31 · source: `results/logs/` (volume) + `config/t1_3_frozen.md`. Regenerate: `python experiments/T01/results/live_status.py`._
 
 > This file is regenerated at checkpoints (arm completion / gate fire), not by continuous polling — it reads training output only and never touches the training processes.
 
@@ -18,7 +18,7 @@ _Generated: **2026-07-18 21:29:30 UTC** · batch start ≈ 2026-07-18 21:09:31 �
 
 | arm | method · cause | status | step / total | elapsed | ETA | last loss/reward |
 |---|---|---|---|---|---|---|
-| **RA** | GRPO · coverage | 🟢 running | 18 / 300 (~300→cap) | 14m47s | 2h35m | 0.5232 (reward(last10)) |
+| **RA** | GRPO · coverage | 🟢 running | 30 / 300 (~300→cap) | 23m26s | 2h36m · ⚠️ 3h cap first — proj stop ≈step 238 (~1.59/2.0 ep) | 0.5353 (reward(last10)) |
 | **SA** | SFT · coverage | ✅ done | 16 / 16 | 0m54s | done | 1.6394 (loss) |
 | **SB** | SFT · precision | ✅ done | 16 / 16 | 0m28s | done | 2.1714 (loss) |
 | **RB** | GRPO · precision | ⚪ queued | 0 / 300 | 0m00s | — | — (reward(last10)) |
@@ -56,25 +56,32 @@ _Generated: **2026-07-18 21:29:30 UTC** · batch start ≈ 2026-07-18 21:09:31 �
 | window | steps | mean reward |
 |---|---|---|
 | first10 | 1–10 | 0.4944 |
-| last10 | 9–18 | 0.5232 |
-| **Δ** |  | **+0.0288** (rising) |
+| last10 | 21–30 | 0.5353 |
+| **Δ** |  | **+0.0409** (rising) |
 
 **Health metrics (last step / summary):**
 
 | metric | value |
 |---|---|
-| reward (last step, noisy — see windowed table above) | 0.5893 |
-| reward_std | 0.1131 |
-| kl | 0.0006462 |
+| reward (last step, noisy — see windowed table above) | 0.4345 |
+| reward_std | 0.2031 |
+| kl | 0.0004064 |
 | format_ok | 1.000 |
-| length drift (mean_len first→last) | 430→268 (cap 1536) |
-| cap-hit % (last / mean) | 0.0% / 1.9% |
+| length drift (mean_len first→last) | 430→490 (cap 1536) |
+| cap-hit % (last / mean) | 0.0% / 1.4% |
 | rollout tok/s | n/a until completion |
-| step_time (last) | 23.5s |
+| step_time (last) | 50.5s |
+
+**3h hardcap behavior + partial-run note.**
+> 🟠 **Truncation likely.** Honest projection (mean 45.0s/step; median 35.7s — GRPO step time is length-driven and bimodal, so mean is the correct estimator, not median): stops ≈**step 238/300 (~1.59 of 2.0 epochs)** at the 3h cap; 2 full epochs would need ≈47 min past the cap.
+>
+> **On truncation:** the `TimeBudget` callback sets `should_training_stop` at the first step past 10800s; the run then exits gracefully and `grpo.py` calls `save_model()` → a final adapter is written at the stop step (plus `save_steps=50` checkpoints at 50/100/150/200/250). The summary records `time_budget_hit=true` and the actual step count.
+>
+> **What "RA complete" then means:** an adapter trained ~1.7 (not 2.0) epochs — usable for eval, but **under-trained vs the frozen 2-epoch spec**. If RB (precision, shorter rollouts) finishes 2 full epochs, the GRPO 'dose' differs across causes → a confound on the method×cause interaction (the analog of the SFT teacher-yield asymmetry already equalized by down-sampling). **Decision point for the operator:** (a) let RA run to 2 full epochs (relax cap ~47 min), (b) cap both GRPO arms at a common step count for symmetry, or (c) accept partial + log the deviation and caveat the coverage arm.
 
 #### 🔺 RA step-50 windowed-trend gate (pre-committed decision point)
 
-> **Gate pending** — needs step 50 (currently 18/50). Probe reference on this hardened pool was Δ=−0.032 (declining), so a PAUSE is plausible.
+> **Gate pending** — needs step 50 (currently 30/50). Probe reference on this hardened pool was Δ=−0.032 (declining), so a PAUSE is plausible.
 
 ### RB — GRPO · precision
 
@@ -84,7 +91,7 @@ _no reward rows yet._
 
 ## 4 · Flags / health
 
-- _None. All arms within expected ranges._
+- 🟠 **RA: PARTIAL-RUN RISK — the 3h hardcap will likely truncate before 2 full epochs.** At the honest mean pace 45.0s/step (median 35.7s — steps are length-driven & bimodal, ~100s on long-completion batches vs ~30s on short), RA projects to stop ≈step 238/300 (**~1.59 of 2.0 epochs**); reaching 300 would need ≈47 min past the cap. The adapter still saves at the cap (`save_model` + `save_steps=50` checkpoints) so it's usable but under-trained vs the 2-epoch spec. **Analysis impact: if RB (precision, shorter rollouts) completes 2 full epochs, RA↔RB training dose is unequal → confounds the GRPO×cause interaction.** Operator decision needed — see RA diagnostics note.
 
 ---
 

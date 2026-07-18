@@ -140,24 +140,34 @@ def classify(a: dict) -> dict:
         else:
             status, note = "RUNNING", ""
 
-    # s/step from median inter-step elapsed delta (skip warmup step 1).
+    # s/step from inter-step elapsed deltas (skip warmup step 1). GRPO step time is
+    # length-driven and bimodal (periodic long-completion batches ≈3-5x the median),
+    # so the MEAN is the honest estimator for "finishes in budget" (total wall ≈ n·mean);
+    # the median alone under-projects the cap. Report both, project on the mean.
     deltas = []
     ss = sorted((r["step"], r.get("elapsed_s")) for r in metric_rows if "step" in r and r.get("elapsed_s") is not None)
     for (s0, e0), (s1, e1) in zip(ss, ss[1:]):
         if s1 > s0 and s1 > 1:
             deltas.append((e1 - e0) / (s1 - s0))
-    s_per_step = st.median(deltas) if deltas else None
+    s_med = st.median(deltas) if deltas else None
+    s_mean = st.mean(deltas) if deltas else None
+    s_proj = s_mean  # conservative
 
     total = a["total_steps"]
+    steps_per_epoch = max(total // 2, 1)
     remaining = max(total - cur_step, 0)
-    eta = remaining * s_per_step if s_per_step else None
+    eta = remaining * s_proj if s_proj else None
     cap_note = ""
-    if a["budget_s"] and s_per_step and status.startswith("RUNNING"):
+    trunc = None
+    if a["budget_s"] and s_proj and status.startswith("RUNNING"):
         budget_left = a["budget_s"] - elapsed
-        if eta is not None and eta > budget_left:
-            cap_step = cur_step + int(budget_left / s_per_step)
-            eta = budget_left
-            cap_note = f"3h cap first — stops ≈step {cap_step}"
+        proj_stop = cur_step + int(budget_left / s_proj)
+        if proj_stop < total:
+            eta = max(budget_left, 0)
+            over_min = round((total - proj_stop) * s_proj / 60)
+            trunc = {"proj_stop": proj_stop, "proj_epochs": round(proj_stop / steps_per_epoch, 2),
+                     "s_mean": round(s_proj, 1), "s_med": round(s_med, 1), "over_min": over_min}
+            cap_note = f"⚠️ 3h cap first — proj stop ≈step {proj_stop} (~{trunc['proj_epochs']}/2.0 ep)"
 
     last = max(metric_rows, key=lambda r: r.get("step", -1)) if metric_rows else {}
     last_val = None
@@ -179,9 +189,10 @@ def classify(a: dict) -> dict:
             last_val = w.get("last10")
 
     return {**a, "rows": rows, "metric_rows": metric_rows, "cur_step": cur_step,
-            "elapsed": elapsed, "s_per_step": s_per_step, "eta": eta, "cap_note": cap_note,
+            "elapsed": elapsed, "eta": eta, "cap_note": cap_note,
             "status": status, "note": note, "summary": summary, "last_val": last_val,
-            "last_kind": last_kind, "adapter": adapter}
+            "last_kind": last_kind, "adapter": adapter, "trunc": trunc,
+            "s_med": s_med, "s_mean": s_mean}
 
 
 # ---------- diagnostics rendering ----------
@@ -274,6 +285,31 @@ def grpo_diag(a: dict) -> list[str]:
           f"| rollout tok/s | {tok_s} |" if tok_s else "| rollout tok/s | n/a until completion |",
           f"| step_time (last) | {last.get('step_time', float('nan')):.1f}s |" if last.get("step_time") else "| step_time | — |",
           ""]
+    if a.get("budget_s"):
+        t = a.get("trunc")
+        L += ["**3h hardcap behavior + partial-run note.**"]
+        if t:
+            L += [f"> 🟠 **Truncation likely.** Honest projection (mean {t['s_mean']}s/step; median {t['s_med']}s — "
+                  f"GRPO step time is length-driven and bimodal, so mean is the correct estimator, not median): "
+                  f"stops ≈**step {t['proj_stop']}/{a['total_steps']} (~{t['proj_epochs']} of 2.0 epochs)** at the "
+                  f"3h cap; 2 full epochs would need ≈{t['over_min']} min past the cap.",
+                  ">",
+                  "> **On truncation:** the `TimeBudget` callback sets `should_training_stop` at the first step "
+                  "past 10800s; the run then exits gracefully and `grpo.py` calls `save_model()` → a final adapter "
+                  "is written at the stop step (plus `save_steps=50` checkpoints at 50/100/150/200/250). The summary "
+                  "records `time_budget_hit=true` and the actual step count.",
+                  ">",
+                  "> **What \"RA complete\" then means:** an adapter trained ~1.7 (not 2.0) epochs — usable for eval, "
+                  "but **under-trained vs the frozen 2-epoch spec**. If RB (precision, shorter rollouts) finishes 2 "
+                  "full epochs, the GRPO 'dose' differs across causes → a confound on the method×cause interaction "
+                  "(the analog of the SFT teacher-yield asymmetry already equalized by down-sampling). **Decision "
+                  "point for the operator:** (a) let RA run to 2 full epochs (relax cap ~{over} min), (b) cap both "
+                  "GRPO arms at a common step count for symmetry, or (c) accept partial + log the deviation and "
+                  "caveat the coverage arm.".replace("{over}", str(t["over_min"])), ""]
+        else:
+            L += ["> On current pace RA is projected to reach the full step count within the 3h cap. If pace "
+                  "slows (length drift up), truncation risk returns — this note will flip to 🟠. At any cap-stop the "
+                  "adapter still saves (`save_model` + `save_steps=50`).", ""]
     if a["arm"] == "RA":
         L += ra_gate_block(w)
     return L
@@ -319,7 +355,18 @@ def health_flags(arms: list[dict]) -> list[str]:
                 flags.append(f"🛑 **{arm}: traceback in stdout** while not marked DONE.")
         if a["status"] in ("FAILED?", "RUNNING?"):
             flags.append(f"⚠️ **{arm}: {a['status']}** — {a['note']}.")
-        if a["cap_note"]:
+        if a.get("trunc"):
+            t = a["trunc"]
+            flags.append(
+                f"🟠 **{arm}: PARTIAL-RUN RISK — the 3h hardcap will likely truncate before 2 full epochs.** "
+                f"At the honest mean pace {t['s_mean']}s/step (median {t['s_med']}s — steps are length-driven & "
+                f"bimodal, ~100s on long-completion batches vs ~30s on short), RA projects to stop ≈step "
+                f"{t['proj_stop']}/{a['total_steps']} (**~{t['proj_epochs']} of 2.0 epochs**); reaching 300 would "
+                f"need ≈{t['over_min']} min past the cap. The adapter still saves at the cap (`save_model` + "
+                f"`save_steps=50` checkpoints) so it's usable but under-trained vs the 2-epoch spec. **Analysis "
+                f"impact: if RB (precision, shorter rollouts) completes 2 full epochs, RA↔RB training dose is "
+                f"unequal → confounds the GRPO×cause interaction.** Operator decision needed — see RA diagnostics note.")
+        elif a["cap_note"]:
             flags.append(f"⏱️ **{arm}: {a['cap_note']}** (approaching 3h hardcap).")
         if a["method"] == "GRPO":
             w = grpo_windows(a["metric_rows"])
