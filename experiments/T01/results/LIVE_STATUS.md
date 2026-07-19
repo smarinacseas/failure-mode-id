@@ -1,6 +1,6 @@
 # T1.3 — LIVE STATUS (auto-generated, read-only)
 
-_Generated: **2026-07-19 06:31:11 UTC** · batch start ≈ 2026-07-18 21:09:31 · source: `results/logs/` (volume) + `config/t1_3_frozen.md`. Regenerate: `python experiments/T01/results/live_status.py`._
+_Generated: **2026-07-19 06:34:22 UTC** · batch start ≈ 2026-07-18 21:09:31 · source: `results/logs/` (volume) + `config/t1_3_frozen.md`. Regenerate: `python experiments/T01/results/live_status.py`._
 
 > This file is regenerated at checkpoints (arm completion / gate fire), not by continuous polling — it reads training output only and never touches the training processes.
 
@@ -9,7 +9,7 @@ _Generated: **2026-07-19 06:31:11 UTC** · batch start ≈ 2026-07-18 21:09:31 �
 ## 1 · Run header
 
 - **Frozen config** (`config/t1_3_frozen.md`): SFT LR **1e-4** (cosine, 2 ep) · GRPO LR **7.5e-6** · k=**6** (frozen) · rollout temp 0.9 · β 0.04 · seed **20260715** · 2 epochs · identical LoRA (r16/α32) all arms.
-- **Running:** —  ·  **Queued:** RB  ·  **Done:** SA, SB, RA
+- **Running:** RB  ·  **Queued:** —  ·  **Done:** SA, SB, RA
 - **Estimand:** method (SFT vs GRPO) × cause (coverage vs precision). SA/RA = coverage, SB/RB = precision.
 
 ---
@@ -18,10 +18,10 @@ _Generated: **2026-07-19 06:31:11 UTC** · batch start ≈ 2026-07-18 21:09:31 �
 
 | arm | method · cause | status | step / total | elapsed | ETA | last loss/reward |
 |---|---|---|---|---|---|---|
+| **RB** | GRPO · precision | 🟢 running | 5 / 300 (~300→cap) | 1m41s | 1h36m | 0.4833 (reward(last10)) |
 | **SA** | SFT · coverage | ✅ done | 16 / 16 | 0m54s | done | 1.6394 (loss) |
 | **SB** | SFT · precision | ✅ done | 16 / 16 | 0m28s | done | 2.1714 (loss) |
 | **RA** | GRPO · coverage | ✅ done | 300 / 300 | 1h42m | done | 0.6746 (reward(final)) |
-| **RB** | GRPO · precision | ⚪ queued | 0 / 300 | 0m00s | — | — (reward(last10)) |
 
 ---
 
@@ -91,7 +91,29 @@ _Generated: **2026-07-19 06:31:11 UTC** · batch start ≈ 2026-07-18 21:09:31 �
 
 ### RB — GRPO · precision
 
-_no reward rows yet._
+**Windowed reward (first10 vs last10 — probe methodology, not single-endpoint):**
+
+| window | steps | mean reward |
+|---|---|---|
+| first10 | 1–10 | 0.4833 |
+| last10 | 1–5 | 0.4833 |
+| **Δ** |  | **+0.0000** (flat/declining) |
+
+**Health metrics (last step / summary):**
+
+| metric | value |
+|---|---|
+| reward (last step, noisy — see windowed table above) | 0.3542 |
+| reward_std | 0.1709 |
+| kl | 0.0006031 |
+| format_ok | 1.000 |
+| length drift (mean_len first→last) | 229→322 (cap 1536) |
+| cap-hit % (last / mean) | 0.0% / 0.0% |
+| rollout tok/s | n/a until completion |
+| step_time (last) | 29.4s |
+
+**3h hardcap behavior + partial-run note.**
+> On current pace RA is projected to reach the full step count within the 3h cap. If pace slows (length drift up), truncation risk returns — this note will flip to 🟠. At any cap-stop the adapter still saves (`save_model` + `save_steps=50`).
 
 ---
 
@@ -108,6 +130,6 @@ _no reward rows yet._
 | SA | ✅ `results/adapters/T01-SA/` | `results/logs/sft_SA_coverage.jsonl` | `RUN_SA.md` (SFT) |
 | SB | ✅ `results/adapters/T01-SB/` | `results/logs/sft_SB_precision.jsonl` | `RUN_SB.md` (SFT) |
 | RA | ✅ `results/adapters/T01-RA/` | `results/logs/grpo_RA_coverage.jsonl` | `results/logs/grpo_RA_coverage_summary.json` |
-| RB | — `results/adapters/T01-RB/` | — | — |
+| RB | — `results/adapters/T01-RB/` | `results/logs/grpo_RB_precision.jsonl` | — |
 
 _Gate JSON: `results/logs/RA_gate_step50.json` (present)._
