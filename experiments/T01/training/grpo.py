@@ -65,6 +65,10 @@ def main():
     ap.add_argument("--max-chars", type=int, default=MAX_CHARS)
     ap.add_argument("--max-completion-length", type=int, default=MAX_COMPLETION_LENGTH)
     ap.add_argument("--time-budget-sec", type=float, default=None)
+    ap.add_argument("--max-steps", type=int, default=None,
+                    help="hard step ceiling (overrides epochs); e.g. 150 for the §9 checkpoint")
+    ap.add_argument("--resume-from-checkpoint", default=None,
+                    help="path to a checkpoint-N dir to resume optimizer/scheduler/RNG/step from")
     ap.add_argument("--continuous-batching", action="store_true")
     ap.add_argument("--logging-steps", type=int, default=1)
     ap.add_argument("--seed", type=int, default=20260715)
@@ -91,6 +95,7 @@ def main():
     cfg = GRPOConfig(
         output_dir=out_dir,
         num_train_epochs=args.epochs,
+        max_steps=args.max_steps if args.max_steps else -1,
         per_device_train_batch_size=PER_DEVICE_BS,
         gradient_accumulation_steps=GRAD_ACCUM,
         num_generations=NUM_GENERATIONS,
@@ -140,7 +145,7 @@ def main():
     policy = getattr(getattr(trainer.model, "base_model", trainer.model), "model", trainer.model)
     meter.attach(policy)
 
-    result = trainer.train()
+    result = trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
     trainer.save_model(out_dir)
 
     tail = _tail_metrics(trainer.state.log_history,

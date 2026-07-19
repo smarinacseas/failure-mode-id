@@ -29,7 +29,7 @@ OUT = REPO / "experiments" / "T01" / "results" / "LIVE_STATUS.md"
 ARMS = [
     {"arm": "SA", "method": "SFT",  "cause": "coverage",  "tag": "sft_SA_coverage",  "total_steps": 16,  "n": 123, "budget_s": None},
     {"arm": "SB", "method": "SFT",  "cause": "precision", "tag": "sft_SB_precision", "total_steps": 16,  "n": 123, "budget_s": None},
-    {"arm": "RA", "method": "GRPO", "cause": "coverage",  "tag": "grpo_RA_coverage", "total_steps": 300, "n": 300, "budget_s": 10800},
+    {"arm": "RA", "method": "GRPO", "cause": "coverage",  "tag": "grpo_RA_coverage", "total_steps": 150, "n": 300, "budget_s": 10800},  # resumed to the §9 checkpoint (max_steps=150) after the flat step-50 gate
     {"arm": "RB", "method": "GRPO", "cause": "precision", "tag": "grpo_RB_precision","total_steps": 300, "n": 300, "budget_s": 10800},
 ]
 
@@ -147,7 +147,9 @@ def classify(a: dict) -> dict:
     deltas = []
     ss = sorted((r["step"], r.get("elapsed_s")) for r in metric_rows if "step" in r and r.get("elapsed_s") is not None)
     for (s0, e0), (s1, e1) in zip(ss, ss[1:]):
-        if s1 > s0 and s1 > 1:
+        # require a POSITIVE elapsed delta: a resume restarts the CSVLogger clock, so the
+        # step across a resume boundary shows a negative jump — drop it (and any absurd outlier).
+        if s1 > s0 and s1 > 1 and 0 < (e1 - e0) < 3600:
             deltas.append((e1 - e0) / (s1 - s0))
     s_med = st.median(deltas) if deltas else None
     s_mean = st.mean(deltas) if deltas else None
@@ -338,10 +340,16 @@ def ra_gate_block(w: dict) -> list[str]:
                       f"(**Δ{ra['halves_delta']:+.4f}**); overall mean {ra['overall_mean']} ± {ra['overall_std']}. "
                       f"Not declining like the probe (Δ{ra['probe_reference_delta']}), but **not the clear positive "
                       f"slope the rule requires to proceed.**", ">"]
-            L += [f"> **Action:** per the pre-committed *flat-or-declining → PAUSE* rule, **RA is halted at step 56; "
-                  f"checkpoint-50 preserved** (`results/adapters/T01-RA/checkpoint-50`), GPU freed. "
-                  f"⚠️ **Operator decision required before resuming.** (My watcher's naive `delta>0→proceed` label "
-                  f"was overridden — the rule needs a *clear* slope, not any positive delta.)", ""]
+            L += [f"> **Action:** per the pre-committed *flat-or-declining → PAUSE* rule, RA was halted at step 56; "
+                  f"checkpoint-50 preserved. (My watcher's naive `delta>0→proceed` label was overridden — the rule "
+                  f"needs a *clear* slope, not any positive delta.)"]
+            dec = gate.get("operator_decision")
+            if dec:
+                L += [">", f"> ✅ **Operator decision:** {dec} **Resumed from checkpoint-50 → running to step 150; "
+                      f"the §9 GRPO-stall kill-switch adjudicates there** (reward trending up by ~150 → continue; "
+                      f"still flat → both RL cells to RFT).", ""]
+            else:
+                L += [">", "> ⚠️ **Operator decision required before resuming.**", ""]
     elif w.get("gate_delta") is not None:
         d = w["gate_delta"]
         L += [f"> **Gate window forming (step {w['max_step']}/50):** interim "
@@ -403,10 +411,15 @@ def health_flags(arms: list[dict]) -> list[str]:
     gate = read_json(LOGS / "RA_gate_step50.json")
     if gate and gate["suggested_verdict"].startswith("FLAT"):
         ra = gate.get("robust_analysis", {})
-        flags.insert(0, f"🛑 **RA step-50 gate → PAUSE (FLAT — no learning at 50-step scale).** Window Δ={gate['delta']:+.4f} "
-                        f"is {abs(gate['delta'])/gate['end_window_std']:.2f}× noise; OLS slope {ra.get('ols_slope_per_step','?')}/step "
-                        f"(t={ra.get('ols_t','?')}), halves Δ{ra.get('halves_delta','?')}. **RA halted at step 56, checkpoint-50 "
-                        f"preserved, GPU freed. Operator decision required before resuming or moving to RB.**")
+        if gate.get("operator_decision"):
+            flags.insert(0, f"🔄 **RA step-50 gate read FLAT (OLS slope {ra.get('ols_slope_per_step','?')}/step, t={ra.get('ols_t','?')}); "
+                            f"operator resumed to the §9 checkpoint (step 150).** If reward is still flat by ~150, the §9 "
+                            f"GRPO-stall kill-switch converts both RL cells to RFT; if trending up, RA continues. Watch this space.")
+        else:
+            flags.insert(0, f"🛑 **RA step-50 gate → PAUSE (FLAT — no learning at 50-step scale).** Window Δ={gate['delta']:+.4f} "
+                            f"is {abs(gate['delta'])/gate['end_window_std']:.2f}× noise; OLS slope {ra.get('ols_slope_per_step','?')}/step "
+                            f"(t={ra.get('ols_t','?')}), halves Δ{ra.get('halves_delta','?')}. **RA halted at step 56, checkpoint-50 "
+                            f"preserved, GPU freed. Operator decision required before resuming or moving to RB.**")
     elif gate:
         flags.insert(0, f"✅ **RA step-50 gate → PROCEED** (Δ={gate['delta']:+.4f}).")
     return flags or ["_None. All arms within expected ranges._"]

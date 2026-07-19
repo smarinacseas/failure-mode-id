@@ -44,7 +44,21 @@ probe scale on hardened coverage") on the real run.
 - Gate record: `results/logs/RA_gate_step50.json` (with robust_analysis); live log
   `results/logs/grpo_RA_coverage.{jsonl,csv}`; pause marker `results/logs/RA.status`.
 
-## ⚠️ Operator decision required (RA not resumed; RB not started)
+## Operator decision (2026-07-19): RESUME to the §9 checkpoint (~150 steps)
 
-This is a substantive decision point, not a mechanical retry. Options — see the report / my
-message for the full trade-offs. Nothing further runs until the operator chooses.
+The step-50 gate was the *early warning*; the pre-registered failure path is the **§9
+GRPO-stall kill-switch at ~150 steps** (reward not trending up by ~150 → both RL cells → RFT).
+50 steps may be too short to detect learning (the frozen config itself flags "no reward
+learning *at the 50-step scale*"). So RA is resumed to let §9 adjudicate:
+
+- **Resumed from `checkpoint-50`** (clean HF resume — optimizer.pt / scheduler.pt / rng_state.pth /
+  global_step 50 all restored; LR stays constant **7.5e-6**, past warmup). Runner gained
+  `--resume-from-checkpoint` + `--max-steps` (execution-only, estimand-neutral).
+- **`--max-steps 150`** → runs steps 51→150 then stops cleanly (save_model + summary). At ~40s/step
+  this is ~65 min; well inside the 3h cap, so **no truncation risk for this phase**.
+- Live log rebuilt to a continuous 1→150 trajectory (steps 1–50 from the original run that produced
+  checkpoint-50; discarded 51–56 archived to `grpo_RA_coverage_pre-resume_raw.jsonl`).
+
+**Next decision at step 150 (§9):** if reward is trending up → RA continues toward completion; if
+still flat → the §9 kill-switch converts **both** RL cells (RA, RB) from GRPO to RFT. I will report
+the §9 read and confirm before any RFT conversion.

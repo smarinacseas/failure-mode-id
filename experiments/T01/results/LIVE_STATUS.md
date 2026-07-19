@@ -1,6 +1,6 @@
 # T1.3 — LIVE STATUS (auto-generated, read-only)
 
-_Generated: **2026-07-18 22:00:34 UTC** · batch start ≈ 2026-07-18 21:09:31 · source: `results/logs/` (volume) + `config/t1_3_frozen.md`. Regenerate: `python experiments/T01/results/live_status.py`._
+_Generated: **2026-07-19 03:33:32 UTC** · batch start ≈ 2026-07-18 21:09:31 · source: `results/logs/` (volume) + `config/t1_3_frozen.md`. Regenerate: `python experiments/T01/results/live_status.py`._
 
 > This file is regenerated at checkpoints (arm completion / gate fire), not by continuous polling — it reads training output only and never touches the training processes.
 
@@ -9,7 +9,7 @@ _Generated: **2026-07-18 22:00:34 UTC** · batch start ≈ 2026-07-18 21:09:31 �
 ## 1 · Run header
 
 - **Frozen config** (`config/t1_3_frozen.md`): SFT LR **1e-4** (cosine, 2 ep) · GRPO LR **7.5e-6** · k=**6** (frozen) · rollout temp 0.9 · β 0.04 · seed **20260715** · 2 epochs · identical LoRA (r16/α32) all arms.
-- **Running:** —  ·  **Queued:** RB  ·  **Done:** SA, SB
+- **Running:** RA  ·  **Queued:** RB  ·  **Done:** SA, SB
 - **Estimand:** method (SFT vs GRPO) × cause (coverage vs precision). SA/RA = coverage, SB/RB = precision.
 
 ---
@@ -18,7 +18,7 @@ _Generated: **2026-07-18 22:00:34 UTC** · batch start ≈ 2026-07-18 21:09:31 �
 
 | arm | method · cause | status | step / total | elapsed | ETA | last loss/reward |
 |---|---|---|---|---|---|---|
-| **RA** | GRPO · coverage | ⏸️ PAUSED | 57 / 300 | 44m08s | — | 0.5278 (reward(last10)) |
+| **RA** | GRPO · coverage | 🟢 running | 53 / 150 (~150→cap) | 39m44s | 1h15m | 0.5187 (reward(last10)) |
 | **SA** | SFT · coverage | ✅ done | 16 / 16 | 0m54s | done | 1.6394 (loss) |
 | **SB** | SFT · precision | ✅ done | 16 / 16 | 0m28s | done | 2.1714 (loss) |
 | **RB** | GRPO · precision | ⚪ queued | 0 / 300 | 0m00s | — | — (reward(last10)) |
@@ -56,21 +56,21 @@ _Generated: **2026-07-18 22:00:34 UTC** · batch start ≈ 2026-07-18 21:09:31 �
 | window | steps | mean reward |
 |---|---|---|
 | first10 | 1–10 | 0.4944 |
-| last10 | 48–57 | 0.5278 |
-| **Δ** |  | **+0.0333** (rising) |
+| last10 | 44–53 | 0.5187 |
+| **Δ** |  | **+0.0242** (rising) |
 
 **Health metrics (last step / summary):**
 
 | metric | value |
 |---|---|
-| reward (last step, noisy — see windowed table above) | 0.4167 |
-| reward_std | 0.2887 |
-| kl | 0.0004592 |
+| reward (last step, noisy — see windowed table above) | 0.5417 |
+| reward_std | 0.1759 |
+| kl | 0.0006505 |
 | format_ok | 1.000 |
-| length drift (mean_len first→last) | 430→480 (cap 1536) |
-| cap-hit % (last / mean) | 8.3% / 1.5% |
+| length drift (mean_len first→last) | 430→332 (cap 1536) |
+| cap-hit % (last / mean) | 0.0% / 1.4% |
 | rollout tok/s | n/a until completion |
-| step_time (last) | 99.0s |
+| step_time (last) | 28.6s |
 
 **3h hardcap behavior + partial-run note.**
 > On current pace RA is projected to reach the full step count within the 3h cap. If pace slows (length drift up), truncation risk returns — this note will flip to 🟠. At any cap-stop the adapter still saves (`save_model` + `save_steps=50`).
@@ -81,7 +81,9 @@ _Generated: **2026-07-18 22:00:34 UTC** · batch start ≈ 2026-07-18 21:09:31 �
 >
 > **Robust estimators over all 50 steps confirm flat:** OLS slope **-0.00018/step (t=-0.21)**; halves mean[1:25]=0.508 vs mean[26:50]=0.5076 (**Δ-0.0004**); overall mean 0.5078 ± 0.087. Not declining like the probe (Δ-0.032), but **not the clear positive slope the rule requires to proceed.**
 >
-> **Action:** per the pre-committed *flat-or-declining → PAUSE* rule, **RA is halted at step 56; checkpoint-50 preserved** (`results/adapters/T01-RA/checkpoint-50`), GPU freed. ⚠️ **Operator decision required before resuming.** (My watcher's naive `delta>0→proceed` label was overridden — the rule needs a *clear* slope, not any positive delta.)
+> **Action:** per the pre-committed *flat-or-declining → PAUSE* rule, RA was halted at step 56; checkpoint-50 preserved. (My watcher's naive `delta>0→proceed` label was overridden — the rule needs a *clear* slope, not any positive delta.)
+>
+> ✅ **Operator decision:** RESUME to ~150 steps (the §9 GRPO-stall checkpoint) — 2026-07-19; if reward still flat by ~150, §9 kill-switch converts both RL cells to RFT. LR unchanged 7.5e-6. **Resumed from checkpoint-50 → running to step 150; the §9 GRPO-stall kill-switch adjudicates there** (reward trending up by ~150 → continue; still flat → both RL cells to RFT).
 
 ### RB — GRPO · precision
 
@@ -91,7 +93,7 @@ _no reward rows yet._
 
 ## 4 · Flags / health
 
-- 🛑 **RA step-50 gate → PAUSE (FLAT — no learning at 50-step scale).** Window Δ=+0.0137 is 0.16× noise; OLS slope -0.00018/step (t=-0.21), halves Δ-0.0004. **RA halted at step 56, checkpoint-50 preserved, GPU freed. Operator decision required before resuming or moving to RB.**
+- 🔄 **RA step-50 gate read FLAT (OLS slope -0.00018/step, t=-0.21); operator resumed to the §9 checkpoint (step 150).** If reward is still flat by ~150, the §9 GRPO-stall kill-switch converts both RL cells to RFT; if trending up, RA continues. Watch this space.
 
 ---
 
