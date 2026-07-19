@@ -29,7 +29,7 @@ OUT = REPO / "experiments" / "T01" / "results" / "LIVE_STATUS.md"
 ARMS = [
     {"arm": "SA", "method": "SFT",  "cause": "coverage",  "tag": "sft_SA_coverage",  "total_steps": 16,  "n": 123, "budget_s": None},
     {"arm": "SB", "method": "SFT",  "cause": "precision", "tag": "sft_SB_precision", "total_steps": 16,  "n": 123, "budget_s": None},
-    {"arm": "RA", "method": "GRPO", "cause": "coverage",  "tag": "grpo_RA_coverage", "total_steps": 150, "n": 300, "budget_s": 10800},  # resumed to the §9 checkpoint (max_steps=150) after the flat step-50 gate
+    {"arm": "RA", "method": "GRPO", "cause": "coverage",  "tag": "grpo_RA_coverage", "total_steps": 300, "n": 300, "budget_s": 10800},  # §9 checkpoint PASS at 150 (trending up) -> resumed to full 2 epochs (300)
     {"arm": "RB", "method": "GRPO", "cause": "precision", "tag": "grpo_RB_precision","total_steps": 300, "n": 300, "budget_s": 10800},
 ]
 
@@ -113,12 +113,19 @@ def classify(a: dict) -> dict:
     metric_rows = [r for r in rows if ("loss" in r or "reward" in r)]
     steps = [r["step"] for r in metric_rows if "step" in r]
     cur_step = max(steps) if steps else 0
-    elapsed = max((r.get("elapsed_s", 0) for r in metric_rows), default=0)
+    # elapsed = the CURRENT session's clock (the latest/max-step row). The CSVLogger clock
+    # and the --time-budget-sec 3h cap both reset on each (re)launch, so the max over all
+    # rows would conflate resume phases and mis-project the cap. The latest row is in the
+    # current session, so its elapsed_s is the right budget clock.
+    last_row = max(metric_rows, key=lambda r: r.get("step", -1)) if metric_rows else {}
+    elapsed = last_row.get("elapsed_s", 0) or 0
 
     override = LOGS / f"{arm}.status"
     summary = read_json(LOGS / f"{tag}_summary.json")
     sft_done = any("train_runtime" in r for r in rows)
-    grpo_done = summary is not None
+    # GRPO is done only when the summary reflects the FULL target (a stale summary from an
+    # earlier resume phase, e.g. steps=150 while target=300, must not read as done).
+    grpo_done = summary is not None and summary.get("steps", 0) >= a["total_steps"]
     adapter = (ADAPTERS / f"T01-{arm}" / "adapter_model.safetensors").exists()
 
     if override.exists():
@@ -171,7 +178,7 @@ def classify(a: dict) -> dict:
                      "s_mean": round(s_proj, 1), "s_med": round(s_med, 1), "over_min": over_min}
             cap_note = f"⚠️ 3h cap first — proj stop ≈step {proj_stop} (~{trunc['proj_epochs']}/2.0 ep)"
 
-    last = max(metric_rows, key=lambda r: r.get("step", -1)) if metric_rows else {}
+    last = last_row
     last_val = None
     last_kind = "loss" if a["method"] == "SFT" else "reward(last10)"
     if a["method"] == "SFT":
@@ -182,9 +189,11 @@ def classify(a: dict) -> dict:
             last_val = last.get("loss")
     else:
         # Windowed last10 mean — NOT the single noisy last step (avoids the
-        # single-endpoint-noise pitfall flagged for the LR probe).
+        # single-endpoint-noise pitfall flagged for the LR probe). Only use the
+        # summary's final reward once the arm is actually DONE (else a stale
+        # earlier-phase summary would mislabel a running resume).
         fm = (summary or {}).get("final_metrics", {})
-        if fm.get("reward") is not None:
+        if status == "DONE" and fm.get("reward") is not None:
             last_val, last_kind = fm["reward"], "reward(final)"
         else:
             w = grpo_windows(metric_rows)
@@ -345,11 +354,21 @@ def ra_gate_block(w: dict) -> list[str]:
                   f"needs a *clear* slope, not any positive delta.)"]
             dec = gate.get("operator_decision")
             if dec:
-                L += [">", f"> ✅ **Operator decision:** {dec} **Resumed from checkpoint-50 → running to step 150; "
-                      f"the §9 GRPO-stall kill-switch adjudicates there** (reward trending up by ~150 → continue; "
-                      f"still flat → both RL cells to RFT).", ""]
+                L += [">", f"> ✅ **Operator decision:** {dec}", ""]
             else:
                 L += [">", "> ⚠️ **Operator decision required before resuming.**", ""]
+            s9 = read_json(LOGS / "RA_step150_s9.json")
+            if s9:
+                up = s9["suggested_read"] == "TRENDING_UP"
+                L += [f"#### {'✅' if up else '🛑'} §9 checkpoint (step 150) — {'PASS: reward TRENDING UP' if up else 'FLAT → GRPO-stall kill-switch'}", "",
+                      f"> Over the full 1–150 trajectory: **OLS slope {s9['ols_slope_per_step']:+.5f}/step, t={s9['ols_t']}** "
+                      f"(gain ~{s9['ols_gain_over_150']:+.3f} over 150); first10 {s9['first10']} → last10 {s9['last10']}; "
+                      f"first-third {s9['first_third']} → last-third {s9['last_third']} (Δ{s9['thirds_delta']:+.4f}). "
+                      + ("**Clear, significant learning — the step-50 flat was a too-short window, exactly as the frozen "
+                         "config anticipated. §9 GT3 bar PASSED; no kill-switch. RA resumed from checkpoint-150 to full "
+                         "2 epochs (300 steps; 150→300 ≈110 min, fits the 3h cap → no truncation).**"
+                         if up else
+                         "**Flat by 150 → §9 GRPO-stall kill-switch: both RL cells (RA,RB) → RFT. Operator confirms first.**"), ""]
     elif w.get("gate_delta") is not None:
         d = w["gate_delta"]
         L += [f"> **Gate window forming (step {w['max_step']}/50):** interim "
@@ -393,9 +412,11 @@ def health_flags(arms: list[dict]) -> list[str]:
             w = grpo_windows(a["metric_rows"])
             last = ([r for r in a["metric_rows"] if "reward" in r] or [{}])[-1]
             if w:
-                if not (EXPECT["reward_lo"] <= w["last10"] <= EXPECT["reward_hi"]):
-                    flags.append(f"⚠️ **{arm}: last10 reward {w['last10']:.3f}** outside probe band "
-                                 f"[{EXPECT['reward_lo']},{EXPECT['reward_hi']}].")
+                # Only LOW reward is an anomaly (not learning / collapse). Reward ABOVE the
+                # early-training probe band means the arm has learned — that's the goal, not a flag.
+                if w["last10"] < EXPECT["reward_lo"]:
+                    flags.append(f"⚠️ **{arm}: last10 reward {w['last10']:.3f}** below probe floor "
+                                 f"{EXPECT['reward_lo']} (not learning / possible collapse).")
             fmt = last.get("format_ok")
             if fmt is not None and fmt < EXPECT["format_ok_min"]:
                 flags.append(f"⚠️ **{arm}: format_ok {fmt:.2f}** < {EXPECT['format_ok_min']} (malformed rollouts rising).")
@@ -411,10 +432,15 @@ def health_flags(arms: list[dict]) -> list[str]:
     gate = read_json(LOGS / "RA_gate_step50.json")
     if gate and gate["suggested_verdict"].startswith("FLAT"):
         ra = gate.get("robust_analysis", {})
-        if gate.get("operator_decision"):
-            flags.insert(0, f"🔄 **RA step-50 gate read FLAT (OLS slope {ra.get('ols_slope_per_step','?')}/step, t={ra.get('ols_t','?')}); "
-                            f"operator resumed to the §9 checkpoint (step 150).** If reward is still flat by ~150, the §9 "
-                            f"GRPO-stall kill-switch converts both RL cells to RFT; if trending up, RA continues. Watch this space.")
+        s9 = read_json(LOGS / "RA_step150_s9.json")
+        if s9 and s9["suggested_read"] == "TRENDING_UP":
+            flags.insert(0, f"✅ **RA §9 checkpoint (step 150) PASSED — reward TRENDING UP** (OLS slope {s9['ols_slope_per_step']:+.5f}/step, "
+                            f"t={s9['ols_t']}; first10 {s9['first10']}→last10 {s9['last10']}). The step-50 flat was a too-short window; "
+                            f"RA is learning coverage. Resumed to full 2 epochs (300); 150→300 fits the 3h cap (no truncation).")
+        elif s9:
+            flags.insert(0, f"🛑 **RA §9 checkpoint (step 150) FLAT** (OLS t={s9['ols_t']}) → GRPO-stall kill-switch: both RL cells → RFT. Operator confirm.")
+        elif gate.get("operator_decision"):
+            flags.insert(0, f"🔄 **RA step-50 gate read FLAT; operator resumed to the §9 checkpoint (step 150).** Awaiting §9 read.")
         else:
             flags.insert(0, f"🛑 **RA step-50 gate → PAUSE (FLAT — no learning at 50-step scale).** Window Δ={gate['delta']:+.4f} "
                             f"is {abs(gate['delta'])/gate['end_window_std']:.2f}× noise; OLS slope {ra.get('ols_slope_per_step','?')}/step "

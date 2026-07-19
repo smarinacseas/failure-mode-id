@@ -62,3 +62,32 @@ learning *at the 50-step scale*"). So RA is resumed to let §9 adjudicate:
 **Next decision at step 150 (§9):** if reward is trending up → RA continues toward completion; if
 still flat → the §9 kill-switch converts **both** RL cells (RA, RB) from GRPO to RFT. I will report
 the §9 read and confirm before any RFT conversion.
+
+## §9 checkpoint (step 150) — ✅ PASS: reward TRENDING UP
+
+Over the full 1–150 trajectory (robust estimators, not single endpoints;
+`results/logs/RA_step150_s9.json`):
+
+| estimator | value | reading |
+|---|---|---|
+| OLS slope over 150 steps | **+0.00115/step, t = 6.29** | strongly significant positive trend (gain ~+0.17) |
+| first10 → last10 | 0.4944 → **0.7016** (Δ +0.207) | clear rise |
+| first-third → last-third | 0.5078 → 0.6108 (Δ +0.103) | clear rise |
+| step-150 summary final reward | **0.6806** (std 0.092, cap-hit 0%, KL 0.013) | healthy |
+
+**RA is learning coverage.** The step-50 flat was simply too short a window — exactly the
+limitation the frozen config flagged ("no reward learning *at the 50-step scale*"). **§9 GT3 bar
+PASSED; no kill-switch fired.**
+
+## Resumed to full 2 epochs (150 → 300)
+
+Per the operator's "if trending up, RA continues" path, RA was resumed from **checkpoint-150**
+(`--max-steps 300`) to complete the frozen 2-epoch spec.
+
+- **Truncation concern resolved by phasing:** 150→300 = 150 steps at ~44s/step ≈ **110 min**, well
+  inside the 3h cap → **no truncation, RA reaches the full 300 steps (2 epochs)**, symmetric with
+  RB's eventual 2 epochs. (The earlier partial-run risk applied only to a single 3h run from step 0;
+  phased resumes each fit the budget.)
+- checkpoints 50/100/150 preserved; log is continuous 1→300. Final adapter (step 300) will overwrite
+  `results/adapters/T01-RA/` on completion; summary + §9 records retained.
+- **Step-300 completion + full-run diagnostics to follow; then RB starts.**
