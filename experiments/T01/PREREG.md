@@ -274,3 +274,119 @@ equally fall back to generate(). Decided at T1.4.
 **Provenance.** The Plan of Record named in the header (Part II) is a local-only
 planning artifact (gitignored under `docs/superpowers/`); its load-bearing T1.3
 values are inlined above so this tracked PREREG stands alone on the training host.
+
+### 2026-07-16 — CAUSE_A (coverage) difficulty recalibration
+
+**Trigger (process metric, pre-training).** The base subject's coverage
+criterion-pass was **out of the PREREG §5 30–70% band**: 86.4% at the GRPO
+rollout regime (temp 0.9) and ~75% at the eval regime (temp 0.6) — measured
+before any real-arm training. Per the pre-committed T1.3 STOP rule (verifier
+component >0.70 ⇒ recalibrate before real arms), CAUSE_A is recalibrated.
+Precision (CAUSE_B) was in band at the rollout regime (61.1% temp 0.9, k=6;
+`results/probe/base_difficulty.json`) — below the >0.70 recalibration trigger — so it
+is **untouched**. No temp-0.6 acceptance measurement is taken for precision: the
+acceptance-regime protocol (`recalibration_stopping_rule.md`) governs only the cause
+being recalibrated (coverage).
+
+**Stopping rule (committed before any acceptance number was read).** Acceptance
+regime = eval regime **temp 0.6, k=3, N=60, seed 20260715** (matches §5 Tier-1
+decode and the original T1.2 calibrate.py). Cap 3 generator versions; accept the
+**first** version in [30%,70%]; no within-band selection by preference; one
+measurement per version; escalate if none of 3 land in band. Full rule + version
+log: `config/recalibration_stopping_rule.md`.
+
+**What changed (coverage generator only).**
+- Hardened count-based generators (harder for the base 3B, still teacher-tractable):
+  keyword_include 4–6 → **7–10** keywords; required_sections 3–5 → **6–8**;
+  keyword_exclude 1–2 → **3–5**.
+- Retired the two near-free binary types from **sampling** — no_placeholders
+  (base ~98–100% pass) and title (~92%) — which held the mean above band. Their
+  verifiers/generators remain registered + archetype-assigned (provenance).
+- Added a stricter coverage type **start_phrase** (exact opening sentence; base
+  passes ~8% — mirror of end_phrase).
+- Constraints per coverage prompt: 5–6 → **6–7** (k capped at |sample pool| = 7).
+- Coverage train (300) + holdout (200) **regenerated** (build_pools --cause
+  coverage, split seed 20260715, full 13-gram external screen vs CC-75 + IFEval:
+  **0 contamination hits**, 0 dups). Precision pools byte-identical (md5 verified).
+
+**Acceptance result.** v2 (the change set above) landed at **61.0%** eval-regime
+criterion-pass on the fresh-composed sample AND **61.0%** on the regenerated train
+pool (identical — same seed 20260715, 0 dedup rejects) — in band, first version at
+the acceptance regime → accepted (no v3, no tuning). v1 (count-hardening only) was
+74.4% at temp 0.9 (exploratory) — logged, not used. Per-type on the regenerated
+pool: start_phrase 7.5, keyword_include 38.6, end_phrase 47.3, keyword_exclude
+67.3, casing 80.9, no_commas 93.3, required_sections 95.0.
+
+**Downstream (forced by the recount).**
+- Coverage SFT teacher data **regenerated** from the new train pool (teacher_gen
+  --cause coverage). New accepted count = **123** (was 204); GT2 yield **41.0% —
+  PASS (≥30%)** (~3.0 attempts/prompt; teacher tokens 319.2k prompt + 1.455M completion).
+  Pre-recal 204-record file archived at `results/probe/coverage_sft_pre-recal_204.jsonl`.
+- Parity target_n recomputed = min(123 coverage, 270 precision) = **123** (was 204);
+  SFT manifests regenerated (SA coverage 123/123 identity, SB precision 123/270,
+  seed 20260715). The sft-parity amendment's target_n=204 is **superseded**.
+- GRPO LR re-probed on the hardened coverage pool (the 7.5e-6 pick was made on the
+  easy pool): **7.5e-6 re-confirmed, no revision** — reward now starts ~0.435 (was
+  ~0.77; real headroom), but the re-probe **does not discriminate**: on the hardened
+  pool all three LRs are flat-to-declining over 50 steps and within noise (windowed
+  Δ mean[40:50]−mean[0:10]: 5e-6 −0.018, 7.5e-6 −0.032, 1e-5 −0.037; windowed
+  end-std 0.196 / 0.202 / 0.188), so there is no signal to revise 7.5e-6 (mid-range,
+  single frozen LR both arms, no per-arm tuning). Health flag carried to the STOP
+  report: **no reward learning at the 50-step probe scale on hardened coverage**
+  (contrast the easy pool's +0.08 climb; length did not drift up). A **pre-committed
+  RA step-50 windowed-trend check** is added: at step 50 of the real RA run compute
+  mean(reward[0:10]) vs mean(reward[40:50]) — if flat-or-declining, PAUSE and report;
+  if clear positive slope, proceed. Full analysis + table: `t1_3_grpo_probe.md`
+  § "Re-probe on the HARDENED coverage pool".
+
+**Unchanged.** Estimand, hypotheses (§§3–4), sample sizes, seeds (§7), analysis
+(§6), precision pools/holdout/SFT, and the 2-epoch schedule. Coverage remains
+coverage (disjoint from precision) — the interaction estimand is intact.
+
+> **Superseded in part (2026-07-16, same day) by the coverage recalibration.** The
+> coverage difficulty recal regenerated the coverage SFT pool, dropping coverage
+> accepted **204 → 123** and therefore `target_n` from min(204,270)=204 to
+> **min(123,270)=123 per cause**. This entry records the *original* T1.2 down-sample
+> decision and its regime-independent mechanism; the counts below (204 / 68% coverage
+> yield) are the **pre-recal** state. Operative manifests now: SA coverage 123/123,
+> SB precision 123/270 (seed 20260715). See
+> `DRAFT_amendment_2026-07-16_coverage-recal.md`.
+
+### 2026-07-16 — SFT training-set down-sample to cross-cause parity
+
+**Decision, and when it was made.** Before any real-arm training (SA/SB/RA/RB)
+had been run, the SFT accepted-pair sets are down-sampled to equal size across
+causes. The decision is based **solely on datagen process metrics** — the teacher
+acceptance yield measured at T1.2 — and **no outcome/eval data was consulted**
+(no arm has been scored; the GRPO LR probe informs only training-method
+hyperparameters, not this decision).
+
+**What changed.** §5 specifies "300 filtered pairs" of SFT data per cause, but the
+teacher-acceptance yield is cause-dependent: coverage kept **204/300 (68%)**,
+precision **270/300 (90%)** (datagen holds 300 prompts fixed per cause and keeps
+one 100%-verifier-pass teacher answer per prompt when found within ≤4 attempts).
+Training SA on 204 pairs and SB on 270 would confound the method×cause interaction
+with an accepted-count asymmetry. Both SFT cells are therefore down-sampled to
+**target_n = min(204, 270) = 204** accepted pairs. The effective SFT n changes
+from "≤300 filtered pairs" to **target_n = 204 per cause**.
+
+**Mechanics (symmetric, deterministic).** Each SFT cell selects target_n ids from
+its **own** accepted set: sort by prompt_id, then `random.Random(20260715).sample`
+(repo seed convention). Coverage is the min-count cell, so its selection is the
+identity (204 of 204). Precision selects 204 of 270. Selections are materialized
+as ids-only manifests under `data/sft_manifests/{SA,SB}.json` (tracked; never any
+response text). Epochs stay at **2** (§5) — reduced n is **not** compensated with
+extra epochs/steps, which would re-introduce the asymmetry as a tuning degree of
+freedom.
+
+**What is explicitly unchanged.** GRPO prompt pools (300/cause), all holdout data
+(`data/holdout/`, 200/cause), the 2-epoch schedule, the primary estimand and
+hypotheses (§§3–4), sample sizes for eval (§5), seeds (§7), and the statistical
+analysis (§6). Within-row data-fairness is preserved: both methods in a row still
+draw from the same cause's data; only the SFT cell size is equalized across rows.
+
+**Provenance.** Manifests: `data/sft_manifests/SA.json` (target_n 204, seed
+20260715, source yield 68.0%), `data/sft_manifests/SB.json` (target_n 204, seed
+20260715, source yield 90.0%) (pre-recal; current manifest files are SA 123/123, SB
+123/270). Generator + determinism/parity/isolation tests:
+`datagen/downsample_sft.py`, `datagen/test_downsample_sft.py`.

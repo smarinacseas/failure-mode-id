@@ -173,3 +173,20 @@ def test_end_phrase_wrong_ending_fails():
 def test_end_phrase_tolerates_trailing_whitespace():
     assert check("Some text. The end.   ",
                  spec("end_phrase", phrase="The end.")).passed is True
+
+
+# --- start_phrase (coverage recalibration 2026-07-16; mirror of end_phrase) ---
+
+def test_start_phrase_correct_opening_passes():
+    assert check("Here is the summary. More details follow.",
+                 spec("start_phrase", phrase="Here is the summary.")).passed is True
+
+
+def test_start_phrase_wrong_opening_fails():
+    assert check("First a preamble. Here is the summary.",
+                 spec("start_phrase", phrase="Here is the summary.")).passed is False
+
+
+def test_start_phrase_tolerates_leading_whitespace_and_quote():
+    assert check('   "Here is the summary." and so on.',
+                 spec("start_phrase", phrase="Here is the summary.")).passed is True

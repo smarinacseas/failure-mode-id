@@ -106,3 +106,15 @@ def end_phrase(response: str, spec: dict) -> CheckResult:
     if response.strip().strip('"').lower().endswith(want):
         return CheckResult(True, "ends with the required phrase")
     return CheckResult(False, f"does not end with {spec['phrase']!r}")
+
+
+@register("start_phrase")
+def start_phrase(response: str, spec: dict) -> CheckResult:
+    # Coverage recalibration 2026-07-16: mirror of end_phrase. Base models rarely
+    # open with an exact prescribed sentence (they add a greeting/title/preamble),
+    # so this is a harder-than-average coverage constraint that helps land the
+    # base 3B in the 30-70% band.
+    want = spec["phrase"].strip().lower()
+    if response.strip().strip('"').lower().startswith(want):
+        return CheckResult(True, "starts with the required phrase")
+    return CheckResult(False, f"does not start with {spec['phrase']!r}")
