@@ -39,8 +39,10 @@ probe scale on hardened coverage") on the real run.
 
 - RA **halted at step 56** (SIGTERM; a straggler orphaned worker under the `nohup` parent was
   also reaped — GPU confirmed freed, 0 MiB).
-- **checkpoint-50 preserved** (`results/adapters/T01-RA/checkpoint-50/` — adapter_model.safetensors
-  + trainer_state.json), the pre-committed decision-point weights. Steps 51–56 discarded.
+- **checkpoint-50 preserved at pause time** (`results/adapters/T01-RA/checkpoint-50/` —
+  adapter_model.safetensors + trainer_state.json), the pre-committed decision-point weights.
+  Steps 51–56 discarded. ⚠️ **This checkpoint was later rotated out** by `save_total_limit=3`
+  during the final 150→300 phase — see "Provenance note" at the end of this record.
 - Gate record: `results/logs/RA_gate_step50.json` (with robust_analysis); live log
   `results/logs/grpo_RA_coverage.{jsonl,csv}`; pause marker `results/logs/RA.status`.
 
@@ -107,3 +109,24 @@ Full 1–300 trajectory (`results/logs/RA_full_run.json`):
 **GT3 GRPO pass bar (reward trending up, not flat by ~150): PASSED decisively.** The coverage arm
 learns strongly under GRPO — the step-50 flat was purely a window-length artifact. Final adapter:
 `results/adapters/T01-RA/adapter_model.safetensors` (step 300). RB (precision GRPO) starts next.
+
+## ⚠️ Provenance note (2026-07-19): decision-point checkpoints rotated out
+
+`checkpoint-50` (the step-50 PAUSE weights) and `checkpoint-150` (the §9 decision-point weights)
+**no longer exist on disk** — both were rotated out by `save_total_limit=3` during the final
+150→300 phase. Only `checkpoint-{200,250,300}` + the final step-300 adapter remain (verified
+`ls results/adapters/T01-RA/` → checkpoint-200/250/300 only; checkpoint-50 and checkpoint-150 both
+`No such file or directory`).
+
+- **Impact on training / T1.4: none.** The final adapter (step 300) is the artifact carried
+  forward; the intermediate checkpoints were only decision waypoints.
+- **Provenance gap:** the exact adapter weights at steps 50 and 150 can no longer be
+  re-instantiated. (The earlier "checkpoint-50 preserved" line above described its state *at the
+  pause*, before the 150→300 phase rotated it out.)
+- **What IS still preserved — the evidentiary basis is intact.** Both the PAUSE and §9 calls were
+  made on the *logged reward trajectory*, not by re-evaluating checkpoint weights, and every input
+  to those decisions survives: `results/logs/RA_gate_step50.json` (step-50 robust analysis),
+  `results/logs/RA_step150_s9.json` (§9 read), the continuous per-step live logs
+  `grpo_RA_coverage.{jsonl,csv}`, and the full 1→300 `log_history` embedded in
+  `checkpoint-300/trainer_state.json`. The numbers the decisions rested on are fully recoverable;
+  only the weight snapshots are not.
