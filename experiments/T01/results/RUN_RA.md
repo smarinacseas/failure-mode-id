@@ -88,6 +88,22 @@ Per the operator's "if trending up, RA continues" path, RA was resumed from **ch
   inside the 3h cap → **no truncation, RA reaches the full 300 steps (2 epochs)**, symmetric with
   RB's eventual 2 epochs. (The earlier partial-run risk applied only to a single 3h run from step 0;
   phased resumes each fit the budget.)
-- checkpoints 50/100/150 preserved; log is continuous 1→300. Final adapter (step 300) will overwrite
-  `results/adapters/T01-RA/` on completion; summary + §9 records retained.
-- **Step-300 completion + full-run diagnostics to follow; then RB starts.**
+- checkpoints preserved (200/250/300 retained; earlier rotated by save_total_limit=3); log continuous 1→300.
+
+## ✅ RA COMPLETE — 2 full epochs (300 steps), GT3 GRPO bar PASSED
+
+Completed cleanly, **no truncation** (`time_budget_hit=false`; ran ~1h42m in the final phase).
+Full 1–300 trajectory (`results/logs/RA_full_run.json`):
+
+| estimator (full run) | value |
+|---|---|
+| **OLS slope over 300 steps** | **+0.00123/step, t = 20.24** — decisive upward trend |
+| first10 → last10 (windowed) | 0.4944 → **0.8004** (Δ **+0.306**) |
+| first-third → last-third | 0.5197 → 0.7686 (Δ +0.249) |
+| overall | mean 0.649 ± 0.140 |
+| summary final metrics | reward 0.6746 (last noisy step), KL 0.016, **cap-hit 0%**, format_ok 1.0, mean_len 492 (no runaway) |
+| throughput | 199 tok/s rollout (150 opt-steps this phase) |
+
+**GT3 GRPO pass bar (reward trending up, not flat by ~150): PASSED decisively.** The coverage arm
+learns strongly under GRPO — the step-50 flat was purely a window-length artifact. Final adapter:
+`results/adapters/T01-RA/adapter_model.safetensors` (step 300). RB (precision GRPO) starts next.
