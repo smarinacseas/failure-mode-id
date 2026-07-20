@@ -2,13 +2,15 @@
 
 > **STATUS: FINAL for Tier-1 (2026-07-20).** Covers T1.3 (training, all four arms)
 > and T1.4 (Tier-1 holdout eval + truncation sensitivity analysis), both complete.
-> Tier-2 (CC-75 transfer) and Tier-3 (general-capability regression battery, the
-> H3 guard) are **not yet run** — T1.5 is a pending operator decision. Every number
+> The **Tier-3 general-capability guard (H3) was run 2026-07-20 and FAILED**
+> (Arm SA −3.2 pp vs base; [`RUN_H3.md`](./RUN_H3.md)) — incorporated in §6
+> (post-finalization additions), §7, and §8. **Tier-2** (CC-75 transfer) remains
+> not run — a pending operator decision. Every number
 > in this report is taken from committed run records or volume artifacts named in
 > §9; the pre-registration ([`../PREREG.md`](../PREREG.md)) remains the authority
 > on the design. Detailed run records: [`RUN_SA.md`](./RUN_SA.md),
 > [`RUN_SB.md`](./RUN_SB.md), [`RUN_RA.md`](./RUN_RA.md), [`RUN_RB.md`](./RUN_RB.md),
-> [`RUN_T1.4.md`](./RUN_T1.4.md).
+> [`RUN_T1.4.md`](./RUN_T1.4.md), [`RUN_H3.md`](./RUN_H3.md).
 
 ---
 
@@ -38,7 +40,7 @@ remains −0.1979, CI [−0.2714, −0.1244]. The exploratory data-targeting hyp
 (H2) is null. We report the reversal honestly and offer three graded post-hoc
 mechanisms, the best-evidenced being a train/eval grading asymmetry specific to the
 SFT pipeline: trained arms never adopt the teacher's `===FINAL===` answer marker
-(0/2300 decodes), so their imitated scaffold prose — exempt from constraint
+(0/4800 decodes), so their imitated scaffold prose — exempt from constraint
 checking during teacher-data acceptance — is graded at eval, where it violates
 formatting constraints wholesale.
 
@@ -91,7 +93,10 @@ everything else is exploratory or descriptive by construction.
   difference-in-differences). Reported with a CI, never used for confirmation.
 - **H3 (regression guard, not a hypothesis).** No trained arm falls more than 3
   points below the untrained base on a general-capability battery (Tier-3).
-  **Status: not yet evaluated** — Tier-3 is part of T1.5, which has not run.
+  **Status: evaluated 2026-07-20 — FAILED.** Arm SA is 3.2 pp below base on MMLU
+  (0-shot, N=1000); the other three trained arms pass. Full result and the
+  method-wise retention pattern in §6 (post-finalization additions); raw scores in
+  [`RUN_H3.md`](./RUN_H3.md).
 
 The pre-registration also committed interpretations for every outcome *before any
 data existed* (PREREG §8), including the one that occurred: *"Interaction < 0, CI
@@ -354,10 +359,14 @@ A separate observation that seeds the leading mechanism in §6: SA emits the ful
 `===FINAL===` marker in **0/1100 uncapped and 0/100 capped decodes** — its
 absence is a general trained behavior, not something truncation cut off (no
 completion ends mid-marker; loose "FINAL" substrings appear 26/1100 vs 6/100,
-never the full marker). RA is identical in kind (0/1198, 0/2), as are SB and RB —
-**all four trained arms emit the marker at rate 0**, despite the marker appearing
-in every SFT training target. Whole-text fallback grading therefore applies
-uniformly to the trained arms, matching their training-time grading. Arm P — the
+never the full marker). RA is identical in kind (0/1198, 0/2), as are SB (0/1183
+uncapped, 0/17 capped) and RB (0/1200) — **all four trained arms emit the marker at
+rate 0** (0/4800 decodes total; the SB/RB counts were verified from the decode
+artifacts on 2026-07-20), despite the marker appearing in every SFT training target.
+Notably SB, though it never once emits the marker, writes the bare word "FINAL" most
+often of any arm (loose substring 85/1183 uncapped = 7.2%). Whole-text fallback
+grading therefore applies uniformly to the trained arms, matching their training-time
+grading. Arm P — the
 *prompted* scaffold — emits it at 10.3% (coverage) / 88.8% (precision). RA also
 shows no milder version of SA's length pathology: median 331 / p90 477 generated
 tokens vs SA/coverage's bimodal median 521 with p90 at the 2048 cap.
@@ -434,7 +443,7 @@ finding and speculate cautiously. Three candidate mechanisms, ordered by evidenc
 *(best-evidenced).* Teacher data was accepted by grading only the post-marker
 answer — the scaffold prose (INVENTORY checklists, VERIFY sections, full of
 commas, capitals, and headers) was never subject to the constraints. The students
-imitated the scaffold but never adopted the marker (0/2300 trained-arm decodes,
+imitated the scaffold but never adopted the marker (0/4800 trained-arm decodes,
 §5.3), so at eval their whole text is graded, scaffold included. The per-type
 signature matches exactly: SA collapses precisely on whole-text formatting
 constraints that scaffold prose violates (casing, no_commas, required_sections)
@@ -477,14 +486,113 @@ of what SFT delivered (§5.5) — try prompting before training. (4) H2's null s
 cause-*targeting* of SFT data bought nothing detectable here; the method, not the
 data's cause-label, carried the effect.
 
+### Post-finalization additions (2026-07-20)
+
+*Added the same day the report was finalized, after the H3 Tier-3 guard was run
+([`RUN_H3.md`](./RUN_H3.md)) and in response to four reviewer questions on the
+confound structure. These extend §6's mechanisms (a)–(c) and update the H3 status
+throughout (§2, STATUS, §7, §8); they change no pre-registered number and no
+headline finding.*
+
+**(d) The two causes are not fully parallel constructions — "cause" is confounded
+with constraint-type family and pool-authoring epoch.** Two facts, both verified
+from artifacts. *Type families are disjoint:* the coverage pool draws its
+constraints from {start_phrase, end_phrase, keyword_include, keyword_exclude,
+casing, no_commas, required_sections} — surface/format rules — and the precision
+pool from {arithmetic_result, item_count, word/sentence/paragraph_count, ordering,
+exact_repetition, keyword/caps_frequency} — counting/arithmetic rules — with **no
+type in common**. *Authoring epochs differ:* the coverage train+holdout were
+**regenerated 2026-07-16** (git `6d67e4f`) when the recalibration added the strict
+`start_phrase` type and hardened thresholds, while the precision pools were **last
+touched 2026-07-15** (`23532c1`) and carried forward untouched from T1.2. So the
+design's "method×cause" is inseparable from "method×constraint-type-family" — which
+is true *by construction*, since the A/B contrast of many-buried-surface vs
+few-exact *requires* different type families — and now also from a
+pool-authoring/calibration difference (coverage re-authored to a stricter bar a day
+later, precision not). The interaction is therefore not a clean archetype effect; it
+is, at minimum, archetype ⊕ type-family ⊕ authoring-epoch, and these are not
+separable within T01. Mechanism (b) is the benign reading of the type-family
+confound (surface constraints happen to be RL-friendly); this is its sharper, less
+comfortable statement — that "coverage" and "precision" may name *constraint
+families authored to different standards* as much as they name failure archetypes.
+Both readings survive the data. A clean archetype test needs the *same*
+constraint-type families instantiated under both causes — the central design lesson
+for T02, extending §6(c).
+
+**(e) Compute-fairness reconsidered — the ~10× surplus "cancels" only if its
+marginal value is constant across causes.** The interaction's compute-fairness claim
+(§3.2; PREREG §10.1, "the surplus cancels") rests on an unstated assumption: that an
+extra unit of GRPO compute is worth the same on coverage as on precision, so it drops
+out of the difference-of-differences. But the result *is* that GRPO's advantage is
+not constant across causes — so that assumption is exactly what is in doubt. If
+coverage's constraint-satisfaction is the more exploration-rewarding task — denser
+verifiable reward (~6.5 vs ~3.5 criteria/prompt → more distinguishable group-relative
+advantage levels per rollout batch) and formulaic surface rules a policy can *find*
+by sampling (start_phrase 4.6% → 95%) — then the same FLOP surplus buys more on
+coverage than on precision, and it does **not** cancel. Under that account some of
+the coverage-side GRPO advantage is a compute effect riding along with the archetype,
+not a pure method×archetype effect. This does not overturn the finding, but it means
+"the interaction is immune to the compute confound" should be stated conditionally —
+immune *if* the marginal value of compute is cause-independent, an assumption this
+very result undercuts. Worth naming as an alternative explanation rather than resting
+on "immune."
+
+**(f) SB underperformed Arm P on precision — real training lost to a $0 prompt, and
+we cannot fully say why.** Rec(SB, precision) = 0.190 < Rec(P, precision) = 0.268:
+SFT on precision data recovered *less* than the enumerate-then-verify system prompt,
+at real training cost against zero. The interaction-consistent reading is that SFT
+genuinely struggles on precision — exactness under the model's own distribution is
+what on-policy practice trains and off-policy imitation does not — which would mean
+H1's original mechanism holds on the SFT/precision cell even though the coverage side
+reversed. But a competing under-implementation reading is not excluded: SB trained on
+only 123 teacher demonstrations for 2 epochs (16 optimizer steps, loss 2.52 → 1.99),
+a light touch that may be undertrained, or simply too few examples to install
+precision behaviors. T01 cannot separate "SFT can't do precision" from "this SFT run
+was too small." The honest statement is that SB losing to a free prompt is real and
+its cause is unidentified — a caveat on any "SFT is bad at precision" reading drawn
+from this one cell. (Consistent with imitation-of-surface-without-function: SB is
+also the arm most drawn to the marker *word* — loose "FINAL" in 85/1183 decodes,
+7.2%, the highest of any arm — while never once producing the actual `===FINAL===`
+token, §5.3.)
+
+**(g) H3 Tier-3 guard: FAILED — and it confirms the SFT-breakage story off-task.**
+The general-capability guard was run on MMLU (0-shot, N=1000 stratified across all 57
+subjects, seed 20260715, deterministic answer-letter log-likelihood scoring; full
+method and raw scores in [`RUN_H3.md`](./RUN_H3.md)). Accuracy vs Arm 0's 52.4%:
+
+| arm | SA | SB | RA | RB | (P) |
+|-----|-----|-----|-----|-----|-----|
+| Δpp vs base | **−3.2** | −3.0 | −0.1 | +0.9 | (−14.4) |
+
+**Verdict FAIL** — Arm SA is more than 3 points below base (PREREG §4, H3), the sole
+violation. The shape is the off-task echo of §5.6: **both SFT arms regress ~3 pp of
+general capability; both GRPO arms retain it** (RA flat, RB slightly up). The §5.6
+result that the SFT arms broke more than they fixed *on their trained task* now has a
+matching off-task signature — the SFT recipe's damage is not confined to the task it
+was trained on — while GRPO's tiny KL leash (β=0.04, measured KL ~0.006–0.016) held
+it near the base policy on both axes. Three honesty notes carried from RUN_H3.md:
+(i) the guard is a **point-estimate** rule and SA's Δ 95% CI is [−5.3, −1.1], which
+spans the −3 line — SA (−3.2) and SB (−3.0) are statistically indistinguishable, so
+the robust claim is "both SFT arms sit at ≈ −3 pp," not "SA specifically failed and
+SB specifically passed"; (ii) MMLU here is scored by log-likelihood over the answer
+letters with no generation, so this is a **knowledge** regression, separate from and
+additional to SA's decode-time repetition pathology (§5.2); (iii) Arm P's −14.4 is a
+measurement artifact — the scaffold makes P's first assistant token a checklist step,
+not an answer letter — on the base weights P shares with Arm 0, so it is not a
+capability loss, and P is (correctly) not gated by H3.
+
 ## 7 · Threats to validity and limitations
 
 1. **Main effects are compute-confounded** (GRPO ~10× FLOPs; wall-clock minutes
    vs hours) — only the interaction is compute-fair; all GRPO-vs-SFT *level*
    comparisons above are descriptive.
-2. **H3 unevaluated.** The Tier-3 general-capability regression battery has not
-   run; SFT arms' on-task breakage (§5.6) makes off-task regression a live
-   concern for *all* trained arms. Tier-2 (CC-75 transfer) is likewise pending —
+2. **H3 evaluated — FAILED; off-task regression confirmed for the SFT arms.** The
+   Tier-3 MMLU guard (§6 post-finalization additions (g); [`RUN_H3.md`](./RUN_H3.md))
+   ran 2026-07-20: both SFT arms fell ~3 pp below base (SA −3.2, the sole guard
+   violation; SB −3.0), both GRPO arms held (RA −0.1, RB +0.9). The off-task
+   regression that §5.6's on-task breakage made a *concern* is now observed — for
+   SFT specifically, not GRPO (though SA/SB are statistically indistinguishable at
+   the 3-pt line; see (g)). **Tier-2** (CC-75 transfer) remains pending —
    in-distribution holdout only, so external validity is untested.
 3. **Single model, single scale, single family** — one cell of the
    (family × scale) grid; a heavily post-trained subject (Meta's SFT+RS+DPO)
@@ -525,10 +633,13 @@ excellent RL targets and poor imitation targets — the latter partly for a
 train/eval grading reason specific to how the teacher data was accepted.
 Diagnosis-driven training remains supported in the weak sense (failure type
 modulated method effectiveness strongly); the specific mapping pre-registered
-here does not. Recommended next steps, in order: the ~40-row E08 label
-hand-check (cheap, tests mechanism (c) at the source); Tier-3 regression (H3 is
-a promised guard, and §5.6 gives it teeth); a marker-reliability or
-whole-text-graded SFT re-run to isolate mechanism (a); then T02 cross-family.
+here does not. The promised Tier-3 guard has since run and **failed for the SFT arms** (SA −3.2 pp,
+SB −3.0; both GRPO arms held) — off-task confirmation of §5.6's on-task SFT breakage
+(§6 additions (g)). Recommended next steps, in order: the ~40-row E08 label
+hand-check (cheap, tests mechanism (c) at the source); a marker-reliability or
+whole-text-graded SFT re-run to isolate mechanism (a); then T02 cross-family, with
+the *same* constraint-type families instantiated under both causes so the archetype
+effect is not confounded with type-family or pool-authoring epoch (§6 additions (d)).
 
 ## 9 · Provenance appendix
 
@@ -558,5 +669,9 @@ are the committed provenance.
 ---
 
 *Report finalized 2026-07-20 from committed artifacts; supersedes the 2026-07-18
-scaffold version of this file. PREREG.md remains the authority on the design;
-where this report explains or interprets, §§5.6 and 6 are explicitly post-hoc.*
+scaffold version of this file. A same-day post-finalization pass incorporated the H3
+Tier-3 guard result ([`RUN_H3.md`](./RUN_H3.md)) and four reviewer questions on the
+confound structure (§6 additions (d)–(g); STATUS, §2, §7, §8 updated to match; the
+`===FINAL===` marker count corrected 2300→4800 after verifying all four arms).
+PREREG.md remains the authority on the design; where this report explains or
+interprets, §§5.6 and 6 are explicitly post-hoc.*
