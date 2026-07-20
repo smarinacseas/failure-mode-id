@@ -1,13 +1,19 @@
-# H3 — Tier-3 general-capability regression guard — ❌ **FAIL** (1 violation: SA)
+# H3 — Tier-3 general-capability regression guard — ❌ FAIL (marginal: SA −3.2 pp, CI spans the −3 line)
 
 Pre-registered guard (PREREG **§4, H3**): *"no trained arm scores more than 3
 points below Arm 0 on the Tier-3 general-capability battery. Violations are
 reported prominently."* H3 is a **regression guard, not a hypothesis to confirm**
 — it protects against fine-tuning silently wrecking general capability.
 
-> ## ❌ VERDICT: FAIL — **Arm SA is 3.2 points below Arm 0** (> the 3-point line).
-> The other three trained arms pass: SB −3.0 (exactly on the line, not *past* it),
-> RA −0.1, RB +0.9. Raw artifacts on the `/workspace` volume
+> ## ❌ VERDICT: FAIL by the pre-registered point-estimate rule — but a **marginal** one.
+> **Arm SA is 3.2 pp below Arm 0** (49.2% vs 52.4%), past the 3-point line, so the
+> literal guard (a point-estimate rule, no CI) returns FAIL. **But SA's Δ 95% CI is
+> [−5.3, −1.1], which includes the −3.0 threshold** — stated precisely: *the point
+> estimate fails, the CI includes the threshold.* The regression is real (CI
+> excludes 0) but its crossing of the 3-point line is within sampling noise, and SA
+> (−3.2) is statistically indistinguishable from SB (−3.0, which "passes"). The
+> other three trained arms pass: SB −3.0 (on the line, not *past* it), RA −0.1,
+> RB +0.9. Raw artifacts on the `/workspace` volume
 > (`results/eval_t3/` — per-arm `*.jsonl`, `*_summary.json`, `mmlu_subset.jsonl`,
 > `delta_ci.json`, `verdict.json`, `run.log`) — gitignored by design; this tracked
 > record is the committed provenance.

@@ -2,8 +2,9 @@
 
 > **STATUS: FINAL for Tier-1 (2026-07-20).** Covers T1.3 (training, all four arms)
 > and T1.4 (Tier-1 holdout eval + truncation sensitivity analysis), both complete.
-> The **Tier-3 general-capability guard (H3) was run 2026-07-20 and FAILED**
-> (Arm SA −3.2 pp vs base; [`RUN_H3.md`](./RUN_H3.md)) — incorporated in §6
+> The **Tier-3 general-capability guard (H3) was run 2026-07-20 and FAILED by the
+> point-estimate rule** (Arm SA −3.2 pp vs base — a *marginal* fail; its CI [−5.3,
+> −1.1] spans the −3 line; [`RUN_H3.md`](./RUN_H3.md)) — incorporated in §6
 > (post-finalization additions), §7, and §8. **Tier-2** (CC-75 transfer) remains
 > not run — a pending operator decision. Every number
 > in this report is taken from committed run records or volume artifacts named in
@@ -42,7 +43,16 @@ mechanisms, the best-evidenced being a train/eval grading asymmetry specific to 
 SFT pipeline: trained arms never adopt the teacher's `===FINAL===` answer marker
 (0/4800 decodes), so their imitated scaffold prose — exempt from constraint
 checking during teacher-data acceptance — is graded at eval, where it violates
-formatting constraints wholesale.
+formatting constraints wholesale. A post-hoc general-capability guard (H3, MMLU)
+points at the same fault line from the other side: **both SFT arms regress ≈3 points
+of unrelated general capability** (SA −3.2, a *marginal* miss of the guard's 3-point
+rule — its CI [−5.3, −1.1] spans the line; SB −3.0) **while both GRPO arms retain it**
+(RA −0.1, RB +0.9). That is the *same* method split as the interaction, and it is
+plausibly one story rather than two: at this scale the SFT recipe broadly overwrites
+the base model — breaking about as much as it fixes on-task (§5.6) and regressing
+off-task — while GRPO's KL-tethered on-policy updates change little beyond the target.
+Read that way the negative interaction is as much "SFT is unexpectedly destructive
+here" as "GRPO is unexpectedly good at coverage."
 
 ---
 
@@ -93,10 +103,11 @@ everything else is exploratory or descriptive by construction.
   difference-in-differences). Reported with a CI, never used for confirmation.
 - **H3 (regression guard, not a hypothesis).** No trained arm falls more than 3
   points below the untrained base on a general-capability battery (Tier-3).
-  **Status: evaluated 2026-07-20 — FAILED.** Arm SA is 3.2 pp below base on MMLU
-  (0-shot, N=1000); the other three trained arms pass. Full result and the
-  method-wise retention pattern in §6 (post-finalization additions); raw scores in
-  [`RUN_H3.md`](./RUN_H3.md).
+  **Status: evaluated 2026-07-20 — FAILED (point-estimate rule; marginal).** Arm SA
+  is 3.2 pp below base on MMLU (0-shot, N=1000) — past the 3-point line, though its
+  95% CI [−5.3, −1.1] includes the threshold; the other three trained arms pass. Full
+  result and the method-wise retention pattern in §6 (post-finalization additions);
+  raw scores in [`RUN_H3.md`](./RUN_H3.md).
 
 The pre-registration also committed interpretations for every outcome *before any
 data existed* (PREREG §8), including the one that occurred: *"Interaction < 0, CI
@@ -564,13 +575,28 @@ method and raw scores in [`RUN_H3.md`](./RUN_H3.md)). Accuracy vs Arm 0's 52.4%:
 |-----|-----|-----|-----|-----|-----|
 | Δpp vs base | **−3.2** | −3.0 | −0.1 | +0.9 | (−14.4) |
 
-**Verdict FAIL** — Arm SA is more than 3 points below base (PREREG §4, H3), the sole
-violation. The shape is the off-task echo of §5.6: **both SFT arms regress ~3 pp of
-general capability; both GRPO arms retain it** (RA flat, RB slightly up). The §5.6
-result that the SFT arms broke more than they fixed *on their trained task* now has a
-matching off-task signature — the SFT recipe's damage is not confined to the task it
-was trained on — while GRPO's tiny KL leash (β=0.04, measured KL ~0.006–0.016) held
-it near the base policy on both axes. Three honesty notes carried from RUN_H3.md:
+**Verdict: FAIL by the pre-registered point-estimate rule — a *marginal* one** (Arm
+SA is more than 3 points below base, PREREG §4, H3, the sole violation; but its Δ 95%
+CI [−5.3, −1.1] spans the −3 line — see note (i)). The shape is the off-task echo of
+§5.6: **both SFT arms regress ~3 pp of general capability; both GRPO arms retain it**
+(RA flat, RB slightly up). The §5.6 result that the SFT arms broke more than they
+fixed *on their trained task* now has a matching off-task signature — the SFT recipe's
+damage is not confined to the task it was trained on — while GRPO's tiny KL leash
+(β=0.04, measured KL ~0.006–0.016) held it near the base policy on both axes.
+
+**This is plausibly one story with the interaction, not a separate second finding.**
+The method split here — SFT damages, GRPO preserves — is the *same* split that
+produces the negative interaction (§5.1). SFT's weak coverage recovery with heavy
+breakage (Rec 0.284, Brk 0.552, §5.6) and its ~3-pt general-capability regression are
+two faces of one behavior: a 123-example scaffold distillation broadly overwriting the
+base model. GRPO's conservative, KL-tethered on-policy updates improve the target and
+leave the rest intact on *both* the on-task and off-task axes. Read this way, the
+reversal is not only "GRPO is unexpectedly good at coverage" but equally "SFT is
+unexpectedly *destructive* at this scale," and H3 is the off-task corroboration of the
+destructive half. (This is a post-hoc synthesis of two correlated observations, not a
+causal claim that off-task regression produces the on-task interaction.)
+
+Three honesty notes carried from RUN_H3.md:
 (i) the guard is a **point-estimate** rule and SA's Δ 95% CI is [−5.3, −1.1], which
 spans the −3 line — SA (−3.2) and SB (−3.0) are statistically indistinguishable, so
 the robust claim is "both SFT arms sit at ≈ −3 pp," not "SA specifically failed and
@@ -589,7 +615,8 @@ capability loss, and P is (correctly) not gated by H3.
 2. **H3 evaluated — FAILED; off-task regression confirmed for the SFT arms.** The
    Tier-3 MMLU guard (§6 post-finalization additions (g); [`RUN_H3.md`](./RUN_H3.md))
    ran 2026-07-20: both SFT arms fell ~3 pp below base (SA −3.2, the sole guard
-   violation; SB −3.0), both GRPO arms held (RA −0.1, RB +0.9). The off-task
+   violation but a *marginal* one — CI [−5.3, −1.1] spans the −3 line; SB −3.0), both
+   GRPO arms held (RA −0.1, RB +0.9). The off-task
    regression that §5.6's on-task breakage made a *concern* is now observed — for
    SFT specifically, not GRPO (though SA/SB are statistically indistinguishable at
    the 3-pt line; see (g)). **Tier-2** (CC-75 transfer) remains pending —
