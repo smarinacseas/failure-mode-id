@@ -516,9 +516,10 @@ def unpack(bundle_path: Path, out_dir: Path) -> dict:
         for u in stale:
             unpacked = unpacked.replace(u, f"unbound-{u}")
 
-    index_path = out_dir / "index.html"
+    # The unpacked design is the eval app; index.html is the hand-written landing page.
+    index_path = out_dir / "eval.html"
     index_path.write_text(unpacked, encoding="utf-8")
-    written.append(("index.html", len(unpacked.encode("utf-8"))))
+    written.append(("eval.html", len(unpacked.encode("utf-8"))))
 
     return {
         "index_path": str(index_path),
