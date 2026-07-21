@@ -243,7 +243,7 @@
         d.sections.forEach(function (sec) {
           var det = document.createElement("details");
           det.className = "sec";
-          det.id = sec.id;
+          det.id = "sec-" + sec.id;
           var sum = el("summary", null,
             '<span class="secnum">' + esc(sec.num) + "</span>" +
             '<span class="sectitle">' + esc(sec.title) + "</span>" + badge(sec.badge) +
@@ -279,13 +279,12 @@
         var toc = document.getElementById("toc");
         toc.innerHTML = '<a href="#results">Results charts</a><a href="#transfer">Transfer</a>' +
           d.sections.map(function (s2) {
-            return '<a href="#' + s2.id + '">' + esc(s2.num) + " · " + esc(s2.title) + "</a>";
+            return '<a href="#sec-' + s2.id + '">' + esc(s2.num) + " · " + esc(s2.title) + "</a>";
           }).join("");
         toc.addEventListener("click", function (e) {
           var a = e.target.closest("a[href^='#']");
           if (!a) return;
-          var id = a.getAttribute("href").slice(1);
-          var det = document.querySelector("details#" + id) || document.getElementById(id);
+          var det = document.getElementById(a.getAttribute("href").slice(1));
           if (det && det.tagName === "DETAILS") det.open = true;
         });
       }
