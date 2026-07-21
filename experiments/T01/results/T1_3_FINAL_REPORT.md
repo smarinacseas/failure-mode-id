@@ -5,8 +5,9 @@
 > The **Tier-3 general-capability guard (H3) was run 2026-07-20 and FAILED by the
 > point-estimate rule** (Arm SA −3.2 pp vs base — a *marginal* fail; its CI [−5.3,
 > −1.1] spans the −3 line; [`RUN_H3.md`](./RUN_H3.md)) — incorporated in §6
-> (post-finalization additions), §7, and §8. **Tier-2** (CC-75 transfer) remains
-> not run — a pending operator decision. Every number
+> (post-finalization additions), §7, and §8. **Tier-2** (CC-75 transfer) has now
+> also run (2026-07-21; [`RUN_TIER2.md`](./RUN_TIER2.md)) — the coverage effect does
+> not transfer to the naturalistic corpus; see §6 addition (h). Every number
 > in this report is taken from committed run records or volume artifacts named in
 > §9; the pre-registration ([`../PREREG.md`](../PREREG.md)) remains the authority
 > on the design. Detailed run records: [`RUN_SA.md`](./RUN_SA.md),
@@ -52,7 +53,17 @@ plausibly one story rather than two: at this scale the SFT recipe broadly overwr
 the base model — breaking about as much as it fixes on-task (§5.6) and regressing
 off-task — while GRPO's KL-tethered on-policy updates change little beyond the target.
 Read that way the negative interaction is as much "SFT is unexpectedly destructive
-here" as "GRPO is unexpectedly good at coverage."
+here" as "GRPO is unexpectedly good at coverage." A transfer test on the naturalistic
+CC-75 corpus (Tier-2) sharpens which half generalizes. The coverage-specific GRPO
+advantage does **not**: RA's 74% synthetic-coverage recovery falls to 7.6%, and the
+interaction vanishes (≈ −0.005), locating T1.4's headline effect in T01's *synthetic*
+constraint distribution rather than a generalizing capability. The SFT-more-destructive
+pattern, by contrast, transfers cleanly and is now triangulated across three
+distributions (synthetic holdout breakage, MMLU general-capability regression, and
+naturalistic CC-75 breakage). **The transfer-robust takeaway is therefore the
+cautionary one: scaffold-distilled SFT at this scale degraded the model on every
+distribution tested, while GRPO's larger gains were concentrated where a clean verifier
+defined the target and did not evidently generalize past it.**
 
 ---
 
@@ -607,6 +618,51 @@ measurement artifact — the scaffold makes P's first assistant token a checklis
 not an answer letter — on the base weights P shares with Arm 0, so it is not a
 capability loss, and P is (correctly) not gated by H3.
 
+**(h) Tier-1 vs Tier-2 (CC-75 transfer) — the coverage effect does not generalize;
+the SFT-destructive pattern does.** *(Added 2026-07-21 after the Tier-2 run —
+[`RUN_TIER2.md`](./RUN_TIER2.md); exploratory/descriptive per §6 and underpowered for
+the interaction by design, PREREG §5.)* **The lead finding is a non-transfer.** T01's
+recovery estimand, re-measured on the *naturalistic* CC-75 corpus that E08 originally
+diagnosed (75 prompts, opus/k=3 grading, recovery against a *local* Arm-0 reference
+that cancels a measured ~20% stack+grader false-recovery floor — RUN_TIER2 §2),
+collapses:
+
+| Rec (arm on its trained cause) | Tier-1 (synthetic pool) | Tier-2 (CC-75 naturalistic) |
+|---|---|---|
+| SA · coverage | 0.284 | 0.052 |
+| **RA · coverage** | **0.740** | **0.076** |
+| SB · precision | 0.190 | 0.094 |
+| RB · precision | 0.306 | 0.113 |
+| **method×cause interaction** | **−0.339** [−0.41, −0.27] | **≈ −0.005** (CIs overlap 0) |
+
+RA — the arm that recovered **74%** of Tier-1 coverage failures, the single cell that
+drove the entire negative interaction — recovers **7.6%** on naturalistic coverage.
+All four arms recover only 5–11% on CC-75, and the interaction is indistinguishable
+from zero. **The honest read: T1.4's headline coverage-specific GRPO advantage appears
+tied to T01's *synthetic* constraint distribution — the surface-format constraint types
+RA mastered (start_phrase, casing, no_commas; §6(d)) — rather than a capability that
+generalizes to how coverage failures actually appear in the wild.** This is the
+empirical corroboration of §6(d)'s confound: the effect lived in the constraint-type
+family, and CC-75's naturalistic `constraint_unaddressed` failures do not share it.
+
+What *does* transfer is the other half, now resting on **three independent
+measurements** that SFT damages the model more than GRPO does: (i) Tier-1 on-task
+breakage (§5.6) — SFT arms net-negative, SA broke 55% of base-passed criteria;
+(ii) H3 off-task (addition (g)) — both SFT arms regress ~3 pp of general capability,
+both GRPO arms retain; (iii) Tier-2 CC-75 breakage — SFT arms break **22.8% / 26.0%**
+of base-passed criteria vs GRPO's **15.3% / 15.4%**. Three distributions — synthetic
+holdout, MMLU, naturalistic CC-75 — one consistent signal.
+
+**So the more defensible, transfer-stable conclusion is not the pre-registered
+interaction (real, but pool-specific) but this:** the method that looked *worse* on the
+engineered coverage benchmark (SFT) is the one that reliably degrades the model across
+every distribution tested, while GRPO's advantage is concentrated where the reward is a
+clean verifier and does not obviously generalize past it. (Tier-2 is descriptive and
+underpowered for the interaction — PREREG §5's 5–8-point floor — so this does **not**
+re-test H1; the non-transfer is a statement about recovery *magnitude* corroborating
+§6(d), and the CC-75 grades carry the §2 single-judge/stack caveat, held on the
+absolute numbers not the qualitative reading.)
+
 ## 7 · Threats to validity and limitations
 
 1. **Main effects are compute-confounded** (GRPO ~10× FLOPs; wall-clock minutes
@@ -619,8 +675,12 @@ capability loss, and P is (correctly) not gated by H3.
    GRPO arms held (RA −0.1, RB +0.9). The off-task
    regression that §5.6's on-task breakage made a *concern* is now observed — for
    SFT specifically, not GRPO (though SA/SB are statistically indistinguishable at
-   the 3-pt line; see (g)). **Tier-2** (CC-75 transfer) remains pending —
-   in-distribution holdout only, so external validity is untested.
+   the 3-pt line; see (g)). **Tier-2** (CC-75 transfer) has now run (addition (h);
+   [`RUN_TIER2.md`](./RUN_TIER2.md)): external validity *was* tested and the
+   coverage-GRPO effect did **not** transfer (RA coverage recovery 74% → 7.6%,
+   interaction ≈ 0), while the SFT-breakage pattern did. Tier-2 is descriptive and
+   underpowered for the interaction (PREREG §5), and its single-judge/stack
+   reproduction caveat (RUN_TIER2 §2) applies to its absolute numbers.
 3. **Single model, single scale, single family** — one cell of the
    (family × scale) grid; a heavily post-trained subject (Meta's SFT+RS+DPO)
    whose headroom and method-response may be atypical.
@@ -662,8 +722,12 @@ Diagnosis-driven training remains supported in the weak sense (failure type
 modulated method effectiveness strongly); the specific mapping pre-registered
 here does not. The promised Tier-3 guard has since run and **failed for the SFT arms** (SA −3.2 pp,
 SB −3.0; both GRPO arms held) — off-task confirmation of §5.6's on-task SFT breakage
-(§6 additions (g)). Recommended next steps, in order: the ~40-row E08 label
-hand-check (cheap, tests mechanism (c) at the source); a marker-reliability or
+(§6 additions (g)). Tier-2 has since tested transfer to the naturalistic CC-75 corpus
+(§6 addition (h)): the coverage-GRPO advantage did **not** generalize (RA coverage
+recovery 74% → 7.6%, interaction ≈ 0), locating the headline effect in T01's synthetic
+constraint distribution — while the SFT-more-destructive pattern transferred, making it
+the more defensible, transfer-stable conclusion. Recommended next steps, in order: the
+~40-row E08 label hand-check (cheap, tests mechanism (c) at the source); a marker-reliability or
 whole-text-graded SFT re-run to isolate mechanism (a); then T02 cross-family, with
 the *same* constraint-type families instantiated under both causes so the archetype
 effect is not confounded with type-family or pool-authoring epoch (§6 additions (d)).
@@ -696,9 +760,10 @@ are the committed provenance.
 ---
 
 *Report finalized 2026-07-20 from committed artifacts; supersedes the 2026-07-18
-scaffold version of this file. A same-day post-finalization pass incorporated the H3
-Tier-3 guard result ([`RUN_H3.md`](./RUN_H3.md)) and four reviewer questions on the
-confound structure (§6 additions (d)–(g); STATUS, §2, §7, §8 updated to match; the
-`===FINAL===` marker count corrected 2300→4800 after verifying all four arms).
-PREREG.md remains the authority on the design; where this report explains or
-interprets, §§5.6 and 6 are explicitly post-hoc.*
+scaffold version of this file. Post-finalization passes incorporated the H3 Tier-3
+guard result ([`RUN_H3.md`](./RUN_H3.md)) and four reviewer questions on the confound
+structure (2026-07-20; §6 additions (d)–(g); the `===FINAL===` marker count corrected
+2300→4800 after verifying all four arms), then the Tier-2 CC-75 transfer result
+(2026-07-21; [`RUN_TIER2.md`](./RUN_TIER2.md); §6 addition (h); abstract, STATUS, §2,
+§7, §8 updated to match). PREREG.md remains the authority on the design; where this
+report explains or interprets, §§5.6 and 6 are explicitly post-hoc.*
