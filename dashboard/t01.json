@@ -1,0 +1,128 @@
+{
+  "meta": {
+    "title": "Does failure type determine training method?",
+    "question": "SFT vs GRPO across coverage and precision failures on Llama-3.2-3B",
+    "status_badges": ["pre-registered", "2x2 factorial", "N=400 holdout", "completed 2026-07"],
+    "date": "2026-07-20",
+    "report_url": "https://github.com/smarinacseas/failure-mode-id/blob/main/experiments/T01/results/T1_3_FINAL_REPORT.md",
+    "prereg_url": "https://github.com/smarinacseas/failure-mode-id/blob/main/experiments/T01/PREREG.md"
+  },
+  "verdict": [
+    { "badge": "prereg", "text": "H1 not confirmed: the interaction is significantly negative (-0.3391, 95% cluster-bootstrap CI [-0.4086, -0.2687]). GRPO's advantage over SFT was largest on coverage failures, the opposite of the prediction: GRPO recovered 74% of coverage failures while SFT recovered 28% and broke 55% of the criteria the base model already passed." },
+    { "badge": "posthoc", "text": "Best-evidenced mechanism: a train/eval grading asymmetry specific to the SFT pipeline. The teacher's scaffold prose was never constraint-checked during data acceptance, the students imitated the scaffold but never emitted the answer marker (0 of 4800 decodes), so at eval their whole text is graded and fails formatting constraints wholesale." },
+    { "badge": "posthoc", "text": "Only the cautionary finding transferred. On naturalistic CC-75 prompts, GRPO's coverage win collapsed from 74% to 7.6% recovery and the interaction vanished (about -0.005). SFT's destructiveness replicated on all three distributions tested: synthetic holdout breakage, an MMLU regression of about 3 points, and naturalistic CC-75 breakage." }
+  ],
+  "charts": {
+    "recovery": {
+      "title": "Recovery on the trained cause (holdout, majority of 3 decodes)",
+      "tip": "recovery",
+      "arms": [
+        { "key": "P",  "label": "Prompt baseline", "coverage": 0.179, "precision": 0.268, "kind": "baseline" },
+        { "key": "SA", "label": "SFT on coverage",  "coverage": 0.284, "precision": 0.194, "kind": "sft" },
+        { "key": "SB", "label": "SFT on precision", "coverage": 0.270, "precision": 0.190, "kind": "sft" },
+        { "key": "RA", "label": "GRPO on coverage", "coverage": 0.740, "precision": 0.218, "kind": "grpo" },
+        { "key": "RB", "label": "GRPO on precision","coverage": 0.181, "precision": 0.306, "kind": "grpo" }
+      ],
+      "interaction": { "estimate": -0.3391, "ci_low": -0.4086, "ci_high": -0.2687,
+        "label": "Interaction (GRPO-SFT on precision) minus (GRPO-SFT on coverage)" }
+    },
+    "breakage": {
+      "title": "What each arm fixed vs what it broke (on its trained cause)",
+      "tip": "breakage",
+      "rows": [
+        { "key": "SA", "label": "SFT · coverage",  "recovery": 0.284, "breakage": 0.552, "net": -299 },
+        { "key": "SB", "label": "SFT · precision", "recovery": 0.190, "breakage": 0.287, "net": -67 },
+        { "key": "RA", "label": "GRPO · coverage", "recovery": 0.740, "breakage": 0.050, "net": 332 },
+        { "key": "RB", "label": "GRPO · precision","recovery": 0.306, "breakage": 0.083, "net": 52 }
+      ]
+    },
+    "transfer": {
+      "title": "What transfers off the synthetic distribution",
+      "collapse": { "label": "RA coverage recovery, synthetic vs naturalistic CC-75",
+        "synthetic": 0.740, "cc75": 0.076,
+        "note": "Tier-2 interaction about -0.005 vs Tier-1's -0.34: the coverage effect is pool-specific." },
+      "cc75_breakage": [
+        { "key": "SA", "value": 0.228 }, { "key": "SB", "value": 0.260 },
+        { "key": "RA", "value": 0.153 }, { "key": "RB", "value": 0.154 }
+      ],
+      "mmlu": [
+        { "key": "SA", "delta": -3.2, "note": "CI [-5.3, -1.1] spans the -3 guard line" },
+        { "key": "SB", "delta": -3.0 },
+        { "key": "RA", "delta": -0.1 },
+        { "key": "RB", "delta": 0.9 }
+      ]
+    }
+  },
+  "sections": [
+    { "id": "intro", "num": "1", "title": "Introduction", "badge": null,
+      "summary": "The E08 failure census made failure causes measurable; T01 asks whether they should pick the training fix.",
+      "body": [
+        "A census of Llama-3.2-3B on constraint-dense prompts (E08) diagnosed every failed criterion with a blinded root-cause taxonomy. Two causes dominated: coverage failures, where the model never engages a stated requirement (28.8% of diagnosed failures), and precision failures, where it engages but executes incorrectly (36.4%).",
+        "T01 tests a practical question: if you know which of these your model suffers from, should that choose between imitation (SFT) and on-policy reinforcement (GRPO)? The intuition being tested: imitation cheaply installs a coverage template, while precision needs on-policy practice against a verifier."
+      ],
+      "callout": null, "report_anchor": "1--introduction" },
+    { "id": "hypotheses", "num": "2", "title": "Hypotheses", "badge": "prereg",
+      "summary": "One confirmatory hypothesis (H1, the interaction), one exploratory (H2, data targeting), one guard (H3, MMLU).",
+      "body": [
+        "H1 (confirmatory): GRPO's advantage over SFT is larger on precision failures than on coverage failures, i.e. the interaction is positive. Decision rule, estimand, and analysis were fixed in the pre-registration before training.",
+        "H2 (exploratory): matching the training data's cause to the model's failure cause beats mismatched data. H3 (guard, added before evaluation): trained arms must not regress more than 3 points on MMLU."
+      ],
+      "callout": null, "report_anchor": "2--hypotheses" },
+    { "id": "methods", "num": "3", "title": "Methods", "badge": "prereg",
+      "summary": "2x2 factorial: {SFT, GRPO} x {coverage, precision} as LoRA arms on Llama-3.2-3B, plus a prompt-only baseline. Recovery on a 400-prompt reserved holdout is the estimand; inference by 10k cluster bootstrap.",
+      "body": [
+        "Four LoRA training arms (SA: SFT coverage, SB: SFT precision, RA: GRPO coverage, RB: GRPO precision) plus Arm P, a zero-cost system-prompt baseline. Training pools were synthesized per cause; SFT targets were distilled from a stronger teacher through a scaffolded prompt, with teacher outputs accepted only if the post-marker answer passed the constraints. GRPO rewarded whole-text constraint satisfaction via deterministic verifiers.",
+        "The estimand is recovery: of the criteria the base model failed, the fraction an arm now passes (majority over 3 decodes) on the reserved 400-prompt holdout. The confirmatory quantity is the interaction, which cancels arm-level confounds shared across causes, including GRPO's roughly 10x compute surplus. CIs come from a prompt-clustered bootstrap (10,000 resamples, fixed seed)."
+      ],
+      "callout": "The coverage pool was recalibrated mid-experiment under a pre-committed stopping rule, before any training ran. The estimand was untouched, but absolute coverage numbers are not comparable to pre-recalibration expectations.",
+      "report_anchor": "3--methods" },
+    { "id": "training", "num": "4", "title": "Training results", "badge": "prereg",
+      "summary": "All four arms hit their pre-registered learning bars; GRPO's coverage arm showed the steepest verified learning trend.",
+      "body": [
+        "All four arms trained to completion and passed their pre-registered learning-bar gates. The GRPO coverage arm (RA) showed a dramatically stronger training trend (t = 20.24) than the GRPO precision arm (RB, t = 2.79), an early hint of the asymmetry the holdout later confirmed."
+      ],
+      "callout": null, "report_anchor": "4--training-results-t13" },
+    { "id": "results", "num": "5", "title": "Evaluation results", "badge": "prereg",
+      "summary": "H1 reversed with the CI entirely below zero. Sensitivity analysis ruled out the truncation confound. H2 is null. Post-hoc breakage shows both SFT arms net-destructive.",
+      "body": [
+        "The interaction is -0.3391, CI [-0.4086, -0.2687]: significantly negative, a reversal rather than a null. GRPO does beat SFT on precision (+0.116), consistent with H1's mechanism in isolation, but beats it on coverage four times as much (+0.455), driven by RA's 74.0% recovery, the largest cell in the table.",
+        "16.5% of the SFT coverage arm's decodes hit the token cap inside degenerate repetition loops. A four-variant sensitivity analysis (V0 to V3) bounded this confound: even granting SA every truncated decode as a pass, the interaction stays negative (-0.1979, CI [-0.2714, -0.1244]). H2, cause-matched vs mismatched SFT data, is null in all variants.",
+        "Post-hoc breakage completes the picture: SA broke 55.2% of the coverage criteria the base model already passed (net -299 criteria), collapsing formatting-preservation types (casing fell from 71% to 1% pass). Both GRPO arms were net-positive; both SFT arms net-negative. Arm P, a free system prompt, captured most of what SFT precision training delivered."
+      ],
+      "callout": "The trained arms never emit the teacher's answer marker (0 of 4800 decodes), so eval grades their full scaffold-styled text. This train/eval asymmetry is specific to the SFT pipeline and inflates the reversal's magnitude by an unknown amount; it cannot explain all of it (a marker-blind sensitivity variant still caps SA at 0.425 vs RA's 0.740).",
+      "report_anchor": "5--evaluation-results-t14" },
+    { "id": "transfer", "num": "6", "title": "Transfer and general capability", "badge": "posthoc",
+      "summary": "The coverage-GRPO effect does not transfer to naturalistic prompts; the SFT-destructive pattern does, and also shows up as an MMLU regression.",
+      "body": [
+        "Tier-2 re-evaluated all arms on the naturalistic CC-75 benchmark. Recovery is uniformly low (5 to 11%) and the interaction vanishes (about -0.005): RA's 74% synthetic-coverage recovery falls to 7.6%. The headline coverage effect lives in T01's synthetic constraint distribution, not in a generalizing capability.",
+        "The SFT arms break 22.8% and 26.0% of base-passed CC-75 criteria vs GRPO's 15.3% and 15.4%. Combined with the Tier-1 holdout breakage and the H3 MMLU guard (SA -3.2, SB -3.0, RA -0.1, RB +0.9), the SFT-more-destructive pattern is triangulated across three independent distributions."
+      ],
+      "callout": "Tier-2 is descriptive and underpowered for the interaction by design. An untrained-arm control shows a roughly 20% false-recovery floor (about 20% of base failures pass locally with zero training), and CC-75 grading carries moderate single-judge noise (77% agreement with the original stack). These bound the absolute numbers, not the transfer/non-transfer reading.",
+      "report_anchor": "post-finalization-additions-2026-07-20" },
+    { "id": "threats", "num": "7", "title": "Threats to validity", "badge": null,
+      "summary": "Compute confound on main effects, cause labels are classifier-assigned, cause is entangled with constraint-type family, single model and scale.",
+      "body": [
+        "Main effects are compute-confounded (GRPO used roughly 10x the FLOPs); only the interaction is compute-fair, and even that assumes compute's marginal value is cause-independent, an assumption the result itself strains.",
+        "The cause labels come 95% from a single LLM classifier; the planned manual audit was deferred. 'Coverage' and 'precision' are also entangled by construction with disjoint constraint-type families and different pool-authoring epochs, so the interaction is an archetype effect, a type-family effect, and an authoring effect that T01 cannot separate. A clean archetype test needs the same constraint families under both causes, the central design lesson for T02.",
+        "One model, one scale, one family: Llama-3.2-3B is heavily post-trained, and its response to further training may be atypical."
+      ],
+      "callout": null, "report_anchor": "7--threats-to-validity-and-limitations" },
+    { "id": "conclusion", "num": "8", "title": "Conclusion", "badge": null,
+      "summary": "Failure type did modulate method choice, in the opposite direction predicted. The transfer-robust lesson is the cautionary one about small-scale scaffold-distilled SFT.",
+      "body": [
+        "Within scope, failure type does modulate training-method choice, significantly and robustly, but opposite the prediction. The transfer-robust takeaway is cautionary: scaffold-distilled SFT at this scale degraded the model on every distribution tested, while GRPO's larger gains were concentrated where a clean verifier defined the target and did not evidently generalize past it.",
+        "Practical readings: prefer on-policy training against the verifier when failures are verifier-checkable; if distilling with a scaffold, either train marker emission to reliability or grade training data whole-text; and try a system prompt before training at all."
+      ],
+      "callout": null, "report_anchor": "8--conclusion" }
+  ],
+  "mechanisms": [
+    { "rank": 1, "title": "Train/eval grading asymmetry punished SFT", "evidence": "best-evidenced",
+      "body": "Teacher data was accepted by grading only the post-marker answer; scaffold prose was never constraint-checked. Students imitated the scaffold but never adopted the marker, so eval grades their whole text. The per-type signature matches exactly: SA collapses on whole-text formatting constraints and improves content-insertion ones. GRPO graded whole-text all along and never suffers this." },
+    { "rank": 2, "title": "Dense verifiable reward is GRPO's home turf", "evidence": "moderate",
+      "body": "Coverage prompts carry about 6.5 mechanically checkable constraints vs precision's 3.5, giving GRPO a denser reward gradient per rollout group, and several coverage types are formulaic surface rules RL discovers readily. RA mastered the hardest one (exact opening phrase, 4.6% to 95.1%). The property that made coverage measurable also made it unusually RL-trainable." },
+    { "rank": 3, "title": "Construct drift from the recalibration", "evidence": "least evidenced",
+      "body": "The mid-stream recalibration hardened coverage with exacting types that demand execution precision as much as noticing, blurring the archetype contrast. If post-recalibration coverage is partly precision in disguise, some of the coverage-side GRPO advantage is H1's own mechanism relabeled. Unquantifiable here; a design lesson for T02." }
+  ],
+  "glossary_keys": ["grpo", "sft", "lora", "interaction", "recovery", "breakage",
+    "cluster-bootstrap", "estimand", "prereg", "posthoc", "coverage", "precision"]
+}
