@@ -75,7 +75,7 @@ def _run_entry(payload: dict, filename: str) -> dict:
 
 # Never pruned: the two run indexes plus hand-authored dashboard data files
 # that are tracked in git but are not experiment deliverables.
-_PRESERVED_FILES = {"runs.json", "training.json", "reference.json"}
+_PRESERVED_FILES = {"runs.json", "training.json", "reference.json", "t01.json"}
 
 
 def _clean_stale(dst: Path, keep: set[str]) -> list[str]:
