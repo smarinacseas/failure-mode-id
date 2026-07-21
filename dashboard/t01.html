@@ -1,0 +1,294 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>T01 · Does failure type determine training method?</title>
+    <link rel="stylesheet" href="theme.css" />
+    <script src="common.js"></script>
+    <script>FMID.initTheme()</script>
+    <style>
+      .wrap { max-width: 1140px; margin: 0 auto; padding: 0 30px 70px;
+        display: grid; grid-template-columns: 1fr 220px; gap: 40px; }
+      .paper { min-width: 0; }
+      .toc { position: sticky; top: 70px; align-self: start; font-size: 12px;
+        padding-top: 46px; }
+      .toc a { display: block; color: var(--ink-3); text-decoration: none;
+        padding: 4px 0 4px 12px; border-left: 2px solid var(--line); }
+      .toc a:hover { color: var(--ink); border-left-color: var(--accent); }
+      .phead { padding: 46px 0 8px; }
+      .phead h1 { font-family: "Newsreader", Georgia, serif; font-weight: 500;
+        font-size: 30px; margin: 0 0 6px; letter-spacing: -0.01em; }
+      .phead .q { font-size: 15px; color: var(--ink-2); margin: 0 0 12px; }
+      .badges { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 8px; }
+      .badges span { font-family: "IBM Plex Mono", monospace; font-size: 10px;
+        font-weight: 600; letter-spacing: .04em; padding: 3px 9px; border-radius: 6px;
+        background: var(--surface-2); color: var(--ink-2);
+        border: 1px solid var(--border); }
+      .links { font-size: 12px; }
+      .links a { color: var(--accent); text-decoration: none; margin-right: 14px; }
+      .links a:hover { text-decoration: underline; }
+      .verdict { background: var(--surface); border: 1px solid var(--accent-line);
+        border-radius: 12px; padding: 18px 22px; margin: 22px 0; }
+      .verdict h2 { font-family: "Newsreader", Georgia, serif; font-weight: 500;
+        font-size: 16px; margin: 0 0 10px; }
+      .verdict li { font-size: 13.5px; line-height: 1.65; color: var(--ink-1);
+        margin-bottom: 9px; }
+      .chartcard { background: var(--surface); border: 1px solid var(--border);
+        border-radius: 12px; padding: 16px 20px 12px; margin: 16px 0; overflow-x: auto; }
+      .chartcard h3 { font-family: "Newsreader", Georgia, serif; font-weight: 500;
+        font-size: 15px; margin: 0 0 12px; }
+      .chartcard svg { display: block; max-width: 100%; }
+      details.sec { border-top: 1px solid var(--line); padding: 4px 0; }
+      details.sec > summary { cursor: pointer; list-style: none; padding: 13px 0;
+        display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+      details.sec > summary::-webkit-details-marker { display: none; }
+      .secnum { font-family: "IBM Plex Mono", monospace; font-size: 12px;
+        color: var(--ink-4); flex: none; }
+      .sectitle { font-family: "Newsreader", Georgia, serif; font-size: 17px;
+        font-weight: 500; }
+      .secsummary { font-size: 12.5px; color: var(--ink-3); flex-basis: 100%;
+        line-height: 1.5; }
+      details.sec[open] .secsummary { display: none; }
+      .secbody p { font-size: 13.5px; line-height: 1.7; color: var(--ink-1);
+        max-width: 46em; }
+      .mech { border: 1px solid var(--border); border-radius: 10px;
+        padding: 13px 17px; margin: 10px 0; background: var(--surface); }
+      .mech .rank { font-family: "IBM Plex Mono", monospace; font-size: 11px;
+        color: var(--ink-3); margin-right: 8px; }
+      .mech b { font-size: 13.5px; }
+      .mech .ev { font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+        font-weight: 700; margin-left: 8px; }
+      .mech .ev.best { color: var(--pass); } .mech .ev.mod { color: var(--amber); }
+      .mech .ev.least { color: var(--warn-dim); }
+      .mech p { font-size: 13px; line-height: 1.65; color: var(--ink-1); margin: 7px 0 0; }
+      .reportlink { font-size: 12px; }
+      footer { border-top: 1px solid var(--line); margin-top: 40px; padding: 16px 0;
+        font-size: 11.5px; color: var(--ink-3); }
+      @media (max-width: 980px) { .wrap { grid-template-columns: 1fr; } .toc { display: none; } }
+    </style>
+  </head>
+  <body>
+    <header id="nav"></header>
+    <div class="wrap">
+      <main class="paper" id="paper"><!-- rendered by JS --></main>
+      <aside class="toc" id="toc"></aside>
+    </div>
+    <script>
+      FMID.mountNav(document.getElementById("nav"), "t01");
+      FMID.initTips();
+
+      function el(tag, cls, html) {
+        var e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (html != null) e.innerHTML = html;
+        return e;
+      }
+      function esc(s) {
+        return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      }
+      function badge(kind) {
+        return kind === "prereg"
+          ? '<span class="fmid-badge-prereg">pre-registered</span>'
+          : kind === "posthoc"
+          ? '<span class="fmid-badge-posthoc">post-hoc</span>'
+          : "";
+      }
+      function pct(x) { return Math.round(x * 1000) / 10 + "%"; }
+      var CSS = getComputedStyle(document.documentElement);
+      function v(name) { return CSS.getPropertyValue(name).trim(); }
+
+      /* ---- chart 1: recovery grouped bars + interaction CI ---- */
+      function chartRecovery(c) {
+        var W = 640, barH = 13, gap = 5, groupGap = 26, left = 150, scale = 420;
+        var colors = { baseline: "var(--ink-4)", sft: "var(--fail)", grpo: "var(--pass)" };
+        var y = 8, s = "";
+        ["coverage", "precision"].forEach(function (cause) {
+          s += '<text x="0" y="' + (y + 9) + '" font-size="11" font-weight="700" fill="var(--ink-2)" style="text-transform:uppercase">' + cause + "</text>";
+          y += 18;
+          c.arms.forEach(function (a) {
+            var w = a[cause] * scale;
+            s += '<text x="' + (left - 8) + '" y="' + (y + barH - 3) + '" font-size="11" fill="var(--ink-2)" text-anchor="end">' + esc(a.label) + "</text>";
+            s += '<rect x="' + left + '" y="' + y + '" width="' + w + '" height="' + barH + '" rx="3" fill="' + colors[a.kind] + '"' + (a.kind === "baseline" ? ' opacity="0.55"' : "") + "/>";
+            s += '<text x="' + (left + w + 6) + '" y="' + (y + barH - 3) + '" font-size="11" font-family="IBM Plex Mono,monospace" fill="var(--ink-1)">' + pct(a[cause]) + "</text>";
+            y += barH + gap;
+          });
+          y += groupGap;
+        });
+        // Interaction interval on its own axis from -0.5 to 0.1
+        var axL = left, axW = scale, lo = -0.5, hi = 0.1;
+        function X(val) { return axL + ((val - lo) / (hi - lo)) * axW; }
+        var i = c.interaction, yI = y + 6;
+        s += '<text x="0" y="' + (yI + 4) + '" font-size="11" font-weight="700" fill="var(--ink-2)">Interaction</text>';
+        s += '<line x1="' + axL + '" y1="' + yI + '" x2="' + (axL + axW) + '" y2="' + yI + '" stroke="var(--line)"/>';
+        s += '<line x1="' + X(0) + '" y1="' + (yI - 10) + '" x2="' + X(0) + '" y2="' + (yI + 10) + '" stroke="var(--ink-4)" stroke-dasharray="3 3"/>';
+        s += '<text x="' + X(0) + '" y="' + (yI + 24) + '" font-size="10" fill="var(--ink-4)" text-anchor="middle">0</text>';
+        s += '<line x1="' + X(i.ci_low) + '" y1="' + yI + '" x2="' + X(i.ci_high) + '" y2="' + yI + '" stroke="var(--fail)" stroke-width="4" stroke-linecap="round"/>';
+        s += '<circle cx="' + X(i.estimate) + '" cy="' + yI + '" r="5" fill="var(--fail)"/>';
+        s += '<text x="' + X(i.estimate) + '" y="' + (yI - 12) + '" font-size="11" font-family="IBM Plex Mono,monospace" fill="var(--fail)" text-anchor="middle">' + i.estimate + " [" + i.ci_low + ", " + i.ci_high + "]</text>";
+        return '<svg viewBox="0 0 ' + W + " " + (yI + 34) + '" width="' + W + '">' + s + "</svg>";
+      }
+
+      /* ---- chart 2: recovery vs breakage pairs ---- */
+      function chartBreakage(c) {
+        var W = 640, barH = 12, left = 150, scale = 420, y = 4, s = "";
+        c.rows.forEach(function (r) {
+          s += '<text x="' + (left - 8) + '" y="' + (y + 19) + '" font-size="11" fill="var(--ink-2)" text-anchor="end">' + esc(r.label) + "</text>";
+          s += '<rect x="' + left + '" y="' + y + '" width="' + (r.recovery * scale) + '" height="' + barH + '" rx="3" fill="var(--pass)"/>';
+          s += '<text x="' + (left + r.recovery * scale + 6) + '" y="' + (y + 10) + '" font-size="10" font-family="IBM Plex Mono,monospace" fill="var(--pass)">fixed ' + pct(r.recovery) + "</text>";
+          y += barH + 2;
+          s += '<rect x="' + left + '" y="' + y + '" width="' + (r.breakage * scale) + '" height="' + barH + '" rx="3" fill="var(--fail)"/>';
+          s += '<text x="' + (left + r.breakage * scale + 6) + '" y="' + (y + 10) + '" font-size="10" font-family="IBM Plex Mono,monospace" fill="var(--fail)">broke ' + pct(r.breakage) + "</text>";
+          var netCol = r.net >= 0 ? "var(--pass)" : "var(--fail)";
+          s += '<text x="' + (W - 4) + '" y="' + (y + 4) + '" font-size="11" font-weight="700" font-family="IBM Plex Mono,monospace" fill="' + netCol + '" text-anchor="end">net ' + (r.net > 0 ? "+" : "") + r.net + "</text>";
+          y += barH + 16;
+        });
+        return '<svg viewBox="0 0 ' + W + " " + y + '" width="' + W + '">' + s + "</svg>";
+      }
+
+      /* ---- chart 3: transfer panel ---- */
+      function chartTransfer(c) {
+        var W = 640, s = "", y = 10;
+        // collapse dumbbell
+        var left = 150, scale = 420;
+        s += '<text x="0" y="' + y + '" font-size="11" font-weight="700" fill="var(--ink-2)">' + esc(c.collapse.label) + "</text>";
+        y += 16;
+        var y0 = y + 8;
+        function X(val) { return left + val * scale; }
+        s += '<line x1="' + X(c.collapse.cc75) + '" y1="' + y0 + '" x2="' + X(c.collapse.synthetic) + '" y2="' + y0 + '" stroke="var(--ink-4)" stroke-width="2"/>';
+        s += '<circle cx="' + X(c.collapse.synthetic) + '" cy="' + y0 + '" r="6" fill="var(--pass)"/>';
+        s += '<text x="' + X(c.collapse.synthetic) + '" y="' + (y0 - 11) + '" font-size="11" font-family="IBM Plex Mono,monospace" fill="var(--pass)" text-anchor="middle">synthetic ' + pct(c.collapse.synthetic) + "</text>";
+        s += '<circle cx="' + X(c.collapse.cc75) + '" cy="' + y0 + '" r="6" fill="var(--fail)"/>';
+        s += '<text x="' + X(c.collapse.cc75) + '" y="' + (y0 + 22) + '" font-size="11" font-family="IBM Plex Mono,monospace" fill="var(--fail)" text-anchor="middle">CC-75 ' + pct(c.collapse.cc75) + "</text>";
+        y = y0 + 40;
+        // cc75 breakage + mmlu mini rows
+        s += '<text x="0" y="' + y + '" font-size="11" font-weight="700" fill="var(--ink-2)">CC-75 breakage</text>';
+        s += '<text x="330" y="' + y + '" font-size="11" font-weight="700" fill="var(--ink-2)">MMLU delta (points)</text>';
+        y += 14;
+        var rowY = y;
+        c.cc75_breakage.forEach(function (r) {
+          s += '<text x="0" y="' + (rowY + 10) + '" font-size="11" fill="var(--ink-2)">' + r.key + "</text>";
+          s += '<rect x="34" y="' + rowY + '" width="' + (r.value * 600) + '" height="10" rx="2" fill="' + (r.key[0] === "S" ? "var(--fail)" : "var(--pass)") + '"/>';
+          s += '<text x="' + (40 + r.value * 600) + '" y="' + (rowY + 9) + '" font-size="10" font-family="IBM Plex Mono,monospace" fill="var(--ink-1)">' + pct(r.value) + "</text>";
+          rowY += 17;
+        });
+        var mmluY = y, zero = 430, per = 18;
+        c.mmlu.forEach(function (r) {
+          var w = Math.abs(r.delta) * per, x = r.delta < 0 ? zero - w : zero;
+          s += '<text x="330" y="' + (mmluY + 10) + '" font-size="11" fill="var(--ink-2)">' + r.key + "</text>";
+          s += '<rect x="' + x + '" y="' + mmluY + '" width="' + Math.max(w, 1.5) + '" height="10" rx="2" fill="' + (r.delta < -0.5 ? "var(--fail)" : "var(--pass)") + '"/>';
+          s += '<text x="' + (r.delta < 0 ? x - 4 : x + w + 4) + '" y="' + (mmluY + 9) + '" font-size="10" font-family="IBM Plex Mono,monospace" fill="var(--ink-1)" text-anchor="' + (r.delta < 0 ? "end" : "start") + '">' + (r.delta > 0 ? "+" : "") + r.delta + "</text>";
+          mmluY += 17;
+        });
+        s += '<line x1="' + zero + '" y1="' + (y - 4) + '" x2="' + zero + '" y2="' + (mmluY - 4) + '" stroke="var(--ink-4)" stroke-dasharray="3 3"/>';
+        y = Math.max(rowY, mmluY) + 8;
+        return '<svg viewBox="0 0 ' + W + " " + y + '" width="' + W + '">' + s + "</svg>";
+      }
+
+      fetch("./t01.json", { cache: "no-store" })
+        .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+        .then(render)
+        .catch(function (e) {
+          document.getElementById("paper").innerHTML =
+            '<div class="fmid-callout" style="margin-top:46px"><b>Failed to load t01.json.</b> ' +
+            esc(e.message) + "</div>";
+        });
+
+      function render(d) {
+        var p = document.getElementById("paper");
+
+        var head = el("div", "phead");
+        head.appendChild(el("h1", null, esc(d.meta.title)));
+        head.appendChild(el("p", "q", esc(d.meta.question)));
+        head.appendChild(el("div", "badges", d.meta.status_badges.map(function (b) {
+          return "<span>" + esc(b) + "</span>";
+        }).join("")));
+        head.appendChild(el("div", "links",
+          '<a href="' + d.meta.report_url + '">Full report (markdown)</a>' +
+          '<a href="' + d.meta.prereg_url + '">Pre-registration</a>'));
+        p.appendChild(head);
+
+        var ver = el("div", "verdict");
+        ver.appendChild(el("h2", null, "Verdict"));
+        var ul = el("ul", null, "");
+        ul.style.cssText = "margin:0;padding-left:18px";
+        d.verdict.forEach(function (item) {
+          ul.appendChild(el("li", null, badge(item.badge) + " " + esc(item.text)));
+        });
+        ver.appendChild(ul);
+        p.appendChild(ver);
+
+        var results = el("div", null, "");
+        results.id = "results";
+        [["recovery", chartRecovery], ["breakage", chartBreakage]].forEach(function (pair) {
+          var c = d.charts[pair[0]];
+          var card = el("div", "chartcard");
+          card.appendChild(el("h3", null, esc(c.title) +
+            (c.tip ? ' <span class="fmid-tip" data-tip="' + c.tip + '" tabindex="0">i</span>' : "")));
+          card.insertAdjacentHTML("beforeend", pair[1](c));
+          results.appendChild(card);
+        });
+        p.appendChild(results);
+
+        var transfer = el("div", null, "");
+        transfer.id = "transfer";
+        var tc = el("div", "chartcard");
+        tc.appendChild(el("h3", null, esc(d.charts.transfer.title)));
+        tc.insertAdjacentHTML("beforeend", chartTransfer(d.charts.transfer));
+        tc.appendChild(el("p", null, esc(d.charts.transfer.collapse.note)));
+        tc.lastChild.style.cssText = "font-size:12px;color:var(--ink-3);line-height:1.5";
+        transfer.appendChild(tc);
+        p.appendChild(transfer);
+
+        d.sections.forEach(function (sec) {
+          var det = document.createElement("details");
+          det.className = "sec";
+          det.id = sec.id;
+          var sum = el("summary", null,
+            '<span class="secnum">' + esc(sec.num) + "</span>" +
+            '<span class="sectitle">' + esc(sec.title) + "</span>" + badge(sec.badge) +
+            '<span class="secsummary">' + esc(sec.summary) + "</span>");
+          det.appendChild(sum);
+          var body = el("div", "secbody");
+          sec.body.forEach(function (para) { body.appendChild(el("p", null, esc(para))); });
+          if (sec.callout) body.appendChild(el("div", "fmid-callout", "<b>Caveat.</b> " + esc(sec.callout)));
+          if (sec.id === "results") {
+            body.appendChild(el("h3", null, "Candidate mechanisms " + badge("posthoc")));
+            body.lastChild.style.cssText = "font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:15px";
+            d.mechanisms.forEach(function (m) {
+              var cls = m.evidence === "best-evidenced" ? "best" : m.evidence === "moderate" ? "mod" : "least";
+              body.appendChild(el("div", "mech",
+                '<span class="rank">#' + m.rank + "</span><b>" + esc(m.title) + "</b>" +
+                '<span class="ev ' + cls + '">' + esc(m.evidence) + "</span><p>" + esc(m.body) + "</p>"));
+            });
+          }
+          if (sec.report_anchor) {
+            body.appendChild(el("p", "reportlink",
+              '<a style="color:var(--accent);text-decoration:none" href="' + d.meta.report_url + "#" +
+              sec.report_anchor + '">Full section in the report →</a>'));
+          }
+          det.appendChild(body);
+          p.appendChild(det);
+        });
+
+        var foot = el("footer", null,
+          "Benchmark: Surge AI Complex Constraints (CC-BY) · " +
+          'Census context: <a style="color:var(--ink-2)" href="eval.html#run=E08-llama3-2-3b-cc75&tab=analysis">E08 failure analysis</a>');
+        p.appendChild(foot);
+
+        var toc = document.getElementById("toc");
+        toc.innerHTML = '<a href="#results">Results charts</a><a href="#transfer">Transfer</a>' +
+          d.sections.map(function (s2) {
+            return '<a href="#' + s2.id + '">' + esc(s2.num) + " · " + esc(s2.title) + "</a>";
+          }).join("");
+        toc.addEventListener("click", function (e) {
+          var a = e.target.closest("a[href^='#']");
+          if (!a) return;
+          var id = a.getAttribute("href").slice(1);
+          var det = document.querySelector("details#" + id) || document.getElementById(id);
+          if (det && det.tagName === "DETAILS") det.open = true;
+        });
+      }
+    </script>
+  </body>
+</html>
