@@ -1,7 +1,7 @@
 # Failure Mode ID
 
 **Criterion-level analysis of where open language models fail on
-constraint-dense prompts — and root-cause diagnosis of *why*, in training-
+constraint-dense prompts, and root-cause diagnosis of *why*, in training-
 protocol terms.**
 
 Live results: <https://smarinacseas.github.io/failure-mode-id/#run=E07-reasoning-full75&tab=analysis&model=qwen-9b&judge=claude-opus-4-8>
@@ -13,7 +13,7 @@ OpenRouter), grades every criterion with a blind multi-family judge panel
 criteria for verifiability, **diagnoses every failed criterion with a blinded
 root-cause taxonomy** (never noticed vs dropped-from-CoT vs executed wrong vs
 judge-suspect …), and publishes a schema-versioned JSON that drives the
-dashboard — including its Failure Analysis tab.
+dashboard, including its Failure Analysis tab.
 
 ## Quickstart (~$2, ~20 minutes)
 
@@ -65,14 +65,17 @@ connectivity → load → generate → grade → classify → **diagnose** → v
 
 Each stage is also runnable alone: `uv run python main.py <stage> --experiment <slug>`.
 Artifacts live under `runs/<slug>/`; deliverables land in
-`outputs/experiments/<slug>.json` and auto-sync to `dashboard/`.
+`outputs/experiments/<slug>.json` and auto-sync to `dashboard/`. The
+dashboard serves three pages: the run landing page at `/`, the failure
+analysis eval app at `/eval.html`, and the T01 training write-up at
+`/t01.html`.
 
-- **generate** — streamed candidate calls, 4-worker pool, wall-clock deadline guard
-- **grade** — one blind judge call per (judge, model, prompt); mixed Anthropic/OpenRouter panels supported; ≥2 judges produce consensus verdicts + agreement stats; refusal/truncation/parse failures recorded distinctly, never silently dropped
-- **classify** — criterion verifiability (auto vs judge) + gameability tags
-- **diagnose** — blinded root-cause labels for every criterion the panel consensus marks FAIL (walks a Fable-preferred fallback chain to Opus per cell, batch; the analyst never sees judge reasons, model identity, or any judge's verdicts; a reserved `judge_suspect` label licenses disagreement), plus an iteration synthesis comparing against the previous experiment and recommending the next one
-- **validate** — human-validation sampling of judge verdicts
-- **aggregate** — joins everything into the schema-versioned results JSON (see `meta/RESULTS_SCHEMA.md`)
+- **generate**: streamed candidate calls, 4-worker pool, wall-clock deadline guard
+- **grade**: one blind judge call per (judge, model, prompt); mixed Anthropic/OpenRouter panels supported; ≥2 judges produce consensus verdicts + agreement stats; refusal/truncation/parse failures recorded distinctly, never silently dropped
+- **classify**: criterion verifiability (auto vs judge) + gameability tags
+- **diagnose**: blinded root-cause labels for every criterion the panel consensus marks FAIL (walks a Fable-preferred fallback chain to Opus per cell, batch; the analyst never sees judge reasons, model identity, or any judge's verdicts; a reserved `judge_suspect` label licenses disagreement), plus an iteration synthesis comparing against the previous experiment and recommending the next one
+- **validate**: human-validation sampling of judge verdicts
+- **aggregate**: joins everything into the schema-versioned results JSON (see `meta/RESULTS_SCHEMA.md`)
 
 ## Reports
 

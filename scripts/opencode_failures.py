@@ -7,7 +7,7 @@ Usage:
     uv run python scripts/opencode_failures.py E05-reasoning-rand20p [--sample 70]
 
 Blinding: reuses diagnose._user_message, so the analyst payload is identical
-to Pass 2's — no judge reasons, no model identity (spec §4 applies to both
+to Pass 2's: no judge reasons, no model identity (spec §4 applies to both
 passes). The instruction differs only in asking for free text instead of a
 taxonomy key.
 """
@@ -77,7 +77,7 @@ def main() -> int:
             if strata[key] and len(picked) < min(args.sample, len(pairs)):
                 picked.append(strata[key].pop())
 
-    # One request per sampled (cell, criterion) — open coding wants independent
+    # One request per sampled (cell, criterion): open coding wants independent
     # descriptions, so no cell-level bundling here (unlike Pass 2).
     requests = []
     meta = {}
@@ -89,7 +89,7 @@ def main() -> int:
         requests.append(_batch_request(cid, OPENCODE_SYSTEM, user_msg))
 
     if not requests:
-        print(f"no failed criteria to sample for {args.slug} — nothing to do.")
+        print(f"no failed criteria to sample for {args.slug}, nothing to do.")
         return 0
 
     print(f"open-coding {len(requests)} sampled failures from {args.slug} …")

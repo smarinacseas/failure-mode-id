@@ -2,9 +2,9 @@
 
 VerIH pairs a system instruction with a (possibly conflicting) user
 instruction; the OUTPUT constraints (format/quantity/keyword) are
-deterministically checkable — that check is the reward (training/reward.py).
+deterministically checkable, that check is the reward (training/reward.py).
 The dataset lives in the skai-research/VerIH GitHub repo, NOT on HuggingFace
-Hub — clone into data/verih/ (gitignored; see Step 4 in the task brief):
+Hub: clone into data/verih/ (gitignored; see Step 4 in the task brief):
 
     git clone https://github.com/skai-research/VerIH data/verih
 
@@ -27,7 +27,7 @@ target_keys=["sys_prompt", "user_prompt", "gt", "type"]). Real row shape:
 
 `gt.func_name` is one of 24 IFEval-style verifier names and does NOT map
 1:1 to training/reward.py's 6-type taxonomy (max_words/min_words/
-keyword_include/keyword_forbid/sentence_count/json_parses) — see the task
+keyword_include/keyword_forbid/sentence_count/json_parses); see the task
 report for the full func_name inventory and mapping gap. `to_sample` does
 not attempt that remapping (out of scope here); it parses `gt` and returns
 it verbatim as the sole constraint dict, matching how VerIH's own
@@ -49,11 +49,11 @@ def to_sample(row: dict) -> dict:
 
     messages: system (from sys_prompt, omitted if blank) + user (from
     user_prompt). constraints: a single-element list holding the parsed
-    `gt` verifier spec verbatim (empty list if `gt` is absent/blank) —
+    `gt` verifier spec verbatim (empty list if `gt` is absent/blank);
     `gt`'s "func_name"/params are VerIH's own schema, not training/reward.py's
     constraint "type" taxonomy (see module docstring). type: VerIH's own
     aligned/conflict tag (row["type"], e.g. "forbidden words:aligned"),
-    passed through losslessly (None if absent) — the training phase uses it
+    passed through losslessly (None if absent); the training phase uses it
     for conflict-split metrics.
     """
     messages = []

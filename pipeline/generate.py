@@ -4,16 +4,16 @@ resumable, threaded).
 Calls are STREAMED with a hard wall-clock deadline (config.GENERATION_DEADLINE_S)
 because `timeout_s` alone provably cannot bound them: httpx's read timeout
 resets on every trickled chunk, and a half-open socket (client slept
-mid-stream) delivers neither bytes nor EOF, so no timeout ever fires — E04
+mid-stream) delivers neither bytes nor EOF, so no timeout ever fires; E04
 lost 10.3 hours to exactly that (meta/2026-07-03-reasoning-smoke.md, lesson 4).
 Two mechanisms cover the two failure shapes:
-  1. per-chunk elapsed check — catches slow-trickle generations that keep
+  1. per-chunk elapsed check: catches slow-trickle generations that keep
      resetting the read timer;
-  2. a watchdog timer that closes the stream at the deadline — a close from
+  2. a watchdog timer that closes the stream at the deadline: a close from
      another thread makes a read blocked on a dead socket raise, catching the
      no-chunks-at-all hang.
 Either abort raises GenerationDeadlineExceeded into the existing retry()
-path: it counts as a retry event, then an error if retries exhaust —
+path: it counts as a retry event, then an error if retries exhaust:
 identical to every other transient failure (continue-on-error per item).
 
 The (candidate × prompt) work items run on a small thread pool
@@ -47,11 +47,11 @@ class GenerationDeadlineExceeded(TimeoutError):
 
 # Three knobs with non-obvious defaults, all forced by Qwen3.5 being a
 # thinking-mode family (see meta/2026-06-30-smoke-test.md):
-#   1. reasoning off by default — thinking and the visible answer share one
+#   1. reasoning off by default: thinking and the visible answer share one
 #      completion budget, so the answer only appears if thinking terminates.
-#   2. max_tokens=8000 — at 4000 complex responses truncate mid-answer.
+#   2. max_tokens=8000: at 4000 complex responses truncate mid-answer.
 #      Reasoning-on runs need far more headroom (thinking + answer).
-#   3. temperature — thinking mode must NOT run greedy: Qwen's model card
+#   3. temperature: thinking mode must NOT run greedy; Qwen's model card
 #      warns greedy decoding causes endless repetitions, observed 2026-07-02
 #      as temp 0.0 + reasoning burning the whole 32k budget on CoT with zero
 #      visible content on every call. Qwen recommends 0.6 for thinking mode.
@@ -61,17 +61,17 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
                   deadline_s: float | None = None,
                   on_reject=None) -> dict:
     """Return response-record fields: the visible answer, finish_reason, and
-    (when the provider returns one) the chain-of-thought — kept out of the
+    (when the provider returns one) the chain-of-thought, kept out of the
     judge's view but stored for post-hoc failure-mode analysis.
 
     The request is identical to the sequential-era call except for the
     transport: `stream=True` so the wall-clock deadline can be enforced
     per chunk. Model params, extra_body (reasoning + provider routing), and
-    timeout_s are unchanged — the frozen treatment is untouched.
+    timeout_s are unchanged; the frozen treatment is untouched.
 
     `on_reject` (optional callable) receives {"error", "finish_reason",
-    "response", "reasoning"} for every doomed ATTEMPT — empty completion or
-    deadline abort — immediately before the raise that hands control to
+    "response", "reasoning"} for every doomed ATTEMPT (empty completion or
+    deadline abort), immediately before the raise that hands control to
     retry(). Rejected drafts are training signal (runaway/looping CoT; see
     pipeline/_decode_health.py), not garbage: without the hook every retry
     silently discards the very text the failure analysis wants.
@@ -89,7 +89,7 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
                 "response": "".join(content_parts),
                 "reasoning": "".join(reasoning_parts),
             })
-        except Exception:  # noqa: BLE001 — capture must never mask the abort
+        except Exception:  # noqa: BLE001 (capture must never mask the abort)
             pass
 
     def _call():
@@ -114,13 +114,13 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
             if close is not None:
                 try:
                     close()
-                except Exception:  # noqa: BLE001 — teardown must never mask the abort
+                except Exception:  # noqa: BLE001 (teardown must never mask the abort)
                     pass
 
         def _abort() -> None:
             # Runs on the watchdog thread: closing the response makes a read
             # blocked on a silent/half-open socket raise instead of waiting
-            # forever — the case the per-chunk check can never see.
+            # forever; the case the per-chunk check can never see.
             deadline_hit.set()
             _close_stream()
 
@@ -168,7 +168,7 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
                     finish = choice.finish_reason
         except GenerationDeadlineExceeded:
             raise
-        except Exception as e:  # noqa: BLE001 — translate watchdog-induced teardown
+        except Exception as e:  # noqa: BLE001 (translate watchdog-induced teardown)
             if deadline_hit.is_set():
                 elapsed = time.monotonic() - started
                 _reject("deadline", finish, content_parts, reasoning_parts)
@@ -185,14 +185,14 @@ def _generate_one(cfg: RunConfig, model_id: str, prompt: str,
         text = "".join(content_parts)
         reasoning = "".join(reasoning_parts)
         # Zero-content cases split on the loop detector (ruling 2026-07-09):
-        #   LOOPING empty — a runaway repetition loop ate the budget and never
+        #   LOOPING empty: a runaway repetition loop ate the budget and never
         #     yielded an answer. That IS the result: return it as a stored,
         #     flagged loop-failure record (grade converts it to a mechanical
         #     all-FAIL, so the prompt stays in the aggregate as a failure
         #     instead of being retried ~5x15min hoping for a lucky escape,
         #     or silently excluded). E07: 5 items burned ~25 runaway streams
         #     this way before the policy changed.
-        #   NON-LOOPING empty — transient provider blip (empty body, mid-CoT
+        #   NON-LOOPING empty: transient provider blip (empty body, mid-CoT
         #     provider error): retriable exactly as before.
         if not text.strip():
             r_loop = detect_repetition_loop(reasoning)
@@ -239,7 +239,7 @@ def _run_item(cfg: RunConfig, mon: RunMonitor, key: str, model_id: str, rec: dic
     try:
         fields = _generate_one(cfg, model_id, rec["prompt"],
                                on_reject=_capture_reject)
-    except Exception as e:  # noqa: BLE001 — post-retry failure
+    except Exception as e:  # noqa: BLE001 (post-retry failure)
         mon.record_error(f"generate {key} {rid}: {type(e).__name__}: {e}")
         mon.item_done(model=key, prompt_id=rid)
         return

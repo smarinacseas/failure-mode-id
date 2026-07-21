@@ -3,7 +3,7 @@
 Read-only over run artifacts. Compares by_root_cause rankings across four
 cuts (E05's 20; E07 full-75; E07 restricted to E05's 20 = repeat-draw A/A;
 E07's disjoint 55) with cluster-bootstrap CIs (clusters = prompts, because
-label counts within one response are heavily correlated — one E05 response
+label counts within one response are heavily correlated, one E05 response
 owned 15 of 219 labels), Wilson intervals (supplementary; criteria are not
 independent), rank-stability metrics, and the pre-registered decision rule.
 Also computes the judge-reliability proxies (concurrence-restricted and
@@ -153,7 +153,7 @@ def load_rows(slug: str) -> list[dict]:
     rows = block.get("rows") or []
     if not rows:
         raise SystemExit(
-            f"{path} has no failure_analysis rows — run diagnose + aggregate "
+            f"{path} has no failure_analysis rows; run diagnose + aggregate "
             f"for {slug} first.")
     return rows
 
@@ -173,7 +173,7 @@ def load_candidate_keys(slug: str) -> list[str]:
 
 
 def e05_sample_ids(limit: int = 20, seed: int = 20260706) -> set[str]:
-    """E05's exact prompt subset, re-derived — never hardcoded."""
+    """E05's exact prompt subset, re-derived, never hardcoded."""
     return {r["id"] for r in
             select_prompts(read_jsonl(config.DATA_JSONL), limit, seed)}
 
@@ -208,7 +208,7 @@ def _cut_block(rows: list[dict], ci: dict[str, tuple[float, float]]) -> dict:
 def _concurs_fail(jc) -> bool:
     """True when the panel concurred on FAIL. Pre-3.3 artifacts carry the
     second-judge string ("both_fail"); 3.3 rows carry the consensus vote
-    split — the generalization of both-judges-failed is >=2 real FAIL votes
+    split; the generalization of both-judges-failed is >=2 real FAIL votes
     with zero dissenting PASS votes (abstentions are non-votes, so they
     neither concur nor dissent)."""
     if isinstance(jc, str):
@@ -277,7 +277,7 @@ def analyze(e05_slug: str, e07_slug: str,
 
 def print_markdown(result: dict) -> None:
     for name, cut in result["cuts"].items():
-        print(f"\n### {name} — {cut['n_rows']} rows / {cut['n_prompts']} prompts")
+        print(f"\n### {name}: {cut['n_rows']} rows / {cut['n_prompts']} prompts")
         print("| root cause | count | share | bootstrap 95% |")
         print("|---|---|---|---|")
         for c in cut["ranking"][:6]:

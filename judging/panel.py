@@ -5,10 +5,10 @@ deliberately diverge from pipeline/_consensus.py (which resolves ties and
 below-quorum cells to FAIL):
 
   1. A refusal / malformed grade is ABSTAIN, never a FAIL vote. (Reused wholesale
-     from _consensus.vote_of — the grade layer already tags artifact reasons.)
+     from _consensus.vote_of; the grade layer already tags artifact reasons.)
   2. A 1-1 tie among the non-abstaining judges is broken by a designated anchor
      judge (Opus 4.8). If the anchor itself abstained, the criterion is EXCLUDED
-     from consensus metrics — it is NOT counted against the model as a FAIL.
+     from consensus metrics; it is NOT counted against the model as a FAIL.
   3. Every criterion needs >=2 non-abstaining verdicts (the completeness gate).
      Cells below that are EXCLUDE/panel_incomplete and drive targeted re-grades;
      completeness_report() lists them and names the judges to re-run.
@@ -105,7 +105,7 @@ def completeness_report(cells, judges: list[str]) -> dict:
 
     Returns {complete, n_cells, n_incomplete, incomplete:[...]} where each
     incomplete entry names the cell and the judges to re-grade (those that
-    abstained OR never produced a record) — the targeted-re-run worklist.
+    abstained OR never produced a record); the targeted-re-run worklist.
     """
     incomplete: list[dict] = []
     n_cells = 0

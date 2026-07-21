@@ -22,7 +22,7 @@ def test_csv_logger_streams_jsonl_and_rebuilds_csv(tmp_path):
     lg.on_train_begin(_args(), _State(0), ctrl)
     lg.on_log(_args(), _State(1), ctrl, logs={"loss": 2.0, "learning_rate": 1e-4})
     lg.on_log(_args(), _State(2), ctrl, logs={"loss": 1.5, "reward": 0.3})
-    # JSONL streamed live (2 lines) — present even if on_train_end never fires
+    # JSONL streamed live (2 lines); present even if on_train_end never fires
     lines = (tmp_path / "run.jsonl").read_text().splitlines()
     assert len(lines) == 2 and json.loads(lines[0])["loss"] == 2.0
     rows = list(csv.DictReader(csv_path.open()))

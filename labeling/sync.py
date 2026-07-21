@@ -3,7 +3,7 @@
 `main.py validate --mode sample` writes runs/<slug>/judge_validation.json with
 60 rows whose `response_excerpt` is truncated to 800 chars. The labeling page
 (dashboard/label.html) needs the FULL candidate response, and GitHub Pages
-only serves the dashboard/ folder — runs/ is gitignored. So this script joins
+only serves the dashboard/ folder, and runs/ is gitignored. So this script joins
 each validation row with its full response from runs/<slug>/responses/
 <model>.jsonl and writes a static bundle the page can fetch:
 
@@ -11,8 +11,8 @@ each validation row with its full response from runs/<slug>/responses/
 
 The bundle keeps every original judge_validation.json field (the page needs
 them to reconstruct a `validate --mode score`-compatible file on commit) and
-adds one field per row: `full_response`. Blinding is enforced by the UI —
-judge_verdict / judge_reason are never rendered before the human votes — not
+adds one field per row: `full_response`. Blinding is enforced by the UI:
+judge_verdict / judge_reason are never rendered before the human votes, not
 by stripping them here; the repo is public either way.
 
 Idempotent. Rerun after any `validate --mode sample`:
@@ -48,7 +48,7 @@ def build_bundle(slug: str) -> Path:
     src = run_dir / "judge_validation.json"
     if not src.exists():
         raise SystemExit(
-            f"{src} missing — run `main.py validate --experiment {slug} --mode sample` first."
+            f"{src} missing, run `main.py validate --experiment {slug} --mode sample` first."
         )
     rows = json.loads(src.read_text(encoding="utf-8"))
 
@@ -57,7 +57,7 @@ def build_bundle(slug: str) -> Path:
     for model in sorted({r["model"] for r in rows}):
         path = run_dir / "responses" / f"{model}.jsonl"
         if not path.exists():
-            raise SystemExit(f"{path} missing — cannot bundle full responses.")
+            raise SystemExit(f"{path} missing, cannot bundle full responses.")
         responses[model] = {r["id"]: r.get("response", "") for r in _read_jsonl(path)}
 
     out_rows = []

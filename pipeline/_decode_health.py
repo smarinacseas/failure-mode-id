@@ -1,8 +1,8 @@
 """Mechanical decode-health signals: repetition-loop detection + per-run census.
 
-User ruling (2026-07-09, during E07): ANY repetition loop — in the reasoning
+User ruling (2026-07-09, during E07): ANY repetition loop, in the reasoning
 channel or the visible answer, whether the model escaped it or ran the budget
-out — counts as a failure. Loops waste tokens, escaping them is unreliable,
+out, counts as a failure. Loops waste tokens, escaping them is unreliable,
 and looping is trainable behavior (repetition penalties, process supervision),
 so the eval surfaces it as first-class, auto-verifiable signal rather than an
 ops footnote. E07 evidence: qwen-9b's largest stored reasoning traces were
@@ -10,8 +10,8 @@ loops that escaped (e.g. CIF-055: 113-char period, chars 31k→149k, then a
 correct answer); unescaped loops exhausted the shared thinking+answer budget
 and surfaced only as retries/errors.
 
-Everything here is pure computation over stored artifacts — no API calls, no
-judge cost — so `aggregate` folds it into every run's results unconditionally.
+Everything here is pure computation over stored artifacts, no API calls, no
+judge cost, so `aggregate` folds it into every run's results unconditionally.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from pipeline._io import read_jsonl
 
 # Loop-detector heuristic: a text is "looping" when one NGRAM-char shingle
 # recurs at least MIN_REPEATS times inside the WINDOW-char tail. 20 repeats
-# of one 40-char shingle is ~20% of a 4000-char tail — far beyond anything
+# of one 40-char shingle is ~20% of a 4000-char tail, far beyond anything
 # varied prose produces, while catching both long-unit loops (period ~ tens
 # of chars) and single-char runaways (period 1).
 WINDOW = 4000
@@ -36,7 +36,7 @@ def detect_repetition_loop(text: str, window: int = WINDOW, ngram: int = NGRAM,
 
     period = median gap between consecutive occurrences of the dominant
     tail shingle (i.e. the repeat-unit length; 1 for single-char runaways);
-    onset = index of that shingle's first occurrence in the FULL text —
+    onset = index of that shingle's first occurrence in the FULL text,
     roughly where the loop began.
     """
     tail = text[-window:]
@@ -59,8 +59,8 @@ def detect_repetition_loop(text: str, window: int = WINDOW, ngram: int = NGRAM,
 def decode_health_block(cfg) -> dict:
     """Per-run loop census over stored responses AND captured rejected
     attempts (runs/<slug>/rejected/<key>.jsonl, written by generate's
-    on_reject hook). `rows` carries only flagged responses — a loop in either
-    channel, or a non-stop finish_reason — while `by_model` tallies cover
+    on_reject hook). `rows` carries only flagged responses (a loop in either
+    channel, or a non-stop finish_reason) while `by_model` tallies cover
     everything.
     """
     rows: list[dict] = []
@@ -71,7 +71,7 @@ def decode_health_block(cfg) -> dict:
             "n_loop_reasoning": 0,
             "n_loop_content": 0,
             "n_loop_any": 0,
-            "n_loop_escaped": 0,   # looped but finish==stop — still a failure
+            "n_loop_escaped": 0,   # looped but finish==stop, still a failure
             "n_loop_died": 0,      # looped and never finished cleanly
             "n_nonstop_finish": 0,
         }

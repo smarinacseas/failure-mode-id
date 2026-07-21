@@ -1,31 +1,31 @@
 """T1.4 truncation-confound sensitivity analysis (post-hoc, exploratory).
 
 Motivation: analysis.json's §8 artifact tell shows SA/coverage hit the
-max_new_tokens=2048 cap on 16.5% of decodes (99/600, 81/200 prompts) — ~10x
+max_new_tokens=2048 cap on 16.5% of decodes (99/600, 81/200 prompts), ~10x
 every other cell. Because Rec(SA,coverage) enters the H1 interaction with a
 negative sign, truncation-induced SA failures would push the interaction
 *down*, i.e. the confound works in the direction of the observed -0.3391.
 This script quantifies that before analysis.json is treated as final.
 
 Q1  Are capped-decode failures concentrated on truncation-sensitive criterion
-    types (end_phrase / required_sections / keyword_include — need late or
+    types (end_phrase / required_sections / keyword_include; need late or
     complete content) vs insensitive types (start_phrase / casing / no_commas /
-    keyword_exclude — prefix-checkable or only violated by present content)?
+    keyword_exclude; prefix-checkable or only violated by present content)?
 
 Q2  Recompute the Rec cells and H1 interaction under three treatments of
     capped decodes, applied symmetrically to every arm (same 10k cluster
     bootstrap, seed 20260715, as PREREG §6):
-      V0 baseline      — reproduce analysis.json exactly (sanity)
-      V1 drop-decodes  — capped decodes removed from the majority vote
-      V2 drop-prompts  — prompts where any interaction arm (RA/SA on coverage,
+      V0 baseline      : reproduce analysis.json exactly (sanity)
+      V1 drop-decodes  : capped decodes removed from the majority vote
+      V2 drop-prompts  : prompts where any interaction arm (RA/SA on coverage,
                          RB/SB on precision) had a capped decode are removed
                          from that cause pool (cluster-level exclusion)
-      V3 upper-bound   — every criterion on a capped decode counted as PASS
+      V3 upper-bound   : every criterion on a capped decode counted as PASS
                          (maximally generous to SA; if the interaction is
                          still negative here, truncation cannot explain it)
 
 Q3/Q4  Marker forensics: ===FINAL=== (and fragments) in raw completions,
-    split by capped/non-capped, for SA and RA — truncation symptom vs
+    split by capped/non-capped, for SA and RA: truncation symptom vs
     scaffold-compliance issue.
 
 Estimand code (majority_tables / rec_on_prompts / interaction_on / bootstrap)
@@ -195,7 +195,7 @@ def main() -> None:
 
     variants = {}
 
-    # V0 baseline — must reproduce analysis.json
+    # V0 baseline: must reproduce analysis.json
     v0_votes = to_votes(data, lambda vs: [p for p, _ in vs])
     variants["V0_baseline"] = variant_stats(majority_tables(v0_votes), pools_full)
 

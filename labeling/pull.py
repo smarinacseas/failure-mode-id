@@ -3,7 +3,7 @@
 dashboard/label.html commits the labeled judge_validation.json to the
 `labels` branch on GitHub (runs/ is gitignored, so labels live on their own
 branch rather than in the working tree's history). This script downloads that
-file and writes it to runs/<slug>/judge_validation.json — after which the
+file and writes it to runs/<slug>/judge_validation.json, after which the
 normal scoring step works:
 
     uv run python labeling/pull.py --experiment E08-llama3-2-3b-cc75
@@ -42,13 +42,13 @@ def pull(owner: str, repo: str, branch: str, slug: str) -> None:
 
     rows = json.loads(raw)
     if not isinstance(rows, list) or not rows:
-        raise SystemExit("Downloaded file is not a non-empty JSON array — refusing to write.")
+        raise SystemExit("Downloaded file is not a non-empty JSON array, refusing to write.")
     for i, r in enumerate(rows):
         missing = REQUIRED_KEYS - set(r)
         if missing:
-            raise SystemExit(f"Row {i} missing keys {sorted(missing)} — refusing to write.")
+            raise SystemExit(f"Row {i} missing keys {sorted(missing)}, refusing to write.")
         if str(r.get("human", "")).strip().upper() not in {"", "PASS", "FAIL"}:
-            raise SystemExit(f"Row {i} has invalid human verdict {r['human']!r} — refusing to write.")
+            raise SystemExit(f"Row {i} has invalid human verdict {r['human']!r}, refusing to write.")
 
     filled = sum(1 for r in rows if str(r["human"]).strip())
     dst = REPO_ROOT / path

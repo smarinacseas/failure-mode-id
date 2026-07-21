@@ -1,12 +1,12 @@
-"""GRPO runner — Arms RA (coverage) and RB (precision). PREREG §5 + amendment
+"""GRPO runner: Arms RA (coverage) and RB (precision). PREREG §5 + amendment
 2026-07-16 (b)(c)(d).
 
 On-policy verifier-feedback RL with LoRA (identical adapter to SFT; only the data
-differs). Rollouts run on the stock `model.generate()` backend —
-`GRPOConfig(use_vllm=False)` — per amendment (d) (no vLLM; speed-only, same
+differs). Rollouts run on the stock `model.generate()` backend
+(`GRPOConfig(use_vllm=False)`), per amendment (d) (no vLLM; speed-only, same
 sampling distribution). Reward = fraction of the prompt's constraints its final
 answer satisfies, minus a malformed penalty, length-capped (verifiers/reward.py
-via reward_adapter). k (num_generations) is frozen at 6 — NOT a sweep axis
+via reward_adapter). k (num_generations) is frozen at 6, NOT a sweep axis
 (amendment (b)); the probe sweeps LR only.
 
 Run (probe / full):
@@ -30,11 +30,11 @@ from reward_adapter import make_constraint_reward
 WORKSPACE = Path("/workspace/failure-mode-id/results")
 
 # Frozen GRPO knobs (PREREG §5 design table + amendment (b)(c)); estimand-immune.
-NUM_GENERATIONS = 6           # k — FROZEN (amendment (b)), not swept
+NUM_GENERATIONS = 6           # k: FROZEN (amendment (b)), not swept
 ROLLOUT_TEMP = 0.9
 BETA = 0.04                   # TRL default KL coeff; change only if unstable, then log
 MAX_COMPLETION_LENGTH = 1536  # must fit answer before ===FINAL===; report cap-hit at probe
-MAX_CHARS = 2800              # length cap M — just above longest teacher answer (2617 ch)
+MAX_CHARS = 2800              # length cap M, just above longest teacher answer (2617 ch)
 PER_DEVICE_BS = 6             # one k-group per device batch
 GRAD_ACCUM = 2                # -> generation_batch_size 12 = 2 unique prompts/step
 WARMUP_RATIO = 0.03
@@ -140,7 +140,7 @@ def main():
     )
 
     # Measure real generate() rollout throughput on the underlying causal LM
-    # (peft_model.base_model.model) — the object TRL calls .generate() on.
+    # (peft_model.base_model.model): the object TRL calls .generate() on.
     meter = GenerateMeter()
     policy = getattr(getattr(trainer.model, "base_model", trainer.model), "model", trainer.model)
     meter.attach(policy)

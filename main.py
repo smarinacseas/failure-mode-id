@@ -90,7 +90,7 @@ def _parser() -> argparse.ArgumentParser:
                    default=None, dest="provider_sort",
                    help="OpenRouter provider routing preference for candidate calls "
                         "(frozen; default: OpenRouter's own routing). Reasoning runs "
-                        "want 'throughput' — thinking budgets on a slow provider mean "
+                        "want 'throughput': thinking budgets on a slow provider mean "
                         "20+ minute calls.")
     p.add_argument("--provider-quant", default=None, dest="provider_quant",
                    help="Comma list of allowed candidate quantizations (frozen; e.g. "
@@ -109,7 +109,7 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--diagnose", choices=("on", "off"), default="on",
                    dest="diagnose",
                    help="For `all`: run the failure root-cause analysis stage "
-                        "after classify (default on). NOT frozen — analysis is "
+                        "after classify (default on). NOT frozen: analysis is "
                         "post-hoc and re-runnable; skipping it costs nothing "
                         "later (`main.py diagnose --experiment <slug>` backfills). "
                         "'on' spends extra judge tokens (~1 batch call per "
@@ -195,7 +195,7 @@ def _print_status() -> None:
         except (KeyError, ValueError, TypeError):
             age = None
         if age is not None and age > _STALE_AFTER_S:
-            print(f"\n⚠ possibly stalled — last update {int(age)}s ago (pid {snap.get('pid')}).")
+            print(f"\n⚠ possibly stalled, last update {int(age)}s ago (pid {snap.get('pid')}).")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -210,7 +210,7 @@ def main(argv: list[str] | None = None) -> int:
             load.run(limit=args.limit, monitor=mon)
         return 0
 
-    # connectivity: cfg optional — with a slug it pings that experiment's models.
+    # connectivity: cfg optional; with a slug it pings that experiment's models.
     cfg = None
     if args.experiment is not None or args.step in DATA_STEPS:
         if args.experiment is None:
@@ -220,7 +220,7 @@ def main(argv: list[str] | None = None) -> int:
         if (args.step == "connectivity"
                 and not (config.RUNS_DIR / args.experiment / "experiment.json").exists()):
             print(
-                f"error: experiment '{args.experiment}' has no frozen parameters yet — "
+                f"error: experiment '{args.experiment}' has no frozen parameters yet, "
                 "run a data step first, or run connectivity without --experiment to ping "
                 "the default models.",
                 file=sys.stderr,

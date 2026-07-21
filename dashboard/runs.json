@@ -2,7 +2,7 @@
   "runs": [
     {
       "id": "E01-smoke-3p",
-      "label": "E01-smoke-3p — First end-to-end pipeline exercise",
+      "label": "E01-smoke-3p · First end-to-end pipeline exercise",
       "date": "2026-07-02",
       "path": "./E01-smoke-3p.json",
       "n_prompts": 3,
@@ -10,7 +10,7 @@
     },
     {
       "id": "E02-smoke-fable-3p",
-      "label": "E02-smoke-fable-3p — pipeline fable judge",
+      "label": "E02-smoke-fable-3p · pipeline fable judge",
       "date": "2026-07-02",
       "path": "./E02-smoke-fable-3p.json",
       "n_prompts": 3,
@@ -18,7 +18,7 @@
     },
     {
       "id": "E03-judge-compare-3p",
-      "label": "E03-judge-compare-3p — Judge comparison — Opus 4",
+      "label": "E03-judge-compare-3p · Judge comparison · Opus 4",
       "date": "2026-07-10",
       "path": "./E03-judge-compare-3p.json",
       "n_prompts": 3,
@@ -26,7 +26,7 @@
     },
     {
       "id": "E04-reasoning-smoke-3p",
-      "label": "E04-reasoning-smoke-3p — Reasoning-on ablation of E03: same 3 prompts, Qwen candidates think before answe",
+      "label": "E04-reasoning-smoke-3p · Reasoning-on ablation of E03: same 3 prompts, Qwen candidates think before answe",
       "date": "2026-07-10",
       "path": "./E04-reasoning-smoke-3p.json",
       "n_prompts": 3,
@@ -34,7 +34,7 @@
     },
     {
       "id": "E05-reasoning-rand20p",
-      "label": "E05-reasoning-rand20p — Randomized-sample scale-up of E04: identical reasoning-on treatment (temp 0",
+      "label": "E05-reasoning-rand20p · Randomized-sample scale-up of E04: identical reasoning-on treatment (temp 0",
       "date": "2026-07-10",
       "path": "./E05-reasoning-rand20p.json",
       "n_prompts": 20,
@@ -42,7 +42,7 @@
     },
     {
       "id": "E06-temp06-3p",
-      "label": "E06-temp06-3p — Temp-only ablation of E03: same 3 prompts, reasoning off, temperature 0",
+      "label": "E06-temp06-3p · Temp-only ablation of E03: same 3 prompts, reasoning off, temperature 0",
       "date": "2026-07-10",
       "path": "./E06-temp06-3p.json",
       "n_prompts": 3,
@@ -50,7 +50,7 @@
     },
     {
       "id": "E07-reasoning-full75",
-      "label": "E07-reasoning-full75 — Full-benchmark replication of E05 reasoning-on treatment (population Pareto; CI ",
+      "label": "E07-reasoning-full75 · Full-benchmark replication of E05 reasoning-on treatment (population Pareto; CI ",
       "date": "2026-07-11",
       "path": "./E07-reasoning-full75.json",
       "n_prompts": 75,
@@ -81,5 +81,5 @@
       "n_models": 3
     }
   ],
-  "synced_at": "2026-07-16T00:13:24.592254+00:00"
+  "synced_at": "2026-07-21T22:44:57.371439+00:00"
 }

@@ -42,7 +42,7 @@ def append_jsonl(path: Path, record: dict) -> None:
     Contract: on success the record is appended whole (serialize first, then
     one write() of line+newline under this file's lock, then flush); on any
     failure nothing is written. Records from concurrent workers can therefore
-    never interleave or tear — resume logic (`done_ids` from re-reading the
+    never interleave or tear; resume logic (`done_ids` from re-reading the
     file) stays byte-simple.
     """
     line = json.dumps(record, ensure_ascii=False) + "\n"
@@ -69,7 +69,7 @@ def retry(
 ) -> T:
     """Call fn() with exponential backoff on transient errors.
 
-    Retries 429s, 5xx, network/timeout, and provider SDK parse errors —
+    Retries 429s, 5xx, network/timeout, and provider SDK parse errors:
     OpenRouter occasionally returns mid-stream-truncated bodies that
     bubble up as JSONDecodeError before our code ever sees them.
     """
@@ -77,7 +77,7 @@ def retry(
     for i in range(attempts):
         try:
             return fn()
-        except Exception as e:  # noqa: BLE001 — provider SDKs raise heterogeneous types
+        except Exception as e:  # noqa: BLE001 (provider SDKs raise heterogeneous types)
             last_exc = e
             msg = str(e).lower()
             name = type(e).__name__.lower()

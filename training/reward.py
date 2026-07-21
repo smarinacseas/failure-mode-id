@@ -1,4 +1,4 @@
-"""Deterministic output-constraint checkers — the RLVR reward signal.
+"""Deterministic output-constraint checkers: the RLVR reward signal.
 
 No LLM judge: each constraint is a pure function of the response string.
 `reward()` returns the mean satisfaction over a sample's constraint set, so
@@ -15,7 +15,7 @@ import re
 
 def _words(text: str) -> list[str]:
     # \b\w+\b counts contractions ("don't" -> 2) and hyphenated compounds
-    # ("well-known" -> 2) as multiple words — an accepted simplification
+    # ("well-known" -> 2) as multiple words, an accepted simplification
     # for quantity constraints.
     return re.findall(r"\b\w+\b", text)
 
@@ -33,7 +33,7 @@ def check_constraint(constraint: dict, response: str) -> bool:
     if t == "sentence_count":
         # Heuristic: neutralize decimal points (3.14), then count
         # terminal-punctuation runs. Abbreviations (Dr., e.g.) still
-        # over-count — known limitation; dataset-native verifiers supersede
+        # over-count, a known limitation; dataset-native verifiers supersede
         # these checkers once the real VerIH schema lands (training/data.py).
         no_decimals = re.sub(r"(?<=\d)\.(?=\d)", "", response)
         parts = [s for s in re.split(r"[.!?]+", no_decimals) if s.strip()]

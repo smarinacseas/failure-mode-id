@@ -2,8 +2,8 @@
 
 Frozen knobs live here so both methods use identical LoRA + the estimand-relevant
 values are single-sourced (PREREG amendment 2026-07-16 (c)). GPU-touching helpers
-(load_model/load_tokenizer) import torch/transformers lazily so this module — and
-the pure helpers extract_final / lora_config — import cheaply for unit tests.
+(load_model/load_tokenizer) import torch/transformers lazily so this module,
+and the pure helpers extract_final / lora_config, import cheaply for unit tests.
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ MODEL_PATH = os.environ.get("T01_MODEL_PATH", "/workspace/models/llama-3.2-3b-in
 CAUSES = ("coverage", "precision")
 FINAL_MARKER = "===FINAL==="
 
-# LoRA target modules — all attention + MLP linears, identical for every arm
+# LoRA target modules: all attention + MLP linears, identical for every arm
 # (PREREG amendment 2026-07-16 (c)).
 LORA_TARGET_MODULES = [
     "q_proj", "k_proj", "v_proj", "o_proj",   # attention
@@ -34,7 +34,7 @@ def extract_final(text: str) -> str:
     """The gradeable answer: everything after the last ===FINAL=== marker, or the
     whole text if the marker is absent (a malformed attempt graded as-is).
 
-    Twin of datagen.teacher_gen.extract_final — re-implemented here (2 lines)
+    Twin of datagen.teacher_gen.extract_final, re-implemented here (2 lines)
     rather than imported, because teacher_gen imports openai/dotenv, which are
     absent in the frozen training env. test_common keeps the two in agreement.
     """

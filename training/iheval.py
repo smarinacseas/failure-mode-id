@@ -2,7 +2,7 @@
 checkpoint, on the held-out VerIH test split.
 
 `score_conflict` scores each sample's ANSWER against its own gt verifier
-spec via `training/verih_reward.py::native_score` — the same scorer VerIH's
+spec via `training/verih_reward.py::native_score`, the same scorer VerIH's
 own eval protocol uses (check_answer's aligned/conflict branch), not the
 binary think-format-gated `rl_reward` used during training. This is a
 deliberate choice, not an oversight: `TinkerSampler.generate`
@@ -10,7 +10,7 @@ deliberate choice, not an oversight: `TinkerSampler.generate`
 strips `<think>...</think>` blocks before the text ever reaches this module.
 Scoring with `rl_reward` here would mean `has_think_block` sees post-strip
 text and always returns False, collapsing every score to 0.0 regardless of
-answer quality. `native_score` needs no think block — it strips through the
+answer quality. `native_score` needs no think block: it strips through the
 last `</think>` itself (a no-op on already-stripped text) and checks only
 constraint satisfaction, so it is well-defined on exactly the text this
 sampler produces.
@@ -35,7 +35,7 @@ def score_conflict(samples: list[dict], sampler) -> float:
     """Mean native-verifier satisfaction of the sampler's answers over
     `samples` (0.0 on an empty sample list). Each sample's constraints[0] is
     the VerIH gt spec scored against the sampler's response text via
-    native_score (answer-satisfaction only — think-block format is a
+    native_score (answer-satisfaction only; think-block format is a
     training-time reward concern, not an eval-gate one; see module
     docstring)."""
     if not samples:
@@ -44,7 +44,7 @@ def score_conflict(samples: list[dict], sampler) -> float:
     for s in samples:
         constraints = s["constraints"]
         if not constraints:
-            continue  # 0.0 contribution — counted via len(samples) below
+            continue  # 0.0 contribution, counted via len(samples) below
         text = sampler.generate(messages=s["messages"], max_tokens=_DEFAULT_MAX_TOKENS,
                                 temperature=0.6, reasoning=True)  # 0.6: reasoning-on, no greedy loops
         total += native_score(text, constraints[0])
@@ -84,7 +84,7 @@ def main() -> None:
     ft_client = service.create_sampling_client(model_path=ckpts["ft"])
 
     # LIVE-VERIFY (gated phase): renderer/tokenizer construction mirrors
-    # training/proxy.py's main() exactly — tokenizer comes from the base
+    # training/proxy.py's main() exactly: tokenizer comes from the base
     # checkpoint's sampling client and base/ft share the SAME renderer pair
     # (get_renderer("qwen3", tok) / get_renderer("qwen3_disable_thinking",
     # tok)), so only weights differ between the two samplers (fair

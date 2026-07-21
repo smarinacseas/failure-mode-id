@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""T1.3 live status reporter — READ-ONLY.
+"""T1.3 live status reporter ·READ-ONLY.
 
 Regenerates `experiments/T01/results/LIVE_STATUS.md` from the training artifacts
 already written by the runners/callbacks (results/logs/*.jsonl, *_summary.json,
 *_lengths.json, results/adapters/, RA_gate_step50.json). It does NOT import
-torch/trl, does NOT touch any training process, and does NOT poll — run it once
+torch/trl, does NOT touch any training process, and does NOT poll ·run it once
 per meaningful checkpoint (per-arm completion, gate fire, cap hit).
 
 Usage:  python experiments/T01/results/live_status.py
@@ -25,7 +25,7 @@ ADAPTERS = REPO / "results" / "adapters"
 FROZEN = REPO / "experiments" / "T01" / "config" / "t1_3_frozen.md"
 OUT = REPO / "experiments" / "T01" / "results" / "LIVE_STATUS.md"
 
-# Arm registry — tag maps to the runner's CSVLogger basename.
+# Arm registry ·tag maps to the runner's CSVLogger basename.
 ARMS = [
     {"arm": "SA", "method": "SFT",  "cause": "coverage",  "tag": "sft_SA_coverage",  "total_steps": 16,  "n": 123, "budget_s": None},
     {"arm": "SB", "method": "SFT",  "cause": "precision", "tag": "sft_SB_precision", "total_steps": 16,  "n": 123, "budget_s": None},
@@ -62,7 +62,7 @@ def read_json(p: Path) -> dict | None:
 
 def hms(sec: float | None) -> str:
     if sec is None or sec < 0 or math.isinf(sec):
-        return "—"
+        return "none"
     sec = int(sec)
     h, r = divmod(sec, 3600)
     m, s = divmod(r, 60)
@@ -141,9 +141,9 @@ def classify(a: dict) -> dict:
         if alive is True:
             status, note = "RUNNING", ""
         elif alive is False and not (sft_done or grpo_done):
-            status, note = "FAILED?", "PID not alive and no completion marker — check stdout"
+            status, note = "FAILED?", "PID not alive and no completion marker ·check stdout"
         elif stale:
-            status, note = "RUNNING?", "log stale >5m — possible stall/crash"
+            status, note = "RUNNING?", "log stale >5m ·possible stall/crash"
         else:
             status, note = "RUNNING", ""
 
@@ -155,7 +155,7 @@ def classify(a: dict) -> dict:
     ss = sorted((r["step"], r.get("elapsed_s")) for r in metric_rows if "step" in r and r.get("elapsed_s") is not None)
     for (s0, e0), (s1, e1) in zip(ss, ss[1:]):
         # require a POSITIVE elapsed delta: a resume restarts the CSVLogger clock, so the
-        # step across a resume boundary shows a negative jump — drop it (and any absurd outlier).
+        # step across a resume boundary shows a negative jump ·drop it (and any absurd outlier).
         if s1 > s0 and s1 > 1 and 0 < (e1 - e0) < 3600:
             deltas.append((e1 - e0) / (s1 - s0))
     s_med = st.median(deltas) if deltas else None
@@ -176,7 +176,7 @@ def classify(a: dict) -> dict:
             over_min = round((total - proj_stop) * s_proj / 60)
             trunc = {"proj_stop": proj_stop, "proj_epochs": round(proj_stop / steps_per_epoch, 2),
                      "s_mean": round(s_proj, 1), "s_med": round(s_med, 1), "over_min": over_min}
-            cap_note = f"⚠️ 3h cap first — proj stop ≈step {proj_stop} (~{trunc['proj_epochs']}/2.0 ep)"
+            cap_note = f"⚠️ 3h cap first ·proj stop ≈step {proj_stop} (~{trunc['proj_epochs']}/2.0 ep)"
 
     last = last_row
     last_val = None
@@ -188,7 +188,7 @@ def classify(a: dict) -> dict:
         else:
             last_val = last.get("loss")
     else:
-        # Windowed last10 mean — NOT the single noisy last step (avoids the
+        # Windowed last10 mean ·NOT the single noisy last step (avoids the
         # single-endpoint-noise pitfall flagged for the LR probe). Only use the
         # summary's final reward once the arm is actually DONE (else a stale
         # earlier-phase summary would mislabel a running resume).
@@ -208,7 +208,7 @@ def classify(a: dict) -> dict:
 
 # ---------- diagnostics rendering ----------
 def sft_diag(a: dict) -> list[str]:
-    L = [f"### {a['arm']} — SFT · {a['cause']}", ""]
+    L = [f"### {a['arm']} ·SFT · {a['cause']}", ""]
     lengths = read_json(LOGS / f"{a['tag']}_lengths.json")
     rows = [r for r in a["metric_rows"] if "loss" in r and "train_runtime" not in r]
     if not rows:
@@ -261,14 +261,14 @@ def grpo_windows(rows: list[dict]) -> dict:
 
 
 def grpo_diag(a: dict) -> list[str]:
-    L = [f"### {a['arm']} — GRPO · {a['cause']}", ""]
+    L = [f"### {a['arm']} ·GRPO · {a['cause']}", ""]
     rows = a["metric_rows"]
     rw = sorted([r for r in rows if "reward" in r], key=lambda r: r["step"])
     if not rw:
         L += ["_no reward rows yet._", ""]
         return L
     w = grpo_windows(rows)
-    L += ["**Windowed reward (first10 vs last10 — probe methodology, not single-endpoint):**", "",
+    L += ["**Windowed reward (first10 vs last10 ·probe methodology, not single-endpoint):**", "",
           "| window | steps | mean reward |", "|---|---|---|",
           f"| first10 | 1–10 | {w['first10']:.4f} |",
           f"| last10 | {max(1,w['max_step']-9)}–{w['max_step']} | {w['last10']:.4f} |",
@@ -287,20 +287,20 @@ def grpo_diag(a: dict) -> list[str]:
     tok_s = (a["summary"] or {}).get("throughput", {}).get("tok_per_s")
     L += ["**Health metrics (last step / summary):**", "",
           "| metric | value |", "|---|---|",
-          f"| reward (last step, noisy — see windowed table above) | {reward:.4f} |" if reward is not None else "| reward | — |",
-          f"| reward_std | {rstd:.4f} |" if rstd is not None else "| reward_std | — |",
-          f"| kl | {kl:.4g} |" if kl is not None else "| kl | — |",
-          f"| format_ok | {fmt:.3f} |" if fmt is not None else "| format_ok | — |",
-          f"| length drift (mean_len first→last) | {len0:.0f}→{lenN:.0f} (cap 1536) |" if len0 and lenN else "| length drift | — |",
-          f"| cap-hit % (last / mean) | {cap*100:.1f}% / {cap_mean*100:.1f}% |" if cap is not None and cap_mean is not None else "| cap-hit % | — |",
+          f"| reward (last step, noisy ·see windowed table above) | {reward:.4f} |" if reward is not None else "| reward | ·|",
+          f"| reward_std | {rstd:.4f} |" if rstd is not None else "| reward_std | ·|",
+          f"| kl | {kl:.4g} |" if kl is not None else "| kl | ·|",
+          f"| format_ok | {fmt:.3f} |" if fmt is not None else "| format_ok | ·|",
+          f"| length drift (mean_len first→last) | {len0:.0f}→{lenN:.0f} (cap 1536) |" if len0 and lenN else "| length drift | ·|",
+          f"| cap-hit % (last / mean) | {cap*100:.1f}% / {cap_mean*100:.1f}% |" if cap is not None and cap_mean is not None else "| cap-hit % | ·|",
           f"| rollout tok/s | {tok_s} |" if tok_s else "| rollout tok/s | n/a until completion |",
-          f"| step_time (last) | {last.get('step_time', float('nan')):.1f}s |" if last.get("step_time") else "| step_time | — |",
+          f"| step_time (last) | {last.get('step_time', float('nan')):.1f}s |" if last.get("step_time") else "| step_time | ·|",
           ""]
     if a.get("budget_s"):
         t = a.get("trunc")
         L += ["**3h hardcap behavior + partial-run note.**"]
         if t:
-            L += [f"> 🟠 **Truncation likely.** Honest projection (mean {t['s_mean']}s/step; median {t['s_med']}s — "
+            L += [f"> 🟠 **Truncation likely.** Honest projection (mean {t['s_mean']}s/step; median {t['s_med']}s ·"
                   f"GRPO step time is length-driven and bimodal, so mean is the correct estimator, not median): "
                   f"stops ≈**step {t['proj_stop']}/{a['total_steps']} (~{t['proj_epochs']} of 2.0 epochs)** at the "
                   f"3h cap; 2 full epochs would need ≈{t['over_min']} min past the cap.",
@@ -310,7 +310,7 @@ def grpo_diag(a: dict) -> list[str]:
                   "is written at the stop step (plus `save_steps=50` checkpoints at 50/100/150/200/250). The summary "
                   "records `time_budget_hit=true` and the actual step count.",
                   ">",
-                  "> **What \"RA complete\" then means:** an adapter trained ~1.7 (not 2.0) epochs — usable for eval, "
+                  "> **What \"RA complete\" then means:** an adapter trained ~1.7 (not 2.0) epochs ·usable for eval, "
                   "but **under-trained vs the frozen 2-epoch spec**. If RB (precision, shorter rollouts) finishes 2 "
                   "full epochs, the GRPO 'dose' differs across causes → a confound on the method×cause interaction "
                   "(the analog of the SFT teacher-yield asymmetry already equalized by down-sampling). **Decision "
@@ -319,7 +319,7 @@ def grpo_diag(a: dict) -> list[str]:
                   "caveat the coverage arm.".replace("{over}", str(t["over_min"])), ""]
         else:
             L += ["> On current pace RA is projected to reach the full step count within the 3h cap. If pace "
-                  "slows (length drift up), truncation risk returns — this note will flip to 🟠. At any cap-stop the "
+                  "slows (length drift up), truncation risk returns ·this note will flip to 🟠. At any cap-stop the "
                   "adapter still saves (`save_model` + `save_steps=50`).", ""]
     if a["arm"] == "RA":
         L += ra_gate_block(w)
@@ -333,14 +333,14 @@ def ra_gate_block(w: dict) -> list[str]:
         v = gate["suggested_verdict"]
         d = gate["delta"]
         if v.startswith("POSITIVE"):
-            L += [f"> **✅ GATE RESULT — PROCEED.** mean(reward[1:10])={gate['mean_reward_1_10']} → "
+            L += [f"> **✅ GATE RESULT ·PROCEED.** mean(reward[1:10])={gate['mean_reward_1_10']} → "
                   f"mean(reward[41:50])={gate['mean_reward_41_50']}, **Δ={d:+.4f}** (clear positive slope). "
                   f"end-window std {gate['end_window_std']}.", ""]
         else:
             ra = gate.get("robust_analysis", {})
-            L += [f"> **🛑 GATE RESULT — PAUSE (FLAT, no learning at 50-step scale).** The pre-committed window "
+            L += [f"> **🛑 GATE RESULT ·PAUSE (FLAT, no learning at 50-step scale).** The pre-committed window "
                   f"delta is **Δ={d:+.4f}** (mean[1:10]={gate['mean_reward_1_10']} → mean[41:50]={gate['mean_reward_41_50']}), "
-                  f"but that is only **{abs(d)/gate['end_window_std']:.2f}× the noise SD** ({gate['end_window_std']}) — a "
+                  f"but that is only **{abs(d)/gate['end_window_std']:.2f}× the noise SD** ({gate['end_window_std']}) ·a "
                   f"single-window artifact.", ">"]
             if ra:
                 L += [f"> **Robust estimators over all 50 steps confirm flat:** OLS slope "
@@ -350,7 +350,7 @@ def ra_gate_block(w: dict) -> list[str]:
                       f"Not declining like the probe (Δ{ra['probe_reference_delta']}), but **not the clear positive "
                       f"slope the rule requires to proceed.**", ">"]
             L += [f"> **Action:** per the pre-committed *flat-or-declining → PAUSE* rule, RA was halted at step 56; "
-                  f"checkpoint-50 preserved. (My watcher's naive `delta>0→proceed` label was overridden — the rule "
+                  f"checkpoint-50 preserved. (My watcher's naive `delta>0→proceed` label was overridden ·the rule "
                   f"needs a *clear* slope, not any positive delta.)"]
             dec = gate.get("operator_decision")
             if dec:
@@ -360,11 +360,11 @@ def ra_gate_block(w: dict) -> list[str]:
             s9 = read_json(LOGS / "RA_step150_s9.json")
             if s9:
                 up = s9["suggested_read"] == "TRENDING_UP"
-                L += [f"#### {'✅' if up else '🛑'} §9 checkpoint (step 150) — {'PASS: reward TRENDING UP' if up else 'FLAT → GRPO-stall kill-switch'}", "",
+                L += [f"#### {'✅' if up else '🛑'} §9 checkpoint (step 150) ·{'PASS: reward TRENDING UP' if up else 'FLAT → GRPO-stall kill-switch'}", "",
                       f"> Over the full 1–150 trajectory: **OLS slope {s9['ols_slope_per_step']:+.5f}/step, t={s9['ols_t']}** "
                       f"(gain ~{s9['ols_gain_over_150']:+.3f} over 150); first10 {s9['first10']} → last10 {s9['last10']}; "
                       f"first-third {s9['first_third']} → last-third {s9['last_third']} (Δ{s9['thirds_delta']:+.4f}). "
-                      + ("**Clear, significant learning — the step-50 flat was a too-short window, exactly as the frozen "
+                      + ("**Clear, significant learning ·the step-50 flat was a too-short window, exactly as the frozen "
                          "config anticipated. §9 GT3 bar PASSED; no kill-switch. RA resumed from checkpoint-150 to full "
                          "2 epochs (300 steps; 150→300 ≈110 min, fits the 3h cap → no truncation).**"
                          if up else
@@ -375,7 +375,7 @@ def ra_gate_block(w: dict) -> list[str]:
               f"mean[1:10]={w['gate_1_10']:.4f} → mean[41:50]={w['gate_41_50']:.4f}, Δ={d:+.4f}. "
               f"Final verdict written at step 50.", ""]
     else:
-        L += [f"> **Gate pending** — needs step 50 (currently {w.get('max_step', 0)}/50). "
+        L += [f"> **Gate pending** ·needs step 50 (currently {w.get('max_step', 0)}/50). "
               f"Probe reference on this hardened pool was Δ=−0.032 (declining), so a PAUSE is plausible.", ""]
     return L
 
@@ -390,22 +390,22 @@ def health_flags(arms: list[dict]) -> list[str]:
         if sp.exists():
             t = sp.read_text()
             if re.search(r"out of memory|OutOfMemoryError|CUDA error", t):
-                flags.append(f"🛑 **{arm}: CUDA OOM / CUDA error** in stdout — investigate.")
+                flags.append(f"🛑 **{arm}: CUDA OOM / CUDA error** in stdout ·investigate.")
             if "Traceback (most recent call last)" in t and a["status"].startswith(("FAIL", "RUNNING?")):
                 flags.append(f"🛑 **{arm}: traceback in stdout** while not marked DONE.")
         if a["status"] in ("FAILED?", "RUNNING?"):
-            flags.append(f"⚠️ **{arm}: {a['status']}** — {a['note']}.")
+            flags.append(f"⚠️ **{arm}: {a['status']}** ·{a['note']}.")
         if a.get("trunc"):
             t = a["trunc"]
             flags.append(
-                f"🟠 **{arm}: PARTIAL-RUN RISK — the 3h hardcap will likely truncate before 2 full epochs.** "
-                f"At the honest mean pace {t['s_mean']}s/step (median {t['s_med']}s — steps are length-driven & "
+                f"🟠 **{arm}: PARTIAL-RUN RISK ·the 3h hardcap will likely truncate before 2 full epochs.** "
+                f"At the honest mean pace {t['s_mean']}s/step (median {t['s_med']}s ·steps are length-driven & "
                 f"bimodal, ~100s on long-completion batches vs ~30s on short), RA projects to stop ≈step "
                 f"{t['proj_stop']}/{a['total_steps']} (**~{t['proj_epochs']} of 2.0 epochs**); reaching 300 would "
                 f"need ≈{t['over_min']} min past the cap. The adapter still saves at the cap (`save_model` + "
                 f"`save_steps=50` checkpoints) so it's usable but under-trained vs the 2-epoch spec. **Analysis "
                 f"impact: if RB (precision, shorter rollouts) completes 2 full epochs, RA↔RB training dose is "
-                f"unequal → confounds the GRPO×cause interaction.** Operator decision needed — see RA diagnostics note.")
+                f"unequal → confounds the GRPO×cause interaction.** Operator decision needed ·see RA diagnostics note.")
         elif a["cap_note"]:
             flags.append(f"⏱️ **{arm}: {a['cap_note']}** (approaching 3h hardcap).")
         if a["method"] == "GRPO":
@@ -413,7 +413,7 @@ def health_flags(arms: list[dict]) -> list[str]:
             last = ([r for r in a["metric_rows"] if "reward" in r] or [{}])[-1]
             if w:
                 # Only LOW reward is an anomaly (not learning / collapse). Reward ABOVE the
-                # early-training probe band means the arm has learned — that's the goal, not a flag.
+                # early-training probe band means the arm has learned ·that's the goal, not a flag.
                 if w["last10"] < EXPECT["reward_lo"]:
                     flags.append(f"⚠️ **{arm}: last10 reward {w['last10']:.3f}** below probe floor "
                                  f"{EXPECT['reward_lo']} (not learning / possible collapse).")
@@ -434,7 +434,7 @@ def health_flags(arms: list[dict]) -> list[str]:
         ra = gate.get("robust_analysis", {})
         s9 = read_json(LOGS / "RA_step150_s9.json")
         if s9 and s9["suggested_read"] == "TRENDING_UP":
-            flags.insert(0, f"✅ **RA §9 checkpoint (step 150) PASSED — reward TRENDING UP** (OLS slope {s9['ols_slope_per_step']:+.5f}/step, "
+            flags.insert(0, f"✅ **RA §9 checkpoint (step 150) PASSED ·reward TRENDING UP** (OLS slope {s9['ols_slope_per_step']:+.5f}/step, "
                             f"t={s9['ols_t']}; first10 {s9['first10']}→last10 {s9['last10']}). The step-50 flat was a too-short window; "
                             f"RA is learning coverage. Resumed to full 2 epochs (300); 150→300 fits the 3h cap (no truncation).")
         elif s9:
@@ -442,7 +442,7 @@ def health_flags(arms: list[dict]) -> list[str]:
         elif gate.get("operator_decision"):
             flags.insert(0, f"🔄 **RA step-50 gate read FLAT; operator resumed to the §9 checkpoint (step 150).** Awaiting §9 read.")
         else:
-            flags.insert(0, f"🛑 **RA step-50 gate → PAUSE (FLAT — no learning at 50-step scale).** Window Δ={gate['delta']:+.4f} "
+            flags.insert(0, f"🛑 **RA step-50 gate → PAUSE (FLAT ·no learning at 50-step scale).** Window Δ={gate['delta']:+.4f} "
                             f"is {abs(gate['delta'])/gate['end_window_std']:.2f}× noise; OLS slope {ra.get('ols_slope_per_step','?')}/step "
                             f"(t={ra.get('ols_t','?')}), halves Δ{ra.get('halves_delta','?')}. **RA halted at step 56, checkpoint-50 "
                             f"preserved, GPU freed. Operator decision required before resuming or moving to RB.**")
@@ -460,7 +460,7 @@ def main():
     # batch start proxy = earliest lengths.json / jsonl mtime
     starts = [p.stat().st_mtime for p in LOGS.glob("*_lengths.json")] + \
              [p.stat().st_mtime for p in LOGS.glob("*.jsonl")]
-    start_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(min(starts))) if starts else "—"
+    start_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(min(starts))) if starts else "none"
 
     order = {"RUNNING": 0, "RUNNING?": 0, "PAUSED": 1, "FAILED?": 1, "DONE": 2, "QUEUED": 3}
     running = [a["arm"] for a in arms if a["status"].startswith("RUNNING")]
@@ -468,26 +468,26 @@ def main():
     done = [a["arm"] for a in arms if a["status"] == "DONE"]
 
     md = []
-    md += [f"# T1.3 — LIVE STATUS (auto-generated, read-only)", "",
+    md += [f"# T1.3 ·LIVE STATUS (auto-generated, read-only)", "",
            f"_Generated: **{now}** · batch start ≈ {start_str} · source: `results/logs/` (volume) + "
            f"`config/t1_3_frozen.md`. Regenerate: `python experiments/T01/results/live_status.py`._", "",
            "> This file is regenerated at checkpoints (arm completion / gate fire), not by continuous "
-           "polling — it reads training output only and never touches the training processes.", "",
+           "polling ·it reads training output only and never touches the training processes.", "",
            "---", "", "## 1 · Run header", "",
            f"- **Frozen config** (`config/t1_3_frozen.md`): SFT LR **{fz['sft_lr']}** (cosine, 2 ep) · "
            f"GRPO LR **{fz['grpo_lr']}** · k=**{fz['k']}** (frozen) · rollout temp {fz['temp']} · β {fz['beta']} · "
            f"seed **{fz['seed']}** · 2 epochs · identical LoRA (r16/α32) all arms.",
-           f"- **Running:** {', '.join(running) or '—'}  ·  **Queued:** {', '.join(queued) or '—'}  ·  "
-           f"**Done:** {', '.join(done) or '—'}",
+           f"- **Running:** {', '.join(running) or 'none'}  ·  **Queued:** {', '.join(queued) or 'none'}  ·  "
+           f"**Done:** {', '.join(done) or 'none'}",
            f"- **Estimand:** method (SFT vs GRPO) × cause (coverage vs precision). SA/RA = coverage, "
            f"SB/RB = precision.", "", "---", "", "## 2 · Per-arm status", "",
            "| arm | method · cause | status | step / total | elapsed | ETA | last loss/reward |",
            "|---|---|---|---|---|---|---|"]
     for a in sorted(arms, key=lambda x: order.get(x["status"], 9)):
         lv = a["last_val"]
-        lv_s = f"{lv:.4f}" if isinstance(lv, (int, float)) else "—"
+        lv_s = f"{lv:.4f}" if isinstance(lv, (int, float)) else "none"
         kind = a["last_kind"]
-        eta_s = hms(a["eta"]) + (f" · {a['cap_note']}" if a["cap_note"] else "") if a["status"].startswith("RUNNING") else ("done" if a["status"] == "DONE" else "—")
+        eta_s = hms(a["eta"]) + (f" · {a['cap_note']}" if a["cap_note"] else "") if a["status"].startswith("RUNNING") else ("done" if a["status"] == "DONE" else "none")
         step_s = f"{a['cur_step']} / {a['total_steps']}" + (f" (~{a['total_steps']}→cap)" if a["budget_s"] and a["status"].startswith("RUNNING") else "")
         md.append(f"| **{a['arm']}** | {a['method']} · {a['cause']} | {status_badge(a['status'])} | "
                   f"{step_s} | {hms(a['elapsed'])} | {eta_s} | {lv_s} ({kind}) |")
@@ -497,12 +497,12 @@ def main():
     md += ["---", "", "## 4 · Flags / health", ""]
     md += [f"- {f}" for f in health_flags(arms)]
     md += ["", "---", "",
-           "## 5 · Artifacts (durable, on /workspace volume — gitignored)", "",
+           "## 5 · Artifacts (durable, on /workspace volume ·gitignored)", "",
            "| arm | adapter | live log | summary |", "|---|---|---|---|"]
     for a in arms:
-        ad = "✅" if a["adapter"] else "—"
-        jl = f"`results/logs/{a['tag']}.jsonl`" if (LOGS / f"{a['tag']}.jsonl").exists() else "—"
-        sm = f"`results/logs/{a['tag']}_summary.json`" if a["summary"] else ("`RUN_" + a["arm"] + ".md` (SFT)" if a["adapter"] and a["method"] == "SFT" else "—")
+        ad = "✅" if a["adapter"] else "none"
+        jl = f"`results/logs/{a['tag']}.jsonl`" if (LOGS / f"{a['tag']}.jsonl").exists() else "none"
+        sm = f"`results/logs/{a['tag']}_summary.json`" if a["summary"] else ("`RUN_" + a["arm"] + ".md` (SFT)" if a["adapter"] and a["method"] == "SFT" else "none")
         md.append(f"| {a['arm']} | {ad} `results/adapters/T01-{a['arm']}/` | {jl} | {sm} |")
     md += ["", f"_Gate JSON: `results/logs/RA_gate_step50.json`"
            f"{' (present)' if (LOGS/'RA_gate_step50.json').exists() else ' (pending)'}._", ""]

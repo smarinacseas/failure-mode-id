@@ -135,7 +135,7 @@ DERIVED: list[dict] = [
 ]
 
 # Trace-less collapse category (spec §3): when no reasoning trace exists,
-# "never noticed" and "noticed-but-dropped" are indistinguishable — both
+# "never noticed" and "noticed-but-dropped" are indistinguishable, both
 # collapse into this answer-observable bucket.
 COLLAPSED: dict = {
     "key": "constraint_unaddressed",
@@ -188,7 +188,7 @@ def allowed_keys(trace_present: bool) -> set[str]:
 def diagnose_system(trace_present: bool) -> str:
     """Analyst system prompt. Deliberately NOT the judge prompt: the role is
     failure analysis, the verdicts are given, and the output is evidence-first
-    (spec §4 blinding rules 4–5)."""
+    (spec §4 blinding rules 4 to 5)."""
     cats = "\n".join(
         f"- {c['key']}: {c['description']}" for c in categories_for(trace_present)
     )

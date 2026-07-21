@@ -79,7 +79,7 @@ def _classify_one(cfg: RunConfig, criteria: list[str]) -> tuple[list[dict], str 
     if tags is not None:
         return tags, spec.key
     from pipeline.monitor import note_error
-    note_error(f"classifier chain exhausted: {err} — defaulting all tags.")
+    note_error(f"classifier chain exhausted: {err}, defaulting all tags.")
     return _normalize_tags([], len(criteria)), None
 
 

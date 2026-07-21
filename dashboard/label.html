@@ -116,7 +116,7 @@
 <header class="topbar">
   <div class="topbar-inner">
     <span class="wordmark">ConstraintLens <span class="dim">· judge validation</span></span>
-    <span class="runchip" id="run-chip">—</span>
+    <span class="runchip" id="run-chip">N/A</span>
     <span class="spacer"></span>
     <span id="auth-area"></span>
     <a href="./index.html" style="font-family:var(--mono);font-size:11.5px;">← dashboard</a>
@@ -130,7 +130,7 @@
     <div class="stat"><div class="k">Labeled</div><div class="v"><span id="st-labeled">0</span><small> / <span id="st-total">0</span></small></div></div>
     <div class="stat"><div class="k">Staged (uncommitted)</div><div class="v" id="st-staged">0</div></div>
     <div class="stat"><div class="k">Committed</div><div class="v" id="st-committed">0</div></div>
-    <div class="stat"><div class="k">Agreement so far</div><div class="v" id="st-agree">—</div></div>
+    <div class="stat"><div class="k">Agreement so far</div><div class="v" id="st-agree">N/A</div></div>
   </div>
   <div class="progress"><div id="progress-fill"></div></div>
 
@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================================
- * CONFIG — edit before deploying (see labeling/SETUP.md).
+ * CONFIG: edit before deploying (see labeling/SETUP.md).
  * ==========================================================================*/
 const CONFIG = {
   owner: "smarinacseas",
@@ -173,9 +173,9 @@ const CONFIG = {
   labelsBranch: "labels",
   defaultRun: "E08-llama3-2-3b-cc75",
   // Only these GitHub logins may commit (the proxy enforces this server-side
-  // too — keep the two lists in sync).
+  // too; keep the two lists in sync).
   allowlist: ["smarinacseas"],
-  // GitHub OAuth app client id (public) — from github.com/settings/developers.
+  // GitHub OAuth app client id (public): from github.com/settings/developers.
   oauthClientId: "REPLACE_WITH_CLIENT_ID",
   // Deployed Cloudflare Worker that holds the client secret (proxy/oauth-worker).
   proxyUrl: "REPLACE_WITH_WORKER_URL", // e.g. https://constraintlens-oauth.<acct>.workers.dev
@@ -188,7 +188,7 @@ const API = "https://api.github.com";
 const DRAFT_KEY = `cl-labels-draft:${RUN}`;
 const TOKEN_KEY = "cl-gh-token";
 const LOGIN_KEY = "cl-gh-login";
-// Original judge_validation.json key order — commits must round-trip exactly
+// Original judge_validation.json key order: commits must round-trip exactly
 // this schema so `main.py validate --mode score` accepts the file.
 const ROW_KEYS = ["judge", "model", "id", "criterion_index", "criterion_text",
                   "prompt_text", "response_excerpt", "judge_verdict", "judge_reason", "human"];
@@ -306,10 +306,10 @@ async function commitLabels() {
         S.staged = {};
         S.remoteExists = true;
         saveDraft();
-        setStatus(`Committed ${filled}/${rows.length} labels to ${CONFIG.labelsBranch} ✓  — pull locally with labeling/pull.py, then run validate --mode score.`);
+        setStatus(`Committed ${filled}/${rows.length} labels to ${CONFIG.labelsBranch} ✓  Pull locally with labeling/pull.py, then run validate --mode score.`);
         break;
       }
-      if ((res.status === 409 || res.status === 422) && attempt < 3) continue; // sha race — refetch and retry
+      if ((res.status === 409 || res.status === 422) && attempt < 3) continue; // sha race: refetch and retry
       const err = await res.json().catch(() => ({}));
       throw new Error(`Commit failed (${res.status}): ${err.message || "unknown error"}`);
     }
@@ -390,7 +390,7 @@ function loadDraft(validKeys) {
 function setLabel(r, verdict) {
   const k = rowKey(r);
   if (verdict === "" && !S.remoteHuman[k]) delete S.staged[k];
-  else if (verdict === S.remoteHuman[k]) delete S.staged[k]; // matches committed — nothing staged
+  else if (verdict === S.remoteHuman[k]) delete S.staged[k]; // matches committed; nothing staged
   else S.staged[k] = verdict;
   saveDraft();
 }
@@ -435,7 +435,7 @@ function renderStats() {
   $("st-total").textContent = total;
   $("st-staged").textContent = Object.keys(S.staged).length;
   $("st-committed").textContent = committed;
-  $("st-agree").textContent = labeled ? `${Math.round(100 * agree / labeled)}%` : "—";
+  $("st-agree").textContent = labeled ? `${Math.round(100 * agree / labeled)}%` : "N/A";
   $("progress-fill").style.width = total ? `${100 * labeled / total}%` : "0%";
 }
 
@@ -455,8 +455,8 @@ function renderCommitBar() {
   const btn = $("btn-commit");
   btn.textContent = S.committing ? "Committing…" : `Commit ${n} label${n === 1 ? "" : "s"}`;
   btn.disabled = S.committing || n === 0 || !S.token || !isAllowed();
-  if (!S.token && n > 0) setStatus(`${n} label${n === 1 ? "" : "s"} staged locally — sign in to commit.`);
-  else if (S.token && !isAllowed()) setStatus(`@${S.login} is not on the allowlist — labels stay local.`);
+  if (!S.token && n > 0) setStatus(`${n} label${n === 1 ? "" : "s"} staged locally. Sign in to commit.`);
+  else if (S.token && !isAllowed()) setStatus(`@${S.login} is not on the allowlist. Labels stay local.`);
 }
 
 function renderCard() {
@@ -465,7 +465,7 @@ function renderCard() {
   if (S.idx >= list.length) S.idx = Math.max(0, list.length - 1);
   $("pos").textContent = `${list.length ? S.idx + 1 : 0} / ${list.length}`;
   if (!list.length) {
-    card.innerHTML = `<div style="color:var(--muted);font-family:var(--mono);font-size:13px;padding:30px 0;text-align:center;">No rows match this filter${S.filter === "unlabeled" ? " — everything is labeled 🎉" : ""}.</div>`;
+    card.innerHTML = `<div style="color:var(--muted);font-family:var(--mono);font-size:13px;padding:30px 0;text-align:center;">No rows match this filter${S.filter === "unlabeled" ? ": everything is labeled 🎉" : ""}.</div>`;
     return;
   }
   const r = list[S.idx];
@@ -487,7 +487,7 @@ function renderCard() {
       </div>
       <div class="clear-row"><button data-act="clear">clear my verdict (x)</button></div>`;
   } else {
-    revealHtml = `<div class="blindnote">Blind mode — the judge's verdict and reasoning stay hidden until you vote.</div>`;
+    revealHtml = `<div class="blindnote">Blind mode: the judge's verdict and reasoning stay hidden until you vote.</div>`;
   }
 
   card.innerHTML = `
@@ -502,7 +502,7 @@ function renderCard() {
       <div class="prose">${esc(r.prompt_text)}</div></details>
     <div class="sec-label">Model response (full)</div>
     <div class="response-box"><div class="prose">${esc(r.full_response || r.response_excerpt)}</div></div>
-    <div class="sec-label">Criterion — does the response satisfy it?</div>
+    <div class="sec-label">Criterion: does the response satisfy it?</div>
     <div class="criterion">${esc(r.criterion_text)}</div>
     <div class="votes">
       <button class="vote pass ${h === "PASS" ? "selected" : ""}" data-act="PASS">PASS (p)</button>
@@ -567,7 +567,7 @@ window.addEventListener("beforeunload", (e) => {
   await handleOAuthCallback();
   try {
     const res = await fetch(`./labeling/${encodeURIComponent(RUN)}.json`, { cache: "no-store" });
-    if (!res.ok) throw new Error(`labeling bundle not found (${res.status}) — run labeling/sync.py and redeploy`);
+    if (!res.ok) throw new Error(`labeling bundle not found (${res.status}). Run labeling/sync.py and redeploy`);
     const bundle = await res.json();
     S.rows = bundle.rows;
   } catch (e) {
@@ -587,7 +587,7 @@ window.addEventListener("beforeunload", (e) => {
       }
     }
   } catch (e) {
-    banner(`Could not read committed labels from GitHub (${e.message}) — starting from the bundle.`, "");
+    banner(`Could not read committed labels from GitHub (${e.message}). Starting from the bundle.`, "");
   }
   loadDraft(new Set(S.rows.map(rowKey)));
   pruneStaged();

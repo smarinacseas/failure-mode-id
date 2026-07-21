@@ -3,7 +3,7 @@
 The SFT loader yields TRL prompt-completion conversational rows (so completion-
 only loss masks the user prompt); the GRPO loader yields prompt + a per-prompt
 `specs` column (JSON string) that the reward adapter consumes. Both read ONLY
-data/sft and data/train — never the reserved evaluation pool (PREREG §5); that
+data/sft and data/train, never the reserved evaluation pool (PREREG §5); that
 isolation is structural: the loaders hardcode their base directory and validate
 the cause.
 """

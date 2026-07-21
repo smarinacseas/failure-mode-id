@@ -1,14 +1,14 @@
 """Diagnose WHY each failed criterion failed (root-cause labels).
 
 One BLINDED analyst call per (candidate, prompt) cell whose criteria the PANEL
-CONSENSUS marks FAIL (reason != panel_no_quorum — spec §3/§4): the analyst
+CONSENSUS marks FAIL (reason != panel_no_quorum, spec §3/§4): the analyst
 sees the prompt, all criteria, the unmet indices, the response, and the
-reasoning trace — never judge reasons, candidate identity, or any judge's
+reasoning trace; never judge reasons, candidate identity, or any judge's
 verdicts. Output appended to runs/<slug>/diagnosis/<candidate>.jsonl; each
 record stamps the `analyst` that produced it.
 
 Transport is a per-item fallback CHAIN (config.DIAGNOSE_CHAIN): the preferred
-analyst runs first and degrades to the next member PER CELL — a refusal or a
+analyst runs first and degrades to the next member PER CELL: a refusal or a
 transport failure advances a cell to the next member rather than dooming it.
 Anthropic members use Message Batches (submit → poll → collect); OpenRouter
 members walk pending cells serially. Resumable.
@@ -40,10 +40,10 @@ POLL_INTERVAL_S = 60.0
 CUSTOM_ID_SEP = "__"
 _sleep = time.sleep          # module attr so tests can stub the poll wait
 
-# Grading-artifact reasons — retained as the documented vocabulary (mirrors
+# Grading-artifact reasons, retained as the documented vocabulary (mirrors
 # _consensus.ARTIFACT_PREFIXES). Targeting no longer filters on these directly:
 # the artifact rule now lives inside consensus_verdict (artifact FAILs abstain),
-# which subsumes it — a single-judge run degrades to quorum 1, and an
+# which subsumes it: a single-judge run degrades to quorum 1, and an
 # artifact-only criterion has no cast vote, so it resolves to panel_no_quorum
 # and is never targeted (spec §4). Single-judge behaves identically to the
 # pre-panel code.
@@ -54,7 +54,7 @@ _ARTIFACT_PREFIXES = ("judge_refusal", "judge_parse_error", "judge_truncated",
 def _failed_cells(cfg: RunConfig, records: list[dict],
                   include_diagnosed: bool = False) -> list[dict]:
     """(candidate, prompt) cells with >=1 criterion the PANEL CONSENSUS marks
-    FAIL for a reason other than panel_no_quorum (spec §3) — missing quorum
+    FAIL for a reason other than panel_no_quorum (spec §3); missing quorum
     means no real verdict, so those abstain out of the target set. Minus cells
     already present in the diagnosis output (resume), unless include_diagnosed
     is set (Pass-1 open coding samples from ALL failed cells; the resume filter
@@ -63,7 +63,7 @@ def _failed_cells(cfg: RunConfig, records: list[dict],
     cells: list[dict] = []
     for key in cfg.candidates:
         # Load EVERY panel judge's grades, in cfg.judges order so the per_judge
-        # dict below is insertion-ordered by cfg.judges — consensus_verdict's
+        # dict below is insertion-ordered by cfg.judges; consensus_verdict's
         # reason-tie-break is caller-order-sensitive (Task 6).
         grades_by_judge = {
             s.key: {g["id"]: g["verdicts"] for g in read_jsonl(cfg.grades_path(s.key, key))}
@@ -88,7 +88,7 @@ def _failed_cells(cfg: RunConfig, records: list[dict],
                 # Only genuine consensus FAILs are diagnosed. Legacy: skip
                 # panel_no_quorum (no real verdict). E08 policy: EXCLUDE verdicts
                 # (undecidable / under-quorum) have verdict != "FAIL", so they
-                # fall out here too — the classifier never sees them (§0.3.4).
+                # fall out here too; the classifier never sees them (§0.3.4).
                 if cv["verdict"] == "FAIL" and cv["reason"] != "panel_no_quorum":
                     failed.append(i)
             if not failed:
@@ -141,7 +141,7 @@ def _user_message(cell: dict) -> tuple[str, str]:
         f"{cell['prompt']}\n\n"
         "ALL CRITERIA THE RESPONSE WAS EVALUATED AGAINST:\n"
         f"{numbered}\n\n"
-        f"CRITERIA JUDGED UNMET — diagnose exactly these indices: {unmet}\n\n"
+        f"CRITERIA JUDGED UNMET; diagnose exactly these indices: {unmet}\n\n"
         f"{trace_block}"
         "MODEL RESPONSE:\n"
         f"{response}"
@@ -211,7 +211,7 @@ def _error_rows(failed_indices: list[int], reason: str) -> list[dict]:
 
 def _batch_request(member, cid: str, system: str, user_msg: str) -> dict:
     """One Anthropic Message Batches request for `member` (its provider model
-    id — the analyst chain, not the grading panel, chooses this)."""
+    id, the analyst chain, not the grading panel, chooses this)."""
     return {
         "custom_id": cid,
         "params": {
@@ -227,7 +227,7 @@ def _batch_request(member, cid: str, system: str, user_msg: str) -> dict:
 def _write_cell(cfg: RunConfig, mon, cell: dict, trace_status: str,
                 rows: list[dict], analyst: str, error: str = "") -> None:
     """Append one diagnosis record. `analyst` is the chain member that produced
-    it (spec §4) — the producing member on the success path, or chain[-1] on the
+    it (spec §4): the producing member on the success path, or chain[-1] on the
     terminal _error_rows path so provenance is recorded either way."""
     mon.item_start(model=cell["key"], prompt_id=cell["rid"])
     append_jsonl(cfg.diagnosis_path(cell["key"]),
@@ -248,7 +248,7 @@ SYNTHESIS_SYSTEM = (
     "including its recommendations. Produce the iteration synthesis.\n\n"
     "Rules:\n"
     "- Compare vs the predecessor ONLY at the level the data supports: if "
-    "limit/sample_seed differ, the samples differ — use directional language "
+    "limit/sample_seed differ, the samples differ; use directional language "
     "and say so.\n"
     "- Review each predecessor recommendation: addressed, partially, or not.\n"
     "- Recommend 1 to 3 next steps, ordered by leverage, each with category "
@@ -259,7 +259,7 @@ SYNTHESIS_SYSTEM = (
     "intervention_ready (stop iterating; specify the training data to build).\n"
     "- Exit rule: if the top causes and their ordering are stable across "
     "consecutive experiments, prefer intervention_ready over another eval "
-    "round — eval iterations have diminishing returns once the Pareto is "
+    "round; eval iterations have diminishing returns once the Pareto is "
     "stable.\n\n"
     "Reply with ONLY a JSON object:\n"
     '{"comparison": ["<bullet>", …], "prior_recommendations_review": '
@@ -272,7 +272,7 @@ SYNTHESIS_SYSTEM = (
 
 def _predecessor(cfg: RunConfig) -> tuple[str | None, dict | None]:
     """Largest experiment number below ours whose results file carries
-    failure_analysis (spec §4b) — skipped experiments are transparent."""
+    failure_analysis (spec §4b); skipped experiments are transparent."""
     number, _label = parse_slug(cfg.slug)
     try:
         idx = json.loads(config.EXPERIMENT_INDEX_PATH.read_text(encoding="utf-8"))
@@ -293,7 +293,7 @@ def _predecessor(cfg: RunConfig) -> tuple[str | None, dict | None]:
 
 def _synthesis_payload(cfg: RunConfig) -> dict | None:
     """Rollups-only view of the current run's diagnosis artifacts (the
-    firewall: no per-cell rows, no response/criterion text — spec §4b)."""
+    firewall: no per-cell rows, no response/criterion text, spec §4b)."""
     tally: dict[str, dict] = {}
     n_rows = n_cells = 0
     for key in cfg.candidates:
@@ -343,7 +343,7 @@ def _synthesize(cfg: RunConfig, mon) -> None:
                               ensure_ascii=False, indent=2)
     except Exception as e:  # noqa: BLE001
         mon.record_error(f"diagnose synthesis failed preparing inputs: "
-                         f"{type(e).__name__}: {e} — continuing without a synthesis block.")
+                         f"{type(e).__name__}: {e}; continuing without a synthesis block.")
         return
 
     # Synthesis runs through the SAME fallback chain diagnosis uses: the
@@ -381,7 +381,7 @@ def _synthesize(cfg: RunConfig, mon) -> None:
     out, _spec, last_err = call_json_chain(
         chain, SYNTHESIS_SYSTEM, user_msg, "synthesis", parse=_parse)
     if out is None:
-        mon.record_error(f"diagnose synthesis failed: {last_err} — "
+        mon.record_error(f"diagnose synthesis failed: {last_err}; "
                          "continuing without a synthesis block.")
         return
     cfg.synthesis_path.parent.mkdir(parents=True, exist_ok=True)
@@ -396,7 +396,7 @@ def _run_member_batch(cfg: RunConfig, mon, member, pending: dict[str, dict]) -> 
     cells still in `pending`. Two rounds mirror grade's batch transport:
     truncated / unparseable / batch-errored cells resubmit ONCE to this member;
     a refusal is sticky per member (marks refused_by, never resubmits to this
-    member) and — unlike the pre-chain code — is NOT written terminally: the
+    member) and, unlike the pre-chain code, is NOT written terminally: the
     cell stays in `pending` to fall through to the next chain member. Successful
     cells are written with analyst=member.key and dropped from `pending`."""
     for attempt in (1, 2):
@@ -428,7 +428,7 @@ def _run_member_batch(cfg: RunConfig, mon, member, pending: dict[str, dict]) -> 
             rc = getattr(b, "request_counts", None)
             detail = ""
             if rc is not None:
-                detail = (f" — processing={getattr(rc, 'processing', '?')}, "
+                detail = (f", processing={getattr(rc, 'processing', '?')}, "
                           f"succeeded={getattr(rc, 'succeeded', '?')}, "
                           f"errored={getattr(rc, 'errored', '?')}")
             mon.note(f"diagnose batch [{member.key}]: {status}{detail}")
@@ -469,7 +469,7 @@ def _run_member_batch(cfg: RunConfig, mon, member, pending: dict[str, dict]) -> 
 
 def _run_member_stream(cfg: RunConfig, mon, member, pending: dict[str, dict]) -> None:
     """One OpenRouter chain member: walk pending cells serially (one streamed
-    call each) with the SAME rule call_json_chain uses per member — a refusal
+    call each) with the SAME rule call_json_chain uses per member: a refusal
     advances with no retry (sticky), a parse failure/truncation retries once
     with this member then advances, a post-retry transport failure advances.
     Serial is fine at diagnose volumes; OpenRouter members are legal but not in
@@ -482,7 +482,7 @@ def _run_member_stream(cfg: RunConfig, mon, member, pending: dict[str, dict]) ->
             try:
                 raw, stop = call_json(member, system, cell["user_msg"],
                                       label=f"{member.client}:{member.key}:diagnose")
-            except Exception as e:  # noqa: BLE001 — retry() exhausted; advance the cell
+            except Exception as e:  # noqa: BLE001 (retry() exhausted; advance the cell)
                 cell["last_err"] = f"diagnose_transport_error: {type(e).__name__}: {e}"
                 break
             rows, err = _text_to_diagnoses(raw, stop, cell["failed_indices"],
@@ -503,7 +503,7 @@ def run(cfg: RunConfig, monitor: RunMonitor | None = None) -> None:
     if not records:
         raise RuntimeError(f"No records in {DATA_JSONL}. Run `load` first.")
 
-    # Resolve the analyst fallback chain once — registry keys → JudgeSpecs. This
+    # Resolve the analyst fallback chain once: registry keys → JudgeSpecs. This
     # is the diagnose chain, wholly independent of the grading panel (cfg.judges).
     chain = tuple(resolve_judge(k) for k in config.DIAGNOSE_CHAIN)
 
@@ -512,7 +512,7 @@ def run(cfg: RunConfig, monitor: RunMonitor | None = None) -> None:
         already = sum(len(read_jsonl(cfg.diagnosis_path(key))) for key in cfg.candidates)
         mon.start_stage("diagnose", total=len(cells) + already, already_done=already)
         if not cells:
-            mon.note("diagnose: no undiagnosed failed cells — nothing to do.")
+            mon.note("diagnose: no undiagnosed failed cells; nothing to do.")
             _synthesize(cfg, mon)      # resume-after-complete still gets synthesis
             mon.end_stage()
             return

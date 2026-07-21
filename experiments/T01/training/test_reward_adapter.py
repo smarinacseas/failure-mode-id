@@ -1,4 +1,4 @@
-"""T1.3 GRPO reward-adapter tests (written test-first — reward_adapter.py does
+"""T1.3 GRPO reward-adapter tests (written test-first; reward_adapter.py does
 not exist yet, RED).
 
 The adapter turns the T1.1 verifier reward `constraint_reward(response, specs)
@@ -33,7 +33,7 @@ def test_partial_and_full_credit_are_per_prompt():
 
 
 def test_grades_only_the_post_final_answer():
-    # scaffold before ===FINAL=== must not be graded — only the final answer is.
+    # scaffold before ===FINAL=== must not be graded; only the final answer is.
     fn = make_constraint_reward()
     completion = "INVENTORY: dog dog dog\n===FINAL===\na cat sat"
     assert fn(prompts=["p"], completions=[completion], specs=[S_CAT]) == [1.0]
@@ -62,7 +62,7 @@ def test_specs_accepted_as_parsed_list_too():
 
 
 def test_ignores_trl_extra_kwargs():
-    # TRL passes trainer_state / completion_ids / log_metric etc. — must not crash.
+    # TRL passes trainer_state / completion_ids / log_metric etc.; must not crash.
     fn = make_constraint_reward()
     out = fn(prompts=["p"], completions=["a cat sat"], specs=[S_CAT],
              completion_ids=[[1, 2, 3]], trainer_state=object(), log_metric=lambda *a: None)

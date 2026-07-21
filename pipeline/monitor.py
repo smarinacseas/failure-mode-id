@@ -51,8 +51,8 @@ class Stage:
     done: int = 0
     state: str = "pending"                     # pending | running | done
     # In-flight work items: (model, prompt_id) -> monotonic start time.
-    # Replaces the old single-item current_model/current_prompt_id fields —
-    # with a worker pool several items are live at once. Insertion-ordered,
+    # Replaces the old single-item current_model/current_prompt_id fields,
+    # since with a worker pool several items are live at once. Insertion-ordered,
     # so a bare item_done() (sequential callers) pops the oldest.
     in_flight: dict = field(default_factory=dict, repr=False)
     _durations: list[float] = field(default_factory=list, repr=False)
@@ -130,7 +130,7 @@ class RecordingSink(Sink):
 
 
 # --------------------------------------------------------------------------- #
-# Module-level active monitor — lets deep helpers (e.g. _io.retry) report
+# Module-level active monitor, lets deep helpers (e.g. _io.retry) report
 # without threading the monitor through every call signature.
 # --------------------------------------------------------------------------- #
 ACTIVE: "RunMonitor | None" = None
@@ -333,11 +333,11 @@ class RunMonitor:
 
 
 # --------------------------------------------------------------------------- #
-# Rendering — shared by ConsoleSink (Task 5) and `main.py status` (Task 12).
+# Rendering: shared by ConsoleSink (Task 5) and `main.py status` (Task 12).
 # --------------------------------------------------------------------------- #
 def _fmt_dur(seconds: float | None) -> str:
     if seconds is None:
-        return "—"
+        return "N/A"
     s = int(seconds)
     h, rem = divmod(s, 3600)
     m, sec = divmod(rem, 60)

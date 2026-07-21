@@ -1,7 +1,7 @@
 """Cancel-to-collect guard for parked Anthropic Message Batches.
 
 Incident (E07, 2026-07-10): a 187-request diagnose batch sat `in_progress`
-with request_counts frozen at processing=187/succeeded=0 for 15.5 hours —
+with request_counts frozen at processing=187/succeeded=0 for 15.5 hours,
 while grade's same-sized batch had drained in 50 minutes the previous
 evening. Manual cancellation flipped the batch to `ended`, and collection
 revealed 184 of 187 requests had ALREADY SUCCEEDED server-side: the
@@ -16,18 +16,18 @@ construction here:
   - `batches.results()` still returns every request that completed
     server-side (and only completed requests are billed);
   - both grade and diagnose collect inside a two-attempt loop that
-    resubmits whatever did not succeed — identical to what happens at the
+    resubmits whatever did not succeed, identical to what happens at the
     24h expiry, just without the wait.
 
 Cost of a false-positive cancel (batch genuinely still working): requests
 in flight at cancellation come back canceled/unbilled and are resubmitted,
 burning one of the caller's two attempts. The default window is therefore
 sized well above the largest healthy drain observed (~50 min for a
-220-request Opus batch) — see config.BATCH_CANCEL_COLLECT_AFTER_S.
+220-request Opus batch); see config.BATCH_CANCEL_COLLECT_AFTER_S.
 
 Counts CAN legitimately stay frozen while work happens (small batches often
 show succeeded=0 until the end), so "no movement" is only meaningful after
-a long window — this guard is a backstop against queue purgatory, not a
+a long window; this guard is a backstop against queue purgatory, not a
 progress meter.
 """
 
@@ -87,14 +87,14 @@ class BatchStaleGuard:
             return
         self._canceled = True
         self._note(
-            f"{self._label}: request_counts frozen for {stale_for / 60:.0f}m "
-            f"— canceling to force collection (results completed server-side "
+            f"{self._label}: request_counts frozen for {stale_for / 60:.0f}m, "
+            f"canceling to force collection (results completed server-side "
             f"are preserved; the remainder resubmits)"
         )
         try:
             retry(lambda: self._client.messages.batches.cancel(self._batch_id),
                   label=f"{self._label}:cancel")
-        except Exception as e:  # noqa: BLE001 — guard must never kill the poll loop
+        except Exception as e:  # noqa: BLE001 (guard must never kill the poll loop)
             self._note(f"{self._label}: cancel failed "
-                       f"({type(e).__name__}: {e}) — will retry next poll")
+                       f"({type(e).__name__}: {e}), will retry next poll")
             self._canceled = False

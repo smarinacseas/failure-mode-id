@@ -36,3 +36,15 @@ def test_sync_preserves_indices_and_reference_from_pruning(tmp_path):
 
     assert (dst / "training.json").exists()
     assert (dst / "reference.json").exists()
+
+
+def test_sync_preserves_hand_authored_t01_json(tmp_path):
+    src = tmp_path / "experiments"; src.mkdir()
+    dst = tmp_path / "dashboard"; dst.mkdir()
+    (dst / "t01.json").write_text('{"curated": true}', encoding="utf-8")
+    _fake_experiment(src, "E01-smoke-3p")
+
+    ds.sync(src, dst)  # t01.json is hand-authored dashboard content, never pruned
+
+    assert (dst / "t01.json").exists()
+    assert json.loads((dst / "t01.json").read_text()) == {"curated": True}

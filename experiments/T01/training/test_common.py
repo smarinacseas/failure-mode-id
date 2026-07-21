@@ -17,7 +17,7 @@ def test_extract_final_no_marker_returns_whole_text():
 
 
 def test_lora_targets_all_attention_and_mlp_linears():
-    # PREREG amendment (c): q,k,v,o_proj + gate,up,down_proj — nothing else.
+    # PREREG amendment (c): q,k,v,o_proj + gate,up,down_proj, nothing else.
     assert set(LORA_TARGET_MODULES) == {
         "q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"}
 

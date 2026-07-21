@@ -41,7 +41,7 @@ def _build_pool(cfg: RunConfig) -> list[dict]:
                     idx = int(v["index"])
                     if not 1 <= idx <= len(criteria):
                         continue
-                    # Skip judge failures — they aren't a real verdict to grade against.
+                    # Skip judge failures, they aren't a real verdict to grade against.
                     reason = v.get("reason", "")
                     if reason.startswith(("judge_parse_error", "judge_truncated", "judge_refusal")):
                         continue
@@ -133,8 +133,8 @@ def score(cfg: RunConfig) -> None:
         for d in disagreements:
             print(
                 f"  · {d['model']} {d['id']} c{d['criterion_index']}: "
-                f"judge={d['judge_verdict']} vs human={d['human_verdict']} "
-                f"— {d['criterion_text'][:80]}"
+                f"judge={d['judge_verdict']} vs human={d['human_verdict']}: "
+                f"{d['criterion_text'][:80]}"
             )
 
     _merge_manifest(cfg, {

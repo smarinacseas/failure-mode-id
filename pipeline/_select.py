@@ -3,10 +3,10 @@
 The pipeline never persists a selected-prompt list: every stage re-reads
 data/complexconstraints.jsonl and re-derives the subset from the frozen
 (limit, sample_seed). Selection is therefore a pure, deterministic function
-of its arguments — same inputs, same subset, across stages and resumes.
+of its arguments: same inputs, same subset, across stages and resumes.
 
-Strategy (seed set): balanced round-robin over use_case strata — one pick
-per stratum per round — so small use cases are never crowded out by the
+Strategy (seed set): balanced round-robin over use_case strata, one pick
+per stratum per round, so small use cases are never crowded out by the
 dominant ones (the real set is 34/22/10/6/1/1/1). Within a stratum, prefer
 records covering an instruction_type or prompt_style not yet in the
 selection; ties fall to a seed-shuffled order. Output keeps file order.

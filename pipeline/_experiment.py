@@ -6,8 +6,8 @@ dashboard can bind once and render any run; changes to the shape bump
 `SCHEMA_VERSION` and get documented in that file.
 
 Two files per tagged run land in `outputs/`:
-1. `outputs/experiments/<slug>.json` — the full deliverable.
-2. `outputs/experiments/index.json` — the dashboard dropdown, one
+1. `outputs/experiments/<slug>.json`: the full deliverable.
+2. `outputs/experiments/index.json`: the dashboard dropdown, one
    compact entry per experiment, ordered by experiment number.
 
 Slug convention: `E<NN>-<kebab-case-slug>` (e.g. `E01-smoke-3p`,
@@ -39,7 +39,7 @@ from config import (
     VALIDATE_SEED,
 )
 from pipeline.run_config import RunConfig
-from pipeline.run_config import InvalidSlugError, SLUG_RE, parse_slug  # noqa: F401 — re-export
+from pipeline.run_config import InvalidSlugError, SLUG_RE, parse_slug  # noqa: F401 (re-export)
 
 SCHEMA_VERSION = "3.3"
 
@@ -93,22 +93,22 @@ def experiment_block(cfg: RunConfig, run_report: str | None, run_date_iso: str) 
 
 
 def dataset_block() -> dict:
-    """`meta.dataset` — benchmark identity + license."""
+    """`meta.dataset`: benchmark identity + license."""
     return dict(DATASET)
 
 
 def models_block(cfg: RunConfig) -> list[str]:
-    """`meta.models` — ordered candidate KEYS.
+    """`meta.models`: ordered candidate KEYS.
 
     Dashboards use these keys directly to index `summary.criterion_pass_rate`,
-    `prompt.responses`, `criterion.results`, etc. — i.e. the same short
+    `prompt.responses`, `criterion.results`, etc., i.e. the same short
     strings the pipeline uses as its model handles.
     """
     return list(cfg.candidates.keys())
 
 
 def model_details_block(cfg: RunConfig) -> list[dict]:
-    """`meta.model_details` — the {key, id, role} rich variant.
+    """`meta.model_details`: the {key, id, role} rich variant.
 
     Optional companion to `meta.models`. Kept for future dashboards / analyses
     that want provider-side IDs or role tags; the ConstraintLens dashboard
@@ -118,13 +118,13 @@ def model_details_block(cfg: RunConfig) -> list[dict]:
 
 
 def judges_block(cfg: RunConfig) -> list[str]:
-    """`meta.judges` — every grader KEY, in order. The dashboard builds its
+    """`meta.judges`: every grader KEY, in order. The dashboard builds its
     judge toggle from this; the first entry is the default view."""
     return list(cfg.judge_keys)
 
 
 def judge_block(cfg: RunConfig) -> str:
-    """`meta.judge` — the DEFAULT grader KEY (first judge, short string).
+    """`meta.judge`: the DEFAULT grader KEY (first judge, short string).
 
     Kept for back-compat / single-judge dashboards; multi-judge views read
     `meta.judges` and the per-judge blocks under `by_judge`.
@@ -161,11 +161,11 @@ def judge_details_block(cfg: RunConfig) -> dict:
 
 
 def counts_block(prompts: list[dict], cfg: RunConfig) -> dict:
-    """`meta.counts` — cross-referencing sums the dashboard prints as headers."""
+    """`meta.counts`: cross-referencing sums the dashboard prints as headers."""
     n_prompts = len(prompts)
     n_criteria = sum(len(p["criteria"]) for p in prompts)
     n_models = len(cfg.candidates)
-    # n_grade_cells is per-judge (criteria × models) — matches the dashboard's
+    # n_grade_cells is per-judge (criteria × models); matches the dashboard's
     # "criteria graded" tile, which shows one judge's view at a time.
     return {
         "n_prompts": n_prompts,
@@ -177,7 +177,7 @@ def counts_block(prompts: list[dict], cfg: RunConfig) -> dict:
 
 
 def categories_block(prompts: list[dict]) -> dict:
-    """`meta.categories` — distinct values + counts, for dashboard filter UI."""
+    """`meta.categories`: distinct values + counts, for dashboard filter UI."""
     it = Counter(p["instruction_type"] for p in prompts)
     ps = Counter(p["prompt_style"] for p in prompts)
     uc = Counter(p["use_case"] for p in prompts)
@@ -189,7 +189,7 @@ def categories_block(prompts: list[dict]) -> dict:
 
 
 def config_block(cfg: RunConfig) -> dict:
-    """`meta.config` — every knob that could differ across experiments.
+    """`meta.config`: every knob that could differ across experiments.
 
     `candidates` and `judge id` live in `meta.models` / `meta.judge`
     respectively; this block is the tunables the dashboard cares about
@@ -231,7 +231,7 @@ def git_block() -> dict:
 
 
 def validation_block(cfg: RunConfig) -> dict:
-    """`meta.validation` — judge-validation status for the dashboard limitations panel.
+    """`meta.validation`: judge-validation status for the dashboard limitations panel.
 
     Read-only view of two files:
       - runs/<slug>/judge_validation.json (written by `validate --mode sample`)
@@ -283,9 +283,9 @@ def _promoted_config_fields(cfg: RunConfig) -> dict:
     when rendering the run-details panel. Fields it wants to surface (token
     budget, reasoning-mode) live nested in `meta.config` in our schema, so
     we duplicate them at the top level here. Nested versions stay authoritative;
-    these are display-only aliases — never edit them in-place downstream.
+    these are display-only aliases, never edit them in-place downstream.
 
-    Additive since schema 2.1 — dashboards that pre-date these fields still
+    Additive since schema 2.1; dashboards that pre-date these fields still
     render fine (they fall back to "Not recorded" / omitted rows).
     """
     return {
@@ -335,7 +335,7 @@ def update_index(slug: str, meta: dict) -> Path:
     """Insert or replace this experiment's entry in `experiments/index.json`.
 
     Index entries are the dashboard dropdown's data source. They are
-    compact by design — everything else lives in the per-experiment
+    compact by design; everything else lives in the per-experiment
     results file. Ordered by experiment number.
     """
     EXPERIMENTS_DIR.mkdir(parents=True, exist_ok=True)
