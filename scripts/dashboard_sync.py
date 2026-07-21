@@ -62,6 +62,9 @@ def _run_entry(payload: dict, filename: str) -> dict:
     n_models = counts.get("n_models", 0)
     description = (experiment.get("description") or "").strip()
     axis = description.split(".", 1)[0] if description else slug
+    # Descriptions are frozen experiment data (not dashboard copy); sanitize
+    # em-dashes so the rendered dropdown label stays plain ASCII.
+    axis = axis.replace("—", "·")
 
     return {
         "id": slug,

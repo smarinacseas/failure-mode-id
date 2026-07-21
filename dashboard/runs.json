@@ -18,7 +18,7 @@
     },
     {
       "id": "E03-judge-compare-3p",
-      "label": "E03-judge-compare-3p · Judge comparison — Opus 4",
+      "label": "E03-judge-compare-3p · Judge comparison · Opus 4",
       "date": "2026-07-10",
       "path": "./E03-judge-compare-3p.json",
       "n_prompts": 3,
@@ -81,5 +81,5 @@
       "n_models": 3
     }
   ],
-  "synced_at": "2026-07-21T21:46:47.921832+00:00"
+  "synced_at": "2026-07-21T22:44:57.371439+00:00"
 }

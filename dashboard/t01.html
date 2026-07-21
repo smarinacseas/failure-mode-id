@@ -235,7 +235,14 @@
         var tc = el("div", "chartcard");
         tc.appendChild(el("h3", null, esc(d.charts.transfer.title)));
         tc.insertAdjacentHTML("beforeend", chartTransfer(d.charts.transfer));
-        tc.appendChild(el("p", null, esc(d.charts.transfer.collapse.note)));
+        var noteText = d.charts.transfer.collapse.note;
+        // MMLU rows can carry their own marginality note (e.g. SA's guard-line
+        // miss sits inside the CI) that's authored but otherwise never shown;
+        // fold it into the same muted paragraph so the nuance stays visible.
+        (d.charts.transfer.mmlu || []).forEach(function (r) {
+          if (r.note) noteText += " " + r.key + "'s regression is marginal: " + r.note + ".";
+        });
+        tc.appendChild(el("p", null, esc(noteText)));
         tc.lastChild.style.cssText = "font-size:12px;color:var(--ink-3);line-height:1.5";
         transfer.appendChild(tc);
         p.appendChild(transfer);
@@ -287,6 +294,18 @@
           var det = document.getElementById(a.getAttribute("href").slice(1));
           if (det && det.tagName === "DETAILS") det.open = true;
         });
+
+        // #results/#transfer/#sec-* only exist once render() has run, which
+        // happens after the async t01.json fetch resolves. The browser's
+        // native fragment scroll (on initial load) fires before that and
+        // misses the target, so re-do it manually now that the DOM exists.
+        if (location.hash) {
+          var target = document.getElementById(location.hash.slice(1));
+          if (target) {
+            if (target.tagName === "DETAILS") target.open = true;
+            target.scrollIntoView();
+          }
+        }
       }
     </script>
   </body>

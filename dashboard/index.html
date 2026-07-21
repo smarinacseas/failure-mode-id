@@ -8,7 +8,7 @@
       // Legacy deep links (#run=...&tab=... / #view=training) belong to the eval app.
       (function () {
         var h = location.hash || "";
-        if (/(^|[#&])(run|view|tab|prompt|model|judge)=/.test(h)) {
+        if (/(^|[#&])(run|view|tab|prompt|model|judge|mode)=/.test(h)) {
           location.replace("eval.html" + h);
         }
       })();
