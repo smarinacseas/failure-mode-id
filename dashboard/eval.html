@@ -3569,7 +3569,7 @@
 
       // Theme button lives inside the dc template; wire it after first render.
       // dc-runtime mounts the template once against a placeholder Logic, then
-      // remounts when the real Logic class attaches — that remount replaces
+      // remounts when the real Logic class attaches. That remount replaces
       // the button node, so clicks are wired via delegation (survives any
       // number of remounts) and the label is repainted for a short window to
       // land after the final mount.
