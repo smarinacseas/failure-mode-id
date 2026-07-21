@@ -326,7 +326,7 @@
                       Evaluation run
                     </div>
                     <sc-for
-                      list="{{ runOptions }}"
+                      list="{{ runOptionsPrimary }}"
                       as="ro"
                       hint-placeholder-count="1"
                     >
@@ -361,6 +361,66 @@
                         <span style="{{ ro.checkStyle }}">✓</span>
                       </div>
                     </sc-for>
+                    <sc-if
+                      value="{{ hasDevRuns }}"
+                      hint-placeholder-val="{{ false }}"
+                    >
+                      <div
+                        onclick="{{ devToggle }}"
+                        style="
+                          cursor: pointer;
+                          padding: 7px 9px;
+                          margin-top: 3px;
+                          border-top: 1px solid var(--line, #e7e3d6);
+                          font-size: 10.5px;
+                          color: var(--ink-3, #8c8678);
+                          font-weight: 600;
+                        "
+                      >
+                        {{ devLabel }}
+                      </div>
+                      <sc-if
+                        value="{{ devOpen }}"
+                        hint-placeholder-val="{{ false }}"
+                      >
+                        <sc-for
+                          list="{{ runOptionsDev }}"
+                          as="ro"
+                          hint-placeholder-count="1"
+                        >
+                          <div
+                            onclick="{{ ro.onClick }}"
+                            style="{{ ro.rowStyle }}"
+                            style-hover="background:var(--accent-bg,#efe2d4)"
+                          >
+                            <div style="min-width: 0">
+                              <div
+                                style="
+                                  font-size: 12.5px;
+                                  font-weight: 500;
+                                  color: var(--ink, #2a2722);
+                                  white-space: nowrap;
+                                  overflow: hidden;
+                                  text-overflow: ellipsis;
+                                "
+                              >
+                                {{ ro.label }}
+                              </div>
+                              <div
+                                style="
+                                  font-size: 10.5px;
+                                  color: var(--ink-4, #a8a294);
+                                  font-family: &quot;IBM Plex Mono&quot;, monospace;
+                                "
+                              >
+                                {{ ro.date }}
+                              </div>
+                            </div>
+                            <span style="{{ ro.checkStyle }}">✓</span>
+                          </div>
+                        </sc-for>
+                      </sc-if>
+                    </sc-if>
                     <div
                       style="
                         margin-top: 4px;
@@ -567,6 +627,33 @@
                 ></span
               >
             </div>
+
+            <sc-if value="{{ hasTakeaway }}" hint-placeholder-val="{{ false }}">
+              <div
+                style="
+                  border-left: 3px solid var(--accent, #b06a3c);
+                  background: var(--surface, #fbfaf5);
+                  border-radius: 0 10px 10px 0;
+                  padding: 11px 16px;
+                  margin-bottom: 14px;
+                  font-size: 13.5px;
+                  line-height: 1.55;
+                  color: var(--ink-1, #46423a);
+                "
+              >
+                <span
+                  style="
+                    font-size: 9.5px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.08em;
+                    font-weight: 700;
+                    color: var(--accent, #b06a3c);
+                    margin-right: 9px;
+                  "
+                  >Takeaway</span
+                >{{ runTakeaway }}
+              </div>
+            </sc-if>
 
             <!-- run details -->
             <div
@@ -2935,7 +3022,7 @@
           sortKey:'id', sortDir:'asc',
           selectedId:null, critFilter:'all', expanded:{},
           data:null, dataRaw:null, judge:null, error:null,
-          runs:[], currentRun:null, runOpen:false, notesOpen:false,
+          runs:[], currentRun:null, runOpen:false, devOpen:false, notesOpen:false,
           faCause:null, faModelF:null, faMenu:null,
           reference:null, refError:null, refMode:null,
         };
@@ -3107,13 +3194,25 @@
           var self=this;
           const runs=this.state.runs||[], cur=this.state.currentRun, open=!!this.state.runOpen;
           const optRowR=(sel)=> 'display:flex;align-items:center;justify-content:space-between;gap:16px;padding:8px 11px;border-radius:7px;cursor:pointer;'+(sel?'background:var(--accent-bg,#efe2d4)':'');
+          const mkOpt = (r)=>({ label:r.label||r.id||r.path, date:r.date||'',
+            rowStyle:optRowR(cur&&r.path===cur.path),
+            checkStyle:(cur&&r.path===cur.path)?'color:var(--accent,#b06a3c);font-weight:700;font-size:12px;flex:none':'display:none',
+            onClick:()=>self.loadRun(r) });
+          const tierOf=(r)=>{ const m=FMID.runMeta(r.id); return (m&&m.tier)||'primary'; };
+          const devRuns=runs.filter(r=>tierOf(r)==='dev');
+          const primaryRuns=runs.filter(r=>tierOf(r)!=='dev');
           return {
             runLabel: cur ? (cur.label||cur.id||'results.json') : 'Loading run…',
             runCaret: open?'▴':'▾', runOpen: open,
             runOnToggle: ()=> this.setState(s=>({runOpen:!s.runOpen})),
             closeRun: ()=> this.setState({runOpen:false}),
             runBtnStyle: 'display:inline-flex;align-items:baseline;gap:8px;background:var(--surface,#fbfaf5);border:1px solid var(--border,#e4dfd1);border-radius:8px;padding:6px 11px;box-shadow:0 1px 2px rgba(0,0,0,.05);cursor:pointer;max-width:100%;min-width:0;overflow:hidden;text-align:left',
-            runOptions: runs.map(r=>({ label:r.label||r.id||r.path, date:r.date||'', rowStyle:optRowR(cur&&r.path===cur.path), checkStyle:(cur&&r.path===cur.path)?'color:var(--accent,#b06a3c);font-weight:700;font-size:12px;flex:none':'display:none', onClick:()=>self.loadRun(r) })),
+            runOptionsPrimary: primaryRuns.map(mkOpt),
+            runOptionsDev: devRuns.map(mkOpt),
+            hasDevRuns: devRuns.length>0,
+            devOpen: !!this.state.devOpen,
+            devToggle: ()=> self.setState(s=>({devOpen:!s.devOpen})),
+            devLabel: (this.state.devOpen?'▾':'▸')+' Smoke and method-dev runs ('+devRuns.length+')',
           };
         }
         componentDidUpdate(){ this.applyTheme(); this.setupGliders(); this.syncHash(); this.scrollRef(); }
@@ -3178,6 +3277,7 @@
               isReference:false,
               goReference:()=>this.goReference(),
               bcReferenceStyle:'color:var(--ink-3,#8c8678);cursor:pointer',
+              hasTakeaway:false, runTakeaway:'',
             };
           }
           const meta=data.meta||{}, summary=data.summary||{}, prompts=data.prompts||[];
@@ -3518,6 +3618,8 @@
             hasJudgeToggle: hasPanel || !!(meta.judges && meta.judges.length>1),
             judgeTabs: judgeChoices.map(j=>({ label: j==='__panel__'?'Panel':prettyJudge(j), onClick:()=>this.setJudge(j), btnStyle:this.btn(j===((this.state.judge)||meta.judge)) })),
             hasAgreement, agKappa, agAbstain, agMatrixCols, agMatrix,
+            hasTakeaway: !!(this.state.currentRun && FMID.runMeta(this.state.currentRun.id) && FMID.runMeta(this.state.currentRun.id).takeaway),
+            runTakeaway: (this.state.currentRun && FMID.runMeta(this.state.currentRun.id) || {}).takeaway || '',
             hasRunNotes: !!(meta.run_notes && meta.run_notes.length),
             runNotes: (meta.run_notes||[]).map(t=>({text:String(t)})),
             notesOpen: !!this.state.notesOpen,

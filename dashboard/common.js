@@ -131,7 +131,7 @@
     "E01-smoke-3p":        { tier: "dev", takeaway: "First 3-prompt smoke: pipeline plumbing works end to end." },
     "E02-smoke-fable-3p":  { tier: "dev", takeaway: "Judge-swap smoke (Fable): grading transport and schema hold up." },
     "E03-judge-compare-3p":{ tier: "dev", takeaway: "Two judges on identical responses: verdict deltas are real, judge choice matters." },
-    "E04-reasoning-smoke": { tier: "dev", takeaway: "Reasoning-mode smoke: thinking budgets and decode health wiring validated." },
+    "E04-reasoning-smoke-3p": { tier: "dev", takeaway: "Reasoning-mode smoke: thinking budgets and decode health wiring validated." },
     "E05-reasoning-rand20p": { tier: "primary", takeaway: "Reasoning on vs off, 20-prompt stratified sample: reasoning helps, motivating the full-benchmark E07." },
     "E06-temp06-3p":       { tier: "dev", takeaway: "Temperature 0.6 spot-check: no verdict-changing effect at smoke scale." },
     "E07-reasoning-full75":{ tier: "primary", takeaway: "Full 75-prompt replication: reasoning-on gains hold at population scale across the Qwen ladder." },
