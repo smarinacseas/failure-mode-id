@@ -10,7 +10,7 @@ comparison apples-to-apples; partial prompts are skipped with a note.
 For tagged runs, the ConstraintLens dashboard's static data folder
 (`dashboard/public/data/`) is refreshed at the end so the deliverable
 is immediately visible in `vite dev` (and shipped by the next GH Pages
-build). Sync failures are non-fatal — aggregate's canonical artifacts
+build). Sync failures are non-fatal: aggregate's canonical artifacts
 still land regardless.
 """
 
@@ -52,7 +52,7 @@ def _load_all(cfg: RunConfig):
     """Return (records, responses, grades_by_judge, tags).
 
     responses/tags are judge-independent (shared). grades_by_judge is
-    {judge: {candidate: {id: verdicts}}} — one grade set per judge over the
+    {judge: {candidate: {id: verdicts}}}, one grade set per judge over the
     same responses.
     """
     records = read_jsonl(DATA_JSONL)
@@ -131,7 +131,7 @@ def _build_panel_prompt_entry(rec: dict, responses: dict, grades_by_judge: dict,
     legacy majority (E01-E07, byte-identical).
 
     `judges` must be iterated in cfg.judges order (the caller's list, built
-    from cfg.judge_keys) — the reason-tie-break depends on a stably-ordered
+    from cfg.judge_keys): the reason-tie-break depends on a stably-ordered
     per_judge dict (Task 6)."""
     criteria_texts = rec["criteria"]
     tag_by_idx = {t["index"]: t for t in tags[rec["id"]]}
@@ -202,7 +202,7 @@ def _summary(prompts: list[dict], models: list[str]) -> dict:
 
     for p in prompts:
         for m in models:
-            # EXCLUDE'd criteria (E08 panel policy) are neither pass nor fail —
+            # EXCLUDE'd criteria (E08 panel policy) are neither pass nor fail:
             # they leave the denominators entirely. Legacy runs never set the
             # flag, so `scored` == every criterion (byte-identical).
             scored = [c for c in p["criteria"] if not c["results"][m].get("excluded")]
@@ -240,7 +240,7 @@ def _summary(prompts: list[dict], models: list[str]) -> dict:
 
 def _exclusions(prompts: list[dict], models: list[str]) -> dict:
     """The EXCLUDE report (§0.3.4): every (prompt, criterion, model) the panel
-    could not decide — undecidable ties and under-quorum cells — with the
+    could not decide (undecidable ties and under-quorum cells) with the
     reason. Published, not buried: these are dropped from pass rates, so the
     count is part of reading the census honestly."""
     rows: list[dict] = []
@@ -256,7 +256,7 @@ def _exclusions(prompts: list[dict], models: list[str]) -> dict:
 
 def _sync_dashboard(mon) -> None:
     """Best-effort copy of every experiment deliverable into the dashboard's
-    static data folder. Failure here never blocks aggregation — the sync is
+    static data folder. Failure here never blocks aggregation: the sync is
     a convenience, not a correctness requirement."""
     if not DASHBOARD_SYNC_SCRIPT.exists():
         return
@@ -272,7 +272,7 @@ def _sync_dashboard(mon) -> None:
 
 
 def _build_run_notes(cfg: RunConfig, responses: dict, by_judge: dict, skipped: list[str]) -> list[str]:
-    """`meta.run_notes` — high-level issues/errors/factors for the dashboard's
+    """`meta.run_notes`: high-level issues/errors/factors for the dashboard's
     expandable Run summary. Hand-written context first (runs/<slug>/NOTES.md,
     one note per line, '#' lines skipped), then auto-derived anomalies, then
     config factors worth knowing that aren't already dashboard rows."""
@@ -289,7 +289,7 @@ def _build_run_notes(cfg: RunConfig, responses: dict, by_judge: dict, skipped: l
     empty = [f"{key}/{rid}" for key, by_id in responses.items()
              for rid, text in by_id.items() if not (text or "").strip()]
     if empty:
-        notes.append(f"⚠ Empty candidate response(s) stored for {', '.join(sorted(empty))} — "
+        notes.append(f"⚠ Empty candidate response(s) stored for {', '.join(sorted(empty))}; "
                      "their prompts are excluded from comparison; regenerate.")
     if skipped:
         notes.append(f"⚠ {len(skipped)} prompt(s) skipped as incomplete: "
@@ -306,7 +306,7 @@ def _build_run_notes(cfg: RunConfig, responses: dict, by_judge: dict, skipped: l
                             counts[tag] = counts.get(tag, 0) + 1
         if counts:
             detail = ", ".join(f"{n} × {tag}" for tag, n in sorted(counts.items()))
-            notes.append(f"⚠ Judge {judge}: {detail} — affected criteria count as FAIL.")
+            notes.append(f"⚠ Judge {judge}: {detail}; affected criteria count as FAIL.")
 
     # Factors worth noting beyond the metadata rows already shown.
     if len(cfg.judges) > 1:
@@ -319,11 +319,11 @@ def _build_run_notes(cfg: RunConfig, responses: dict, by_judge: dict, skipped: l
         parts.append(f"{', '.join(anth)} reason with adaptive thinking (Anthropic)")
     if orj:
         parts.append(f"{', '.join(orj)} run with reasoning enabled via OpenRouter")
-    notes.append("; ".join(parts) + f" — streamed {JUDGE_MAX_TOKENS}-token budget; "
+    notes.append("; ".join(parts) + f", streamed {JUDGE_MAX_TOKENS}-token budget; "
                  f"candidate reasoning {'enabled' if cfg.reasoning else 'disabled'} "
                  f"at temperature {cfg.temperature}.")
     for key, fam in family_overlaps(cfg):
-        notes.append(f"⚠ Judge {key} shares the {fam!r} model family with a candidate — "
+        notes.append(f"⚠ Judge {key} shares the {fam!r} model family with a candidate; "
                      "self-preference bias possible; verdicts flagged via judge_details.")
     return notes
 
@@ -346,7 +346,7 @@ def _failure_analysis_block(cfg: RunConfig, records: list[dict],
                             grades_by_judge: dict) -> dict | None:
     """Spec §5 contract. Source of truth is runs/<slug>/diagnosis/; returns
     None when no diagnosis artifacts exist (dashboard shows the empty state).
-    judge_concurrence is joined HERE, post-hoc — never an input to diagnosis
+    judge_concurrence is joined HERE, post-hoc: never an input to diagnosis
     (spec §4 blinding rule 3)."""
     by_id = {r["id"]: r for r in records}
 
@@ -355,7 +355,7 @@ def _failure_analysis_block(cfg: RunConfig, records: list[dict],
         (spec §3): the generalization of the old second-judge strings to any
         panel size. Grading-artifact FAILs abstain (vote_of, inside
         dispatch_consensus) so judge-pipeline noise never reads as a real second
-        opinion — a 2-judge refusal shows as one FAIL + one abstain, not
+        opinion: a 2-judge refusal shows as one FAIL + one abstain, not
         both_fail. Judges iterate in cfg.judges order (reason-tie determinism)."""
         per_judge: dict[str, dict] = {}
         for s in cfg.judges:
@@ -376,7 +376,7 @@ def _failure_analysis_block(cfg: RunConfig, records: list[dict],
                 continue
             cells += 1
             # Pre-stamp artifacts (the E03-E05 backfill) carry no
-            # taxonomy_version field at all; missing means v1 (spec §2.8) —
+            # taxonomy_version field at all; missing means v1 (spec §2.8),
             # never the running code's CURRENT version, which would
             # silently misattribute provenance after a v2 bump.
             taxonomy_versions_seen.add(art.get("taxonomy_version", 1))
@@ -470,19 +470,19 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
     `outputs/experiments/<slug>.json` plus the dashboard `index.json`.
     """
     # A missing --run-report path silently misses the whole "each experiment
-    # produces a standardized MD summary" discipline — every meta/*.md is
+    # produces a standardized MD summary" discipline: every meta/*.md is
     # meant to derive from meta/TEMPLATE.md. Warn early rather than embed a
     # dead path into the JSON meta.
     if run_report:
         report_path = ROOT / run_report if not Path(run_report).is_absolute() else Path(run_report)
         if not report_path.exists():
             mon.note(
-                f"aggregate: WARNING — --run-report path does not exist: {run_report}\n"
+                f"aggregate: WARNING: --run-report path does not exist: {run_report}\n"
                 f"           Copy meta/TEMPLATE.md → {run_report} and fill it in.",
             )
 
     records, responses, grades_by_judge, tags = _load_all(cfg)
-    # Same selection every stage used — with a sample_seed this is the
+    # Same selection every stage used, with a sample_seed this is the
     # stratified subset, NOT the first `limit` rows.
     records = select_prompts(records, cfg.limit, cfg.sample_seed)
 
@@ -559,7 +559,7 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
             panel["completeness"] = panel_policy.completeness_report(coverage, judges)
 
     # Default (top-level) view: the panel when one exists (>=2 judges), else
-    # the first judge — back-compat for single-judge readers.
+    # the first judge, back-compat for single-judge readers.
     default = panel if panel is not None else by_judge[cfg.judge.key]
     prompts = default["prompts"]
     summary = default["summary"]
@@ -581,16 +581,16 @@ def _run(cfg: RunConfig, run_report: str | None, mon) -> None:
         results["panel"] = panel
     if failure_analysis is not None:
         results["failure_analysis"] = failure_analysis
-        mon.note(f"aggregate: failure_analysis — {failure_analysis['counts']['diagnosed']} "
+        mon.note(f"aggregate: failure_analysis: {failure_analysis['counts']['diagnosed']} "
                  f"diagnosed criteria over {failure_analysis['counts']['cells']} cells")
 
-    # Mechanical loop census (schema 3.2) — always present; loops count as
+    # Mechanical loop census (schema 3.2): always present; loops count as
     # failures even when escaped (user ruling 2026-07-09).
     decode_health = decode_health_block(cfg)
     results["decode_health"] = decode_health
     loops = {k: v["n_loop_any"] for k, v in decode_health["by_model"].items()
              if v["n_loop_any"]}
-    mon.note(f"aggregate: decode_health — loops by model: {loops or 'none'}")
+    mon.note(f"aggregate: decode_health: loops by model: {loops or 'none'}")
 
     RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     RESULTS_PATH.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")

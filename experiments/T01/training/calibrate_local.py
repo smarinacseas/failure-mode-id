@@ -1,7 +1,7 @@
 """Fast local recalibration loop: compose FRESH coverage prompts with the current
 compose.py, run the LOCAL base model (k rollouts, temp 0.9), report mean
 per-criterion pass + per-type breakdown vs the 30-70% band. No file writes, no
-API — the iteration loop for hardening the coverage generator (edit compose.py,
+API; the iteration loop for hardening the coverage generator (edit compose.py,
 re-run this) before committing to a full regenerate + teacher spend.
 
   python calibrate_local.py --n 60 --k 4
@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "datagen"))
 
 import torch  # noqa: E402
 
-import reward  # noqa: F401,E402 — registers verifier pools
+import reward  # noqa: F401,E402: registers verifier pools
 from base import check  # noqa: E402
 from common import extract_final, load_model, load_tokenizer  # noqa: E402
 from compose import compose_prompt  # noqa: E402

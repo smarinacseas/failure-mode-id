@@ -4,7 +4,7 @@
 Reads results/eval_t1_4/criteria.jsonl and prints:
   1. decode-level raw criterion pass rate per arm x cause,
   2. per-type decode-level pass rate per arm on the coverage pool,
-  3. breakage Brk(arm, cause) — the complement of the pre-registered recovery
+  3. breakage Brk(arm, cause): the complement of the pre-registered recovery
      metric: the fraction of Arm-0 majority-PASS criteria that the arm now
      majority-FAILS. Rec counts base failures fixed; Brk counts base passes
      broken. Same majority-vote convention as tier1_analysis.py (pass iff

@@ -3,8 +3,8 @@
 Repeat-draws CIF-012 under E07's frozen treatment on the two models that have
 hosted degenerate_output (qwen-9b in E05, qwen-35b in E06), then runs decode
 forensics over the draws, E07's own responses, and E05's original CIF-012
-response. Writes ONLY sidecar paths under runs/<slug>/probe/ — never the
-pipeline-owned responses/ files — so the frozen run and its resume logic are
+response. Writes ONLY sidecar paths under runs/<slug>/probe/ (never the
+pipeline-owned responses/ files) so the frozen run and its resume logic are
 untouched. Deliberately does not call run_config.resolve(): on a missing slug
 resolve() would freeze DEFAULT params; this script must fail instead.
 """
@@ -19,7 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import config  # noqa: E402
-from pipeline._decode_health import (  # noqa: E402,F401 — re-exported
+from pipeline._decode_health import (  # noqa: E402,F401 (re-exported)
     MIN_REPEATS,
     NGRAM,
     WINDOW,
@@ -52,12 +52,12 @@ def forensic_row(source: str, model: str, rec: dict) -> dict:
 
 
 def load_frozen_cfg(slug: str) -> RunConfig:
-    """Read-only load of a slug's frozen params. Hard-fails if absent —
+    """Read-only load of a slug's frozen params. Hard-fails if absent:
     calling resolve() here would freeze DEFAULT params for the slug."""
     path = config.RUNS_DIR / slug / "experiment.json"
     if not path.exists():
         raise SystemExit(
-            f"{path} not found — run the E07 pipeline first (its first "
+            f"{path} not found; run the E07 pipeline first (its first "
             "invocation freezes the params this probe must reuse)."
         )
     frozen = json.loads(path.read_text(encoding="utf-8"))["params"]
@@ -85,7 +85,7 @@ def run_draws(cfg: RunConfig, prompt: str, out_path: Path,
             try:
                 fields = _generate_one(cfg, model_id, prompt,
                                        on_reject=_capture)
-            except Exception as e:  # noqa: BLE001 — per-draw continue-on-error
+            except Exception as e:  # noqa: BLE001 (per-draw continue-on-error)
                 print(f"probe draw {key}#{draw} failed: {type(e).__name__}: {e}")
                 continue
             append_jsonl(out_path, {"model": key, "draw": draw, **fields})
@@ -104,8 +104,8 @@ def print_markdown(rows: list[dict]) -> None:
               f"| {r['finish_reason']} | {r['reasoning_chars']:,} "
               f"| {r['content_chars']:,} "
               f"| {'YES' if loop['looping'] else 'no'} "
-              f"| {loop['period'] if loop['period'] is not None else '—'} "
-              f"| {loop['onset'] if loop['onset'] is not None else '—'} |")
+              f"| {loop['period'] if loop['period'] is not None else '.'} "
+              f"| {loop['onset'] if loop['onset'] is not None else '.'} |")
 
 
 def main() -> None:

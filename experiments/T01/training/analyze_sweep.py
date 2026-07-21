@@ -1,6 +1,6 @@
 """Compact GRPO LR-sweep report (STOP report). For each LR: reward mean/std
 trajectory (windowed), format_ok, KL, response-length drift (mean_length first vs
-last window — a PREREG §8 artifact tell), cap-hit, tok/s, steps. Picks the LR by
+last window; a PREREG §8 artifact tell), cap-hit, tok/s, steps. Picks the LR by
 reward SLOPE + stability, not final reward."""
 import csv, glob, json, os, re
 

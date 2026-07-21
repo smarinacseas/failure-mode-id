@@ -1,7 +1,7 @@
 """Central config: API clients, model registry, file paths.
 
 Keys are loaded from `.env` only (never hardcoded). Candidate IDs MUST be
-verified against https://openrouter.ai/models — the open-model lineup
+verified against https://openrouter.ai/models: the open-model lineup
 ships monthly and these strings drift. The connectivity check in
 `pipeline/generate.py` will fail loudly if any ID is wrong.
 """
@@ -33,7 +33,7 @@ PROXY_SCHEME = "proxy://"
 
 def proxy_client() -> "OpenAI":
     """Lazily build the OpenAI-compatible client for the local candidate proxy.
-    Raises if the proxy env vars are absent — so a normal OpenRouter-only run
+    Raises if the proxy env vars are absent, so a normal OpenRouter-only run
     never touches this path."""
     global _PROXY_CLIENT
     if _PROXY_CLIENT is None:
@@ -60,7 +60,7 @@ def resolve_candidate_transport(model_id: str):
 # Judge + classifier via Anthropic. Non-candidate family → no self-preference bias.
 anthropic = Anthropic()
 
-# Judges (graders). A run may carry several — each grades the SAME candidate
+# Judges (graders). A run may carry several; each grades the SAME candidate
 # responses. Registry maps a short PATH-SAFE key (used in grades/<key>/ dirs,
 # by_judge, custom_ids, dashboard labels) to {client, model}. OpenRouter model
 # ids MUST be verified against https://openrouter.ai/models when pinned.
@@ -73,7 +73,7 @@ JUDGE_REGISTRY: dict[str, dict] = {
 }
 # Default panel: every registry key. 5 members (odd) so a full-attendance
 # majority vote cannot tie. Qwen judges stay out: Qwen is the candidate
-# ladder (family overlap warns, never blocks — see run_config.resolve).
+# ladder (family overlap warns, never blocks; see run_config.resolve).
 JUDGES: list[str] = list(JUDGE_REGISTRY)
 JUDGE: str = JUDGES[0]
 
@@ -101,26 +101,26 @@ GENERATION_WORKERS: int = 4
 
 # Hard wall-clock deadline for a SINGLE candidate generation call. `timeout_s`
 # is an httpx read timeout: it resets on every streamed chunk, so it bounds
-# dead sockets only — not slow-trickle generations, and not the half-open
+# dead sockets only, not slow-trickle generations, and not the half-open
 # socket a mid-stream client sleep leaves behind (neither bytes nor EOF; the
-# E04 run lost 10.3 h to one such call — see meta/2026-07-03-reasoning-smoke.md).
+# E04 run lost 10.3 h to one such call; see meta/2026-07-03-reasoning-smoke.md).
 # The deadline is enforced in pipeline/generate.py by streaming the call and
 # checking elapsed wall-clock per chunk, plus a watchdog that closes the
 # stream if no chunk ever arrives.
 #
 # Derivation (2026-07-06, scripts kept in CONCURRENCY.md): p99 (nearest-rank)
 # of the 69 observed generation-call durations under the frozen reasoning-on
-# treatment (48k budget, temp 0.6, provider_sort=throughput) — E04 attempt-6
-# log (9 calls) + E05-reasoning-rand20p log (60 calls) — is 1014.6 s
+# treatment (48k budget, temp 0.6, provider_sort=throughput): E04 attempt-6
+# log (9 calls) + E05-reasoning-rand20p log (60 calls), is 1014.6 s
 # (qwen-9b/CIF-024, 16.9 min; per-item log deltas, retries included, so an
 # upper bound on any single call). Deadline = max(2 × p99, 900 s floor)
 # = max(2029.3, 900) → 2030 s. Abandoned-config E04 calls (greedy hangs,
 # 32k cap-outs, up to 45.6 min) are excluded: no current freeze can
-# reproduce that configuration — and all would have been caught by this guard.
+# reproduce that configuration, and all would have been caught by this guard.
 #
 # 2026-07-08: raised 2030 → 2700 for E07's max_tokens bump (48k → 64k). A
 # legitimate run-to-cap at 64k tokens needs ~2670 s at the same worst-case
-# ~24 tok/s the 2030 s figure implied for 48k — and a capped repetition loop
+# ~24 tok/s the 2030 s figure implied for 48k, and a capped repetition loop
 # should be STORED (finish_reason=length, diagnosable) rather than
 # deadline-aborted into an error.
 GENERATION_DEADLINE_S: float = 2700.0
@@ -128,7 +128,7 @@ GENERATION_DEADLINE_S: float = 2700.0
 # Cancel-to-collect backstop for Message Batches (grade + diagnose).
 # E07 (2026-07-10): a 187-request diagnose batch showed processing=187/
 # succeeded=0 for 15.5h; canceling revealed 184 had already succeeded
-# server-side — the counts endpoint was stale, and the poll loop's only
+# server-side; the counts endpoint was stale, and the poll loop's only
 # exit was `ended`. After this many seconds of in_progress with frozen
 # request_counts, pipeline/_batch_guard.py cancels the batch: completed
 # requests are collected (only they are billed), the remainder resubmits
@@ -143,17 +143,17 @@ GENERATION_DEADLINE_BASIS: str = (
 
 # Judge / classifier calls. Judges run with adaptive thinking on (see
 # pipeline/_judge_llm.py) so both Opus and Fable reason before emitting the
-# JSON verdict — apples-to-apples. Thinking tokens count against max_tokens,
+# JSON verdict, apples-to-apples. Thinking tokens count against max_tokens,
 # so the budget must cover hidden thinking PLUS the verdict array; the call is
 # streamed, so this can exceed the ~16k non-streaming SDK timeout guard.
 JUDGE_MAX_TOKENS: int = 32000
 
 # OpenRouter judge calls: streamed worker pool (Anthropic judges use Message
 # Batches / sequential per the frozen judge_mode; OpenRouter has no batch API).
-# Concurrency is transport, not treatment — not frozen (like GENERATION_WORKERS).
+# Concurrency is transport, not treatment; not frozen (like GENERATION_WORKERS).
 JUDGE_WORKERS: int = 4
 
-# Hard wall-clock deadline for ONE OpenRouter judge call — same failure surface
+# Hard wall-clock deadline for ONE OpenRouter judge call, same failure surface
 # as candidate generation (half-open sockets, slow trickle; see
 # GENERATION_DEADLINE_S). No observed p99 yet, so the basis is the token budget:
 # JUDGE_MAX_TOKENS (32k) at the worst-case ~24 tok/s the generation deadline
@@ -162,13 +162,13 @@ JUDGE_DEADLINE_S: float = 1350.0
 JUDGE_DEADLINE_BASIS: str = (
     "JUDGE_MAX_TOKENS (32k) at worst-case ~24 tok/s (the GENERATION_DEADLINE_S "
     "basis rate) ≈ 1333 s, rounded to 1350 s (2026-07-11); no observed judge "
-    "p99 yet — revise from data"
+    "p99 yet; revise from data"
 )
 
 # Diagnose fallback chain (spec 2026-07-09 §4). Fable is the preferred analyst
 # but demonstrably refuses on CIF-006-class content; per-item fallback to Opus
 # means the preferred model does the work and degrades per CELL, not per stage
-# (pre-panel this forced Opus-solo for everything). NOT frozen — diagnosis is
+# (pre-panel this forced Opus-solo for everything). NOT frozen: diagnosis is
 # post-hoc, re-runnable measurement. Entries are judge registry keys.
 DIAGNOSE_CHAIN: tuple[str, ...] = ("claude-fable-5", "claude-opus-4-8")
 DIAGNOSE_MAX_TOKENS: int = 32000
@@ -193,7 +193,7 @@ PROGRESS_PATH = OUTPUTS_DIR / "progress.json"
 
 RESULTS_PATH = OUTPUTS_DIR / "results.json"
 
-# Per-experiment results storage — dashboard reads `index.json` for the dropdown
+# Per-experiment results storage: dashboard reads `index.json` for the dropdown
 # and fetches the individual `<slug>.json` files on selection.
 EXPERIMENTS_DIR = OUTPUTS_DIR / "experiments"
 EXPERIMENT_INDEX_PATH = EXPERIMENTS_DIR / "index.json"

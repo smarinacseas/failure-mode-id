@@ -5,11 +5,11 @@ Turns the T1.1 verifier reward `constraint_reward(response, specs) -> float`
 `(prompts, completions, **kwargs) -> list[float]`:
 
   * the GRPO dataset carries a per-prompt `specs` column (JSON string);
-  * each rollout is graded on its *final answer* only — `extract_final(c)` —
+  * each rollout is graded on its *final answer* only (`extract_final(c)`),
     so the reasoning scaffold before ===FINAL=== is never graded;
   * `max_chars` activates the pre-registered length cap (verbosity can't be the win).
 
-Identical reward for the RA and RB arms — only the training data differs.
+Identical reward for the RA and RB arms; only the training data differs.
 """
 from __future__ import annotations
 

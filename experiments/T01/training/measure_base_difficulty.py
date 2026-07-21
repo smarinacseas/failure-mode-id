@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "verifiers"))  # ba
 
 import torch
 
-import reward  # noqa: F401,E402 — importing registers the verifier pools
+import reward  # noqa: F401,E402: importing registers the verifier pools
 from base import check  # noqa: E402
 from common import CAUSES, MODEL_PATH, extract_final, load_model, load_tokenizer
 from datasets_t01 import DATA_DIR

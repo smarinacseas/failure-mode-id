@@ -1,17 +1,17 @@
 """T1.4 Tier-1 analysis (PREREG §§3, 6).
 
 Inputs: results/eval_t1_4/criteria.jsonl (per-criterion records, grade_tier1)
-        results/eval_t1_4/decode_meta.jsonl (lengths/malformed — §8 artifact tell)
+        results/eval_t1_4/decode_meta.jsonl (lengths/malformed; §8 artifact tell)
 
 Estimand chain (all frozen in PREREG before any T1.4 data existed):
 
-  majority(arm, prompt, criterion)  — pass in a strict majority of the arm's
+  majority(arm, prompt, criterion): pass in a strict majority of the arm's
       k decodes (k=3 → ≥2). Arm 0's majority defines its failed-criterion set.
-  Rec(arm, cause) — fraction of Arm-0's failed criteria on that cause pool the
+  Rec(arm, cause): fraction of Arm-0's failed criteria on that cause pool the
       arm now passes (majority over the arm's decodes).           (§3)
   Interaction = [Rec(RB,B) − Rec(SB,B)] − [Rec(RA,A) − Rec(SA,A)] (§3)
 
-Uncertainty (§6): prompt-level cluster bootstrap — resample prompts with
+Uncertainty (§6): prompt-level cluster bootstrap: resample prompts with
 replacement *within each cause pool*, 10,000 iterations, seed 20260715,
 percentile 2.5/97.5. Criteria travel with their prompt (the cluster); Arm-0's
 failed set is recomputed inside every replicate, so the denominator's sampling
@@ -67,7 +67,7 @@ def majority_tables(data):
 def rec_on_prompts(maj, arm: str, cause: str, prompt_ids) -> tuple[float, int]:
     """Rec(arm, cause) over a prompt multiset (bootstrap draws repeat prompts).
 
-    Arm-0's failed set is recomputed on the same multiset — numerator and
+    Arm-0's failed set is recomputed on the same multiset; numerator and
     denominator always see identical clusters."""
     base = maj.get(("0", cause), {})
     armt = maj.get((arm, cause), {})
@@ -93,7 +93,7 @@ def interaction_on(maj, prompts_by_cause) -> float:
 
 
 def h2_did_on(maj, prompts_by_cause) -> float:
-    """H2 (exploratory): SFT data-targeting crossover DiD —
+    """H2 (exploratory): SFT data-targeting crossover DiD:
     [Rec(SA,A) − Rec(SB,A)] − [Rec(SA,B) − Rec(SB,B)]: own-data advantage on
     coverage minus own-data (dis)advantage on precision. > 0 → cause-matched
     SFT data helps the matched cause more."""

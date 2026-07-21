@@ -3,7 +3,7 @@
 The bundled design ships as a single self-extracting HTML: base64-gzipped
 assets in a manifest, a template with UUID placeholders, and a bootstrap
 script that decodes assets to blob URLs on every load. That's convenient
-for the design tool but wasteful for a shipping dashboard — every visit
+for the design tool but wasteful for a shipping dashboard: every visit
 does the base64/gzip dance client-side.
 
 This script unpacks the bundle once:
@@ -35,7 +35,7 @@ DEFAULT_BUNDLE = REPO_ROOT / "design" / "ConstraintLens Dashboard.html"
 DEFAULT_OUT = REPO_ROOT / "dashboard"
 
 # ext_resources entries with these `id`s carry sample data the design shipped
-# with — we don't want them in the deployed dashboard because the pipeline
+# with; we don't want them in the deployed dashboard because the pipeline
 # writes real versions at the same relative paths.
 LIVE_DATA_IDS = frozenset({"runsJson", "resultsJson"})
 
@@ -74,7 +74,7 @@ _EXTRA_RUN_DETAIL_ROWS = (
 
 # Responsive shim: the design ships every layout as inline styles, so
 # attribute selectors + !important is the only way to override without
-# forking the source. Rules only fire at their breakpoints — desktop
+# forking the source. Rules only fire at their breakpoints; desktop
 # stays pixel-identical.
 #
 # The browser normalizes inline styles when parsing (adds a space after
@@ -162,7 +162,7 @@ def _fix_selection_color(html: str) -> str:
     to near-invisible when the user drags-selects. Swapping in the
     design's warm accent (matches `--pill-imp`) with an explicit light
     text color guarantees legibility across every text tone. Idempotent
-    on the source string — a design update that changes the color just
+    on the source string; a design update that changes the color just
     skips this patch.
     """
     source = "::selection{background:#e3d4bf}"
@@ -222,7 +222,7 @@ def _add_tag_glossary(html: str) -> str:
       3. Append dUseTitle/dInstrTitle/dStyleTitle to the detail row.
       4. Add title="…" to the six template spans that render tags.
 
-    Follows the design's own pattern — `title="{{ c.gameTitle }}"` on the
+    Follows the design's own pattern: `title="{{ c.gameTitle }}"` on the
     gameable pill already relies on native browser tooltips, so this
     keeps the vocabulary consistent.
     """
@@ -237,7 +237,7 @@ def _add_tag_glossary(html: str) -> str:
         return html
     html = html.replace(anchor_1, _GLOSSARY_JS.strip() + "\n" + anchor_1, 1)
 
-    # (2) Extend the drill-row return literal — insert titles right after
+    # (2) Extend the drill-row return literal: insert titles right after
     # the styleLabel field so the object stays legible.
     anchor_2 = "styleLabel:p.prompt_style,"
     replacement_2 = (
@@ -260,42 +260,42 @@ def _add_tag_glossary(html: str) -> str:
     if anchor_3 in html and replacement_3 not in html:
         html = html.replace(anchor_3, replacement_3, 1)
 
-    # (4a) Drill table — use_case cell (plain text) gets a title span.
+    # (4a) Drill table: use_case cell (plain text) gets a title span.
     html = html.replace(
         '<sc-raw-td style="padding:11px 12px;color:var(--ink-1,#2a2f3a)">{{ r.useLabel }}</sc-raw-td>',
         '<sc-raw-td style="padding:11px 12px;color:var(--ink-1,#2a2f3a)"><span title="{{ r.useTitle }}">{{ r.useLabel }}</span></sc-raw-td>',
         1,
     )
 
-    # (4b) Drill table — instruction pill.
+    # (4b) Drill table: instruction pill.
     html = html.replace(
         '<span style="{{ r.instrCss }}">{{ r.instrLabel }}</span>',
         '<span title="{{ r.instrTitle }}" style="{{ r.instrCss }}">{{ r.instrLabel }}</span>',
         1,
     )
 
-    # (4c) Drill table — prompt style cell.
+    # (4c) Drill table: prompt style cell.
     html = html.replace(
         '<sc-raw-td style="padding:11px 12px;color:var(--ink-2,#5b616d)">{{ r.styleLabel }}</sc-raw-td>',
         '<sc-raw-td style="padding:11px 12px;color:var(--ink-2,#5b616d)"><span title="{{ r.styleTitle }}">{{ r.styleLabel }}</span></sc-raw-td>',
         1,
     )
 
-    # (4d) Detail modal — use case pill.
+    # (4d) Detail modal: use case pill.
     html = html.replace(
         '<span style="font-size:11.5px;background:var(--line,#eef0f3);color:var(--ink-1,#3a4150);padding:3px 9px;border-radius:6px">{{ dUseLabel }}</span>',
         '<span title="{{ dUseTitle }}" style="font-size:11.5px;background:var(--line,#eef0f3);color:var(--ink-1,#3a4150);padding:3px 9px;border-radius:6px">{{ dUseLabel }}</span>',
         1,
     )
 
-    # (4e) Detail modal — instruction pill.
+    # (4e) Detail modal: instruction pill.
     html = html.replace(
         '<span style="{{ dInstrCss }}">{{ dInstrLabel }}</span>',
         '<span title="{{ dInstrTitle }}" style="{{ dInstrCss }}">{{ dInstrLabel }}</span>',
         1,
     )
 
-    # (4f) Detail modal — prompt style pill.
+    # (4f) Detail modal: prompt style pill.
     html = html.replace(
         '<span style="font-size:11.5px;background:var(--line,#eef0f3);color:var(--ink-1,#3a4150);padding:3px 9px;border-radius:6px">{{ dStyleLabel }}</span>',
         '<span title="{{ dStyleTitle }}" style="font-size:11.5px;background:var(--line,#eef0f3);color:var(--ink-1,#3a4150);padding:3px 9px;border-radius:6px">{{ dStyleLabel }}</span>',
@@ -319,7 +319,7 @@ def _inject_glossary_link(html: str) -> str:
     """Add a discreet 'Glossary ↗' link at the far right of the footer.
 
     Chosen over the topbar because the footer is where reference-type
-    metadata already lives (run/judge/counts) — the link matches the
+    metadata already lives (run/judge/counts); the link matches the
     footer's IBM Plex Mono chrome and doesn't crowd the model tabs.
     Idempotent on the anchor href.
     """
@@ -337,7 +337,7 @@ def _augment_run_details(html: str) -> str:
     The design's Logic hardcodes `runDetails:[…]` inside a `<script
     type="text/x-dc">` block. We locate the shipped `Coverage` row (a
     stable landmark that closes the array) and append the extra items
-    directly after it. Idempotent — bails out if the marker Reasoning
+    directly after it. Idempotent: bails out if the marker Reasoning
     mode row is already present.
     """
     if "'Reasoning mode'" in html:
@@ -347,7 +347,7 @@ def _augment_run_details(html: str) -> str:
     )
     m = coverage_re.search(html)
     if not m:
-        return html  # design's runDetails changed shape — patch would be brittle
+        return html  # design's runDetails changed shape; patch would be brittle
     return html[: m.end()] + _EXTRA_RUN_DETAIL_ROWS + html[m.end():]
 
 
@@ -358,7 +358,7 @@ def _patch_scfor_around_tr(html: str, list_expr: str, tr_var: str) -> str:
     Fixes a design-export bug where the tool emitted the sc-for tag with an
     empty body ahead of the table instead of wrapping the row template. The
     tr's inner bindings still reference `<tr_var>` so the intent is clear
-    from the shape — we just have to re-attach the loop.
+    from the shape; we just have to re-attach the loop.
     """
     empty_sc = re.compile(
         r"<sc-for\s+list=\"\{\{\s*"
@@ -403,11 +403,11 @@ def _filename_for(uuid: str, mime: str, seen_js: list[bool]) -> str | None:
     """Map (uuid, mime) → relative path under `dashboard/`.
 
     Returns None when the asset should NOT be extracted (e.g. bundled sample
-    JSONs the pipeline overwrites at runtime — those we drop instead of
+    JSONs the pipeline overwrites at runtime, those we drop instead of
     burning them into the repo).
     """
     if mime == "text/javascript":
-        # Every design bundle carries exactly one text/javascript blob — the
+        # Every design bundle carries exactly one text/javascript blob, the
         # dc-runtime (`support.js`). Overwriting the user's copy is safe
         # because the source is the same design tool.
         if seen_js[0]:
@@ -449,11 +449,11 @@ def unpack(bundle_path: Path, out_dir: Path) -> dict:
     for uuid, entry in manifest.items():
         mime = entry.get("mime", "application/octet-stream")
         if uuid in live_data_uuids:
-            dropped.append(f"{uuid} ({mime}) — live data via sync script")
+            dropped.append(f"{uuid} ({mime}): live data via sync script")
             continue
         rel_path = _filename_for(uuid, mime, seen_js)
         if rel_path is None:
-            dropped.append(f"{uuid} ({mime}) — no export rule")
+            dropped.append(f"{uuid} ({mime}): no export rule")
             continue
         data = _decode_asset(entry)
         abs_path = out_dir / rel_path
@@ -463,7 +463,7 @@ def unpack(bundle_path: Path, out_dir: Path) -> dict:
         written.append((rel_path, len(data)))
 
     # Substitute UUIDs. The bundler emits UUIDs as raw hex-with-dashes with no
-    # protocol — they appear inside src=/url() strings and are unique enough
+    # protocol; they appear inside src=/url() strings and are unique enough
     # to swap as plain string replacements.
     unpacked = template
     for uuid, rel_path in uuid_to_path.items():
@@ -479,14 +479,14 @@ def unpack(bundle_path: Path, out_dir: Path) -> dict:
     # Design extension: the shipped runDetails array covers models / judge /
     # counts / date / token / benchmark / coverage. Reasoning-mode,
     # judge-validation status, and git commit are equally load-bearing for
-    # interpreting a run — append them here so the pipeline's config is
+    # interpreting a run; append them here so the pipeline's config is
     # visible on the dashboard without touching the design source.
     unpacked = _augment_run_details(unpacked)
 
     # HTML parser applies table-parsing rules to <table>/<tbody>/<tr>/<td>/etc.
     # and will hoist any non-table children (like <sc-for>) OUT of the table.
     # Renaming them to `sc-raw-*` avoids that; the dc-runtime unwraps them
-    # back to real tags at render time via its RAW_UNWRAP map. Idempotent —
+    # back to real tags at render time via its RAW_UNWRAP map. Idempotent:
     # only the exact bare tag names are matched, `sc-raw-table` is safe.
     unpacked = _encode_table_tags(unpacked)
 
@@ -501,7 +501,7 @@ def unpack(bundle_path: Path, out_dir: Path) -> dict:
     # selectors + !important to override without touching the source.
     unpacked = _inject_responsive_css(unpacked)
 
-    # Legibility fix on ::selection — the shipped rule is background-only
+    # Legibility fix on ::selection: the shipped rule is background-only
     # and drops muted-gray text to near-invisible when highlighted.
     unpacked = _fix_selection_color(unpacked)
 
@@ -560,7 +560,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  · {note}")
     if result["stale_refs"]:
         print(
-            "unpack_design: WARN — template still references live-data UUIDs after substitution: "
+            "unpack_design: WARN: template still references live-data UUIDs after substitution: "
             + ", ".join(result["stale_refs"])
         )
     return 0

@@ -1,6 +1,6 @@
 """Dataset builders for the T1.3 runners.
 
-SFT (SA, SB): TRL conversational *prompt-completion* rows — prompt = the bare
+SFT (SA, SB): TRL conversational *prompt-completion* rows; prompt = the bare
 user task, completion = the teacher's scaffold + ===FINAL=== + answer. With
 completion_only_loss the user prompt is masked, so the student learns to emit the
 enumerate/compute-then-verify behaviour from the bare task (PREREG §5 / amendment (c)).
@@ -9,7 +9,7 @@ GRPO (RA, RB): prompt + a per-prompt `specs` column (JSON string) that the rewar
 adapter parses to grade each rollout.
 
 Isolation (PREREG §5): each loader hardcodes its base directory (`sft` / `train`)
-and validates the cause — there is no code path that can read the reserved
+and validates the cause; there is no code path that can read the reserved
 evaluation pool (a datagen static guard additionally enforces that no
 training-side source names that pool at all).
 """

@@ -2,7 +2,7 @@
 
 One frozen RunConfig per experiment slug. Built by `resolve()` in Task 2:
 first invocation freezes params to runs/<slug>/experiment.json; later
-invocations reload them. Stages receive the cfg explicitly — no module-level
+invocations reload them. Stages receive the cfg explicitly; no module-level
 knob mutation anywhere.
 """
 
@@ -57,7 +57,7 @@ class JudgeSpec:
     @classmethod
     def from_value(cls, v: "JudgeSpec | dict | str") -> "JudgeSpec":
         """Hydrate a freeze entry. Plain strings are pre-panel Anthropic ids
-        (key == model) — byte-identical legacy behavior."""
+        (key == model), byte-identical legacy behavior."""
         if isinstance(v, cls):
             return v
         if isinstance(v, dict):
@@ -89,7 +89,7 @@ def resolve_judge(entry: str) -> JudgeSpec:
     if entry.startswith("claude-"):
         return JudgeSpec(key=entry, client="anthropic", model=entry)
     raise ValueError(
-        f"unknown judge {entry!r}; registry keys: {', '.join(config.JUDGE_REGISTRY)} — "
+        f"unknown judge {entry!r}; registry keys: {', '.join(config.JUDGE_REGISTRY)}, "
         "or add an unregistered judge with key=provider/model-id")
 
 
@@ -127,7 +127,7 @@ def parse_slug(slug: str) -> tuple[int, str]:
 
 def track_for_slug(slug: str) -> str:
     """Track family from the slug prefix: T… → 'training', else 'analysis'.
-    The slug is the single source of truth for track — no separate field."""
+    The slug is the single source of truth for track; no separate field."""
     return "training" if slug[:1].upper() == "T" else "analysis"
 
 
@@ -138,7 +138,7 @@ class RunConfig:
     slug: str
     candidates: dict[str, str]      # key -> provider model id
     # Panel graders; each grades the SAME responses. Constructor accepts
-    # registry-key strings / {key,client,model} dicts / JudgeSpecs — all
+    # registry-key strings / {key,client,model} dicts / JudgeSpecs, all
     # hydrated to JudgeSpec in __post_init__.
     judges: tuple[JudgeSpec, ...]
     max_tokens: int
@@ -150,20 +150,20 @@ class RunConfig:
     # OpenRouter provider routing preference (None = default routing).
     # Default routing is a provider lottery whose throughput spans ~10x
     # (20 vs 164 tok/s observed 2026-07-02); "throughput" pins the fast end,
-    # which reasoning runs need — a 32k+ thinking budget at 20 tok/s is a
+    # which reasoning runs need: a 32k+ thinking budget at 20 tok/s is a
     # ~25-minute call. Caveat: fast providers may serve quantized weights,
     # so routing preference is itself a (frozen, documented) treatment.
     provider_sort: str | None = None
-    # Seeded stratified sampling: None = first-`limit` rows (E01–E04
+    # Seeded stratified sampling: None = first-`limit` rows (E01-E04
     # behavior); an int selects `limit` prompts spread across use cases /
-    # instruction types / prompt styles (see pipeline/_select.py). Frozen —
+    # instruction types / prompt styles (see pipeline/_select.py). Frozen:
     # a different seed is a different prompt subset, hence a different
     # experiment.
     sample_seed: int | None = None
     # Judge transport: "batch" (Anthropic Message Batches: submit → poll →
     # collect) or "sequential" (one streamed call per grade cell, the
     # pre-concurrency path). Grading params and judge-blindness are identical
-    # in both modes — this is a transport choice, not a treatment change —
+    # in both modes; this is a transport choice, not a treatment change,
     # but it is frozen so the manifest records how a run's grades were made.
     judge_mode: str = "batch"
     # Classify fallback chain (frozen). None -> (first judge,). Walked per prompt; refusal advances, one retry then advance (spec §4).
@@ -178,7 +178,7 @@ class RunConfig:
     # None -> OpenRouter's default routing (any quantization). A tuple like
     # ("bf16","fp16") restricts routing to providers serving those quantizations
     # and sets require_parameters so providers that can't honor the filter are
-    # dropped — the guard against a silently int-quantized candidate endpoint.
+    # dropped: the guard against a silently int-quantized candidate endpoint.
     provider_quantizations: tuple[str, ...] | None = None
     # Candidate decode seed (frozen; §0.2 "seeds logged"). None -> no seed sent.
     # Best-effort on OpenRouter (provider-dependent), but the requested seed is
@@ -209,7 +209,7 @@ class RunConfig:
 
     @property
     def judge(self) -> JudgeSpec:
-        """The canonical judge (first spec) — default dashboard view;
+        """The canonical judge (first spec): default dashboard view;
         classification uses classifier_chain."""
         return self.judges[0]
 
@@ -237,7 +237,7 @@ class RunConfig:
 
     def diagnosis_path(self, key: str) -> Path:
         """Root-cause diagnoses per candidate: diagnosis/<candidate>.jsonl.
-        No judge subdir — the analyst chain (config.DIAGNOSE_CHAIN) degrades per
+        No judge subdir; the analyst chain (config.DIAGNOSE_CHAIN) degrades per
         cell, so each record stamps the `analyst` that produced it instead."""
         return self.run_dir / "diagnosis" / f"{key}.jsonl"
 
@@ -268,7 +268,7 @@ class RunConfig:
             provider["sort"] = self.provider_sort
         if self.provider_quantizations:
             # The quantizations filter alone restricts routing to providers that
-            # serve these precisions — the §0.2 "no int-quant endpoint" guard.
+            # serve these precisions: the §0.2 "no int-quant endpoint" guard.
             # Do NOT add require_parameters here: it also demands provider support
             # for every request param (reasoning, seed), which the bf16/fp16 Llama
             # providers don't declare → "no endpoints found" 404 (dry-run 2026-07-15).
@@ -308,7 +308,7 @@ class RunConfig:
             kwargs = {f: d[f] for f in _PARAM_FIELDS}
         except KeyError as e:
             raise ValueError(
-                f"experiment.json for {slug!r} is missing field {e.args[0]!r} — "
+                f"experiment.json for {slug!r} is missing field {e.args[0]!r}, "
                 f"was it hand-edited? Delete runs/{slug}/ to start over."
             ) from e
         # Lists → tuples; the string/dict entries hydrate to JudgeSpec in
@@ -343,7 +343,7 @@ def parse_candidates(spec: str) -> dict[str, str]:
         else:
             raise ValueError(
                 f"unknown candidate key {entry!r}; registry keys: "
-                f"{', '.join(config.CANDIDATES)} — or add a new model with key=provider/model-id"
+                f"{', '.join(config.CANDIDATES)}, or add a new model with key=provider/model-id"
             )
     if not out:
         raise ValueError("--candidates parsed to an empty set")
@@ -374,7 +374,7 @@ def _defaults() -> dict:
     return {
         "candidates": dict(config.CANDIDATES),
         # Resolve registry keys to specs so the default panel carries real
-        # clients/models — a raw "gpt-5" key would otherwise be sent to the
+        # clients/models, a raw "gpt-5" key would otherwise be sent to the
         # Anthropic API by grade/connectivity.
         "judges": tuple(resolve_judge(k) for k in config.JUDGES),
         "classifier_chain": None,
@@ -394,7 +394,7 @@ def _defaults() -> dict:
 
 
 def family_overlaps(cfg: RunConfig) -> list[tuple[str, str]]:
-    """Judges whose model family matches a candidate family — the
+    """Judges whose model family matches a candidate family: the
     self-preference-bias configuration the v1 design structurally avoided.
     Recorded and warned about, never blocked (a deliberate same-family
     ablation is a legitimate experiment)."""
@@ -425,10 +425,10 @@ def resolve(slug: str, overrides: dict) -> RunConfig:
 
         def _norm_param(key, x):
             # Judge params need FIELD-AWARE normalization: a legacy freeze
-            # stores judges as plain strings while overrides carry JudgeSpecs —
+            # stores judges as plain strings while overrides carry JudgeSpecs;
             # hydrating each element through from_value().to_dict() makes
             # str/dict/spec forms of the SAME judge compare equal. Only judge
-            # fields get this — candidates dict values are plain strings that
+            # fields get this: candidates dict values are plain strings that
             # must never be reinterpreted as judge entries.
             if key in ("judges", "classifier_chain") and isinstance(x, (list, tuple)):
                 return [JudgeSpec.from_value(el).to_dict() for el in x]
@@ -445,7 +445,7 @@ def resolve(slug: str, overrides: dict) -> RunConfig:
             raise ConfigConflictError(
                 f"experiment {slug!r} has frozen parameters; conflicting flags:\n"
                 f"{lines}\n"
-                "Parameters freeze on an experiment's first run — start a new "
+                "Parameters freeze on an experiment's first run, start a new "
                 "slug to run with different parameters."
             )
         return RunConfig.from_json_dict(slug, frozen)
@@ -466,7 +466,7 @@ def resolve(slug: str, overrides: dict) -> RunConfig:
     tmp.write_text(payload, encoding="utf-8")
     os.replace(tmp, path)
     for key, fam in family_overlaps(cfg):
-        print(f"⚠ judge {key!r} shares the {fam!r} family with a candidate — "
+        print(f"⚠ judge {key!r} shares the {fam!r} family with a candidate, "
               "self-preference bias is possible; this is recorded in the results JSON.",
               file=sys.stderr)
     return cfg

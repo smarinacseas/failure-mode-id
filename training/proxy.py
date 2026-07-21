@@ -41,7 +41,7 @@ def build_app(samplers: dict[str, Sampler], api_key: str) -> FastAPI:
             temperature=body.get("temperature", 0.0),
             # The OpenAI SDK merges extra_body into the top-level request JSON
             # (_merge_mappings(json_data, options.extra_json)) before sending,
-            # so "reasoning" arrives as a top-level key — there is never an
+            # so "reasoning" arrives as a top-level key; there is never an
             # "extra_body" key on the wire.
             reasoning=bool((body.get("reasoning") or {}).get("enabled", False)),
         )
@@ -59,7 +59,7 @@ def build_app(samplers: dict[str, Sampler], api_key: str) -> FastAPI:
         # SSEDecoder, which yields zero events from a plain JSON body. Sampling
         # already happened above (sync); this generator only frames the
         # already-computed text as a single-delta chunk followed by a
-        # finish_reason="stop" chunk and the terminal [DONE] — legal SSE, and
+        # finish_reason="stop" chunk and the terminal [DONE]; legal SSE, and
         # all frames arrive immediately so the harness's per-chunk deadline
         # logic is never starved.
         created = int(time.time())
@@ -88,8 +88,8 @@ class TinkerSampler:
 
     NOTE: tinker_cookbook bakes "thinking" into which renderer you build
     (e.g. get_renderer("qwen3", tok) vs get_renderer("qwen3_disable_thinking",
-    tok)) rather than into a build_generation_prompt(..., thinking=...) kwarg
-    — confirmed against the installed tinker_cookbook==0.4.3 renderer
+    tok)) rather than into a build_generation_prompt(..., thinking=...) kwarg,
+    confirmed against the installed tinker_cookbook==0.4.3 renderer
     registry offline (no live server access). Hence two renderers per
     sampler, selected by the `reasoning` flag at call time.
     """

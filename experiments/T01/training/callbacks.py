@@ -1,12 +1,12 @@
 """Training callbacks + a generate() throughput meter for the T1.3 runners.
 
-* CSVLogger      — streams every TRL/HF `on_log` dict to JSONL (crash-safe) and
+* CSVLogger      : streams every TRL/HF `on_log` dict to JSONL (crash-safe) and
                    rebuilds a CSV (union of all keys) so `step,loss` (SFT) and
                    `step,reward` (GRPO) land under /workspace even if a run is
                    killed at the 3-hour hardcap.
-* TimeBudget     — sets should_training_stop once wall time exceeds a budget
+* TimeBudget     : sets should_training_stop once wall time exceeds a budget
                    (the GRPO probe's 3-hour hardcap).
-* GenerateMeter  — wraps the policy's `.generate` / `.generate_batch` to measure
+* GenerateMeter  : wraps the policy's `.generate` / `.generate_batch` to measure
                    true rollout throughput (tokens/sec) on the stock generate()
                    backend (PREREG amendment 2026-07-16 (d): no vLLM).
 """
@@ -78,7 +78,7 @@ class TimeBudget(TrainerCallback):
 
 class GenerateMeter:
     """Monkeypatch a model's generation methods to accumulate wall time and the
-    number of newly-generated tokens. Not a TrainerCallback — attach it to the
+    number of newly-generated tokens. Not a TrainerCallback; attach it to the
     unwrapped policy right after the trainer is built. Measures the real
     generate() rollout throughput (the number the probe must report)."""
 

@@ -1,32 +1,32 @@
 """Grade candidate responses with each blind judge.
 
 ONE judge call per (judge, prompt, candidate response). Never include the
-model name — the judge is structurally blind. Every judge in `cfg.judges`
+model name; the judge is structurally blind. Every judge in `cfg.judges`
 grades the SAME responses, so the dashboard can compare graders
 apples-to-apples. JSON parsing is defensive with one retry; a truncated
 response (judge spent its whole budget thinking) or a persistent parse
-failure records all-FAIL with an error note — see pipeline/_judge_llm.py
+failure records all-FAIL with an error note; see pipeline/_judge_llm.py
 for why the budget is generous and the call is streamed.
 
 Two transports, selected by the frozen `judge_mode` param (default "batch"):
 
-  batch      — the panel is split by judge client (Task 3). Anthropic-client
-               judges: one Message Batch per judge — submit every missing
+  batch:     the panel is split by judge client (Task 3). Anthropic-client
+               judges: one Message Batch per judge; submit every missing
                grade cell, poll every POLL_INTERVAL_S with logged status,
                then collect results through the same locked append_jsonl
                path. `custom_id` is the item's stable id
-               ("<candidate>__<prompt-id>" — the prompt id alone would
+               ("<candidate>__<prompt-id>", the prompt id alone would
                collide across candidates within a judge's batch). On resume,
                done_ids are re-derived from the output JSONL exactly as
                before and only the missing ids are submitted. Per-item batch
                errors and unparseable texts get the same one-retry-then-
                all-FAIL treatment as the sequential path. OpenRouter-client
                judges: OpenRouter has no batch API, so their cells grind on
-               a small ThreadPoolExecutor (config.JUDGE_WORKERS) instead —
+               a small ThreadPoolExecutor (config.JUDGE_WORKERS) instead,
                submitted up front and awaited WHILE the Anthropic batches
                submit/poll/collect, all inside the same `run()` invocation
                with no barrier between the two transports (see `_run_pool`).
-  sequential — the pre-batch path: one streamed call per cell, in order,
+  sequential: the pre-batch path: one streamed call per cell, in order,
                for every judge regardless of client. `_run_sequential`
                already dispatches per spec via `call_json`, so this mode
                needs no pool.
@@ -100,7 +100,7 @@ def _text_to_verdicts(raw: str, stop_reason: str | None,
                       n_criteria: int) -> tuple[list[dict] | None, str]:
     """Parse one judge response text. Returns (verdicts, "") on success or
     (None, error_reason) when the judge refused, the text is truncated, or it
-    is unparseable — the single source of truth for both transports."""
+    is unparseable; the single source of truth for both transports."""
     if stop_reason == "refusal":
         # Model-level refusal to grade (empty output). Sticky: 7/7 identical
         # refusals observed on E05 Fable × CIF-006, so callers must not spend
@@ -108,7 +108,7 @@ def _text_to_verdicts(raw: str, stop_reason: str | None,
         return None, ("judge_refusal: model declined to grade this cell "
                       "(stop_reason=refusal)")
     if stop_reason == "max_tokens":
-        # Truncated before finishing the JSON — almost always thinking eating
+        # Truncated before finishing the JSON; almost always thinking eating
         # the whole budget. Distinct from a genuine parse failure.
         return None, "judge_truncated: stop_reason=max_tokens (raise JUDGE_MAX_TOKENS)"
     try:
@@ -132,7 +132,7 @@ def _grade_one(spec: JudgeSpec, prompt: str, response: str, criteria: list[str])
             return verdicts
         last_err = err
         if err.startswith("judge_refusal"):
-            break               # sticky — a second attempt is a wasted call
+            break               # sticky: a second attempt is a wasted call
     return _all_fail(len(criteria), last_err or "judge_parse_error: unknown")
 
 
@@ -154,22 +154,22 @@ def _skip_empty(cfg: RunConfig, mon, judge_key: str, key: str, rid: str) -> None
     # (no grade record → prompt excluded at aggregate) rather than
     # spending judge calls to produce a misleading 0/N.
     mon.item_start(model=f"{key}@{judge_key}", prompt_id=rid)
-    mon.record_error(f"grade {judge_key}/{key} {rid}: empty response — skipped (regenerate)")
+    mon.record_error(f"grade {judge_key}/{key} {rid}: empty response, skipped (regenerate)")
     mon.item_done(model=f"{key}@{judge_key}", prompt_id=rid)
 
 
 def _write_loop_failure(cfg: RunConfig, mon, judge_key: str, key: str, rid: str,
                         n_criteria: int, loop: dict) -> None:
-    """Mechanical all-FAIL for a stored loop-failure record — no judge call.
+    """Mechanical all-FAIL for a stored loop-failure record; no judge call.
 
     The model produced no answer: a runaway repetition loop consumed the
     budget (generate stores these flagged instead of retrying; ruling
-    2026-07-09 — loops count as failures). Grading emptiness would waste
+    2026-07-09: loops count as failures). Grading emptiness would waste
     judge tokens to reach the same verdict, and skipping would silently
     EXCLUDE the prompt from the aggregate; the explicit 0/N keeps it in
     the results as the failure it is. Diagnose targets these cells like
     any other FAILs (the reason prefix is not a grading artifact)."""
-    reason = (f"loop_failure: no answer — runaway repetition loop in "
+    reason = (f"loop_failure: no answer, runaway repetition loop in "
               f"{loop.get('channel', 'reasoning')} "
               f"(period={loop.get('period')}, onset={loop.get('onset')})")
     _write_cell(cfg, mon, judge_key, key, rid, _all_fail(n_criteria, reason))
@@ -213,7 +213,7 @@ def _custom_id(key: str, rid: str) -> str:
 
 def _batch_request(spec: JudgeSpec, cid: str, user_msg: str) -> dict:
     # Params identical to the sequential call in pipeline/_judge_llm.call_json
-    # (model, budget, adaptive thinking, system, single user message) — the
+    # (model, budget, adaptive thinking, system, single user message); the
     # transport differs, the treatment does not. `spec.model` is the provider
     # id; the batch is keyed downstream by spec.key.
     return {
@@ -307,7 +307,7 @@ def _run_batch(cfg: RunConfig, mon, by_id: dict,
                 status = getattr(b, "processing_status", "unknown")
                 detail = ""
                 if rc is not None:
-                    detail = (f" — processing={getattr(rc, 'processing', '?')}, "
+                    detail = (f", processing={getattr(rc, 'processing', '?')}, "
                               f"succeeded={getattr(rc, 'succeeded', '?')}, "
                               f"errored={getattr(rc, 'errored', '?')}")
                 mon.note(f"grade batch {judge_key}: {status}{detail}")
@@ -338,7 +338,7 @@ def _run_batch(cfg: RunConfig, mon, by_id: dict,
                             del cells[res.custom_id]
                             collected += 1
                         elif err.startswith("judge_refusal"):
-                            # Sticky (see _text_to_verdicts) — write the
+                            # Sticky (see _text_to_verdicts); write the
                             # terminal record now; a resubmission round would
                             # only refuse again.
                             _write_cell(cfg, mon, judge_key, cell["key"], cell["rid"],
@@ -349,7 +349,7 @@ def _run_batch(cfg: RunConfig, mon, by_id: dict,
                             cell["last_err"] = err   # resubmit next round
                     else:
                         # errored / canceled / expired: the batch analog of the
-                        # sequential call raising — one resubmission, then the
+                        # sequential call raising; one resubmission, then the
                         # all-FAIL fallback (continue-on-error, as before).
                         errored += 1
                         err_obj = getattr(res.result, "error", None)
@@ -363,7 +363,7 @@ def _run_batch(cfg: RunConfig, mon, by_id: dict,
                 _sleep(POLL_INTERVAL_S)
 
     # Cells that failed both rounds: same terminal record the sequential path
-    # writes after its second attempt — all-FAIL verdicts carrying the reason,
+    # writes after its second attempt: all-FAIL verdicts carrying the reason,
     # recorded as an error, item marked done. Never silently dropped.
     for judge_key, cells in pending.items():
         for cid, cell in list(cells.items()):
@@ -402,7 +402,7 @@ def _run_pool(cfg: RunConfig, mon, by_id: dict,
               plan: list[tuple[JudgeSpec, str, list[dict]]],
               pool: ThreadPoolExecutor) -> list:
     """Submit every OpenRouter grade cell to `pool`; returns the futures
-    (caller awaits — see run()). Cells share only the locked append_jsonl
+    (caller awaits; see run()). Cells share only the locked append_jsonl
     path and the monitor's own lock; no other mutable state crosses workers."""
     return [pool.submit(_pool_item, cfg, mon, spec, key, resp_rec, by_id)
             for spec, key, todo in plan for resp_rec in todo]
@@ -426,7 +426,7 @@ def run(cfg: RunConfig, monitor: RunMonitor | None = None) -> None:
                 todo = [r for r in responses if r["id"] in by_id and r["id"] not in done_ids]
                 already += len(done_ids)
                 if not responses:
-                    mon.note(f"grade {spec.key}/{key}: no responses yet — skipping.")
+                    mon.note(f"grade {spec.key}/{key}: no responses yet, skipping.")
                 plan.append((spec, key, todo))
 
         mon.start_stage("grade", total=total, already_done=already)
@@ -434,7 +434,7 @@ def run(cfg: RunConfig, monitor: RunMonitor | None = None) -> None:
         or_plan = [p for p in plan if p[0].client == "openrouter"]
         if cfg.judge_mode == "sequential":
             # judge_mode=="sequential" intentionally runs the WHOLE plan
-            # sequentially, OpenRouter judges included — one streamed call
+            # sequentially, OpenRouter judges included; one streamed call
             # per cell is exactly what that mode means.
             _run_sequential(cfg, mon, by_id, plan)
         else:

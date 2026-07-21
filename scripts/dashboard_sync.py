@@ -7,7 +7,7 @@ to `index.html`). So this script simply:
 
   · Copies every `outputs/experiments/<slug>.json` → `dashboard/<slug>.json`.
   · Rebuilds `dashboard/runs.json` in the shape the design's Logic expects:
-    `{"runs": [{"id", "label", "date", "path"}, …]}` — ordered by
+    `{"runs": [{"id", "label", "date", "path"}, …]}`, ordered by
     experiment number ascending, newest last so the top-of-list stays
     stable.
 
@@ -28,7 +28,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
-from pipeline.run_config import track_for_slug  # noqa: E402 — needs REPO_ROOT on sys.path
+from pipeline.run_config import track_for_slug  # noqa: E402 (needs REPO_ROOT on sys.path)
 
 DEFAULT_SRC = REPO_ROOT / "outputs" / "experiments"
 DEFAULT_DST = REPO_ROOT / "dashboard"
@@ -46,7 +46,7 @@ def _experiment_files(src: Path) -> list[Path]:
 
 
 def _run_entry(payload: dict, filename: str) -> dict:
-    """Compact `{id, label, date, path}` — what the design's dropdown renders.
+    """Compact `{id, label, date, path}`: what the design's dropdown renders.
 
     Label bakes the axis under investigation (`slug`) plus the shape of the
     run (`Np × Mm`) so the dropdown is scannable without opening each run.
@@ -65,7 +65,7 @@ def _run_entry(payload: dict, filename: str) -> dict:
 
     return {
         "id": slug,
-        "label": f"{slug} — {axis[:80]}" if description else slug,
+        "label": f"{slug} · {axis[:80]}" if description else slug,
         "date": (experiment.get("run_date") or "")[:10],
         "path": f"./{filename}",
         "n_prompts": n_prompts,

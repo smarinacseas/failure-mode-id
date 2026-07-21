@@ -6,7 +6,7 @@ Two subcommands, mirroring the repo's `validate sample/score` pattern:
       Cross-checks dashboard export integrity against the post-repair
       responses.jsonl, draws a stratified n=40 sample from the three biggest
       root-cause pools, and writes a BLINDED worksheet.md (prompt + criterion
-      + full response + a blank `human_label:` line — nothing that reveals the
+      + full response + a blank `human_label:` line, nothing that reveals the
       classifier's call) plus an answer_key.json for later scoring.
 
   score --dir <dir>
@@ -26,7 +26,7 @@ Integrity input: runs/E08-llama3-2-3b-cc75/responses/llama-3b.jsonl.
 
 Criterion indexing convention: failure_analysis rows carry a 1-based
 `criterion_index` (a string), so the join to the prompt's criterion list is
-`criteria[int(criterion_index) - 1]`. This is verified, not assumed — the
+`criteria[int(criterion_index) - 1]`. This is verified, not assumed: the
 1-based join lands on a consensus-FAIL criterion for all 882 real rows,
 whereas the 0-based reading lands on a fail for only 585. `build` re-asserts
 that invariant on every sampled row (see `assert_consensus_fail`) so the base
@@ -75,7 +75,7 @@ B_CAUSE = "execution_slip"
 SAMPLE_SEED_DEFAULT = 20260715
 N_INTEGRITY_IDS = 3
 
-BODY_DELIMITER = "===== WORKSHEET ROWS — do not edit anything above this line ====="
+BODY_DELIMITER = "===== WORKSHEET ROWS: do not edit anything above this line ====="
 
 DEFAULT_DASHBOARD = REPO_ROOT / "dashboard" / "E08-llama3-2-3b-cc75.json"
 DEFAULT_RESPONSES = REPO_ROOT / "runs" / "E08-llama3-2-3b-cc75" / "responses" / "llama-3b.jsonl"
@@ -83,7 +83,7 @@ DEFAULT_OUT = REPO_ROOT / "runs" / "E08-llama3-2-3b-cc75" / "hand_check"
 
 
 class HandCheckError(Exception):
-    """Any abort condition — surfaced as a clear CLI message, exit code 1."""
+    """Any abort condition, surfaced as a clear CLI message, exit code 1."""
 
 
 # --- Loading / accessors -------------------------------------------------
@@ -118,7 +118,7 @@ def prompts_index(dashboard: dict) -> dict[str, dict]:
 def criterion_text_for(row: dict, pidx: dict[str, dict]) -> str:
     """Join a failure-analysis row to its criterion text.
 
-    criterion_index is 1-based and may arrive as a string — coerce and shift.
+    criterion_index is 1-based and may arrive as a string; coerce and shift.
     """
     prompt = pidx[row["id"]]
     idx = int(row["criterion_index"]) - 1
@@ -153,7 +153,7 @@ def assert_pool_sizes(rows: list[dict], expected: dict[str, int] = EXPECTED_POOL
             for cause, (found, want) in mismatched.items()
         )
         raise HandCheckError(
-            "Pool-size guard failed (schema drift) — the dashboard's diagnosis "
+            "Pool-size guard failed (schema drift): the dashboard's diagnosis "
             f"pools are not the run we contracted against. {detail}. "
             "Refusing to build a sample against a drifted frame."
         )
@@ -167,7 +167,7 @@ def assert_consensus_fail(sampled: list[dict], pidx: dict[str, dict]) -> None:
     A row diagnoses a *failure*, so `criteria[int(criterion_index)-1]` must have
     `results.llama-3b.pass is False`. Anything else (a pass, or a missing
     results block) means the 1-based convention no longer holds for this export
-    — abort rather than build a worksheet against a mis-joined frame.
+    Abort rather than build a worksheet against a mis-joined frame.
     """
     violations = []
     for n, row in enumerate(sampled, start=1):
@@ -179,7 +179,7 @@ def assert_consensus_fail(sampled: list[dict], pidx: dict[str, dict]) -> None:
             )
     if violations:
         raise HandCheckError(
-            "Consensus-FAIL invariant broken — the 1-based criterion join no "
+            "Consensus-FAIL invariant broken: the 1-based criterion join no "
             "longer lands on a failed criterion, so the index convention or the "
             "dashboard export has drifted. Offending rows:\n  "
             + "\n  ".join(violations)
@@ -190,7 +190,7 @@ def build_frame(rows: list[dict]) -> dict[str, list[dict]]:
     """The three strata pools, each sorted by (id, criterion_index).
 
     Sorting on the row's identity before any RNG draw makes the fixed-seed
-    sample a pure function of pool CONTENT, never of dashboard row order —
+    sample a pure function of pool CONTENT, never of dashboard row order:
     the order-stability convention from pipeline/validate.py.
     """
     frame: dict[str, list[dict]] = {cause: [] for cause in STRATA_CAUSES}
@@ -233,7 +233,7 @@ def run_integrity_check(pidx: dict[str, dict], responses: dict[str, str], ids: l
             raise HandCheckError(
                 f"Integrity check: response for id {pid!r} differs between the "
                 "dashboard and responses.jsonl. The dashboard export is STALE "
-                "relative to post-truncation-repair state — re-run "
+                "relative to post-truncation-repair state, re-run "
                 "`main.py aggregate` before any hand-check."
             )
 
@@ -241,7 +241,7 @@ def run_integrity_check(pidx: dict[str, dict], responses: dict[str, str], ids: l
 # --- Sampling ------------------------------------------------------------
 
 def stratified_sample(rows: list[dict], seed: int) -> list[dict]:
-    """Draw 15/15/10 from the three pools, then shuffle — one seeded RNG for
+    """Draw 15/15/10 from the three pools, then shuffle: one seeded RNG for
     both the per-stratum draw and the final worksheet shuffle."""
     frame = build_frame(rows)
     rng = random.Random(seed)
@@ -334,7 +334,7 @@ def build_worksheet(
     worksheet_path = out_dir / "worksheet.md"
     if worksheet_path.exists():
         raise HandCheckError(
-            f"{worksheet_path} already exists — refusing to overwrite a labeling "
+            f"{worksheet_path} already exists, refusing to overwrite a labeling "
             "session in progress. Delete the directory manually to start fresh."
         )
 
@@ -407,7 +407,7 @@ def parse_human_labels(worksheet_text: str, vocab: list[str]) -> dict[int, str]:
         shown = ", ".join(f"row {n}={v!r}" for n, v in invalid)
         problems.append(f"{len(invalid)} out-of-vocabulary label(s): {shown}")
     if problems:
-        raise HandCheckError("Cannot score — " + "; ".join(problems) + ".")
+        raise HandCheckError("Cannot score: " + "; ".join(problems) + ".")
     return labels
 
 
@@ -524,7 +524,7 @@ def _print_score(summary: dict, out_dir: Path) -> None:
     for (h, c), n in sorted(summary["confusion"].items()):
         print(f"  human={h:<24} classifier={c:<24} {n}")
     ab = summary["ab_cell"]
-    print(f"A↔B cell ({A_CAUSE} ↔ {B_CAUSE}) — total {ab['total']}:")
+    print(f"A↔B cell ({A_CAUSE} ↔ {B_CAUSE}), total {ab['total']}:")
     print(f"  classifier={A_CAUSE}, human={B_CAUSE}: {ab[f'classifier_{A_CAUSE}__human_{B_CAUSE}']}")
     print(f"  classifier={B_CAUSE}, human={A_CAUSE}: {ab[f'classifier_{B_CAUSE}__human_{A_CAUSE}']}")
     if summary["disagreements"]:

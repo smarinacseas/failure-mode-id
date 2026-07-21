@@ -572,7 +572,7 @@
               font-size: 13px;
             "
           >
-            Could not load results.json — {{ loadError }}
+            Could not load results.json: {{ loadError }}
           </div>
         </sc-if>
 
@@ -1162,8 +1162,8 @@
                   >Models satisfy most constraints but rarely all of them at
                   once.</b
                 >
-                A response can clear 90% of its checks and still fail the task —
-                one missed atomic constraint fails the prompt. The gap between
+                A response can clear 90% of its checks and still fail the task.
+                One missed atomic constraint fails the prompt. The gap between
                 these two bars is the benchmark.
               </div>
             </div>
@@ -2661,7 +2661,7 @@
                     <div style="font-size:12.5px;color:var(--ink-1,#46423a);padding:2px 0 2px 14px;text-indent:-10px">· {{ sc.text }}</div>
                   </sc-for>
                   <sc-if value="{{ faSynthHasPrior }}" hint-placeholder-val="{{ false }}">
-                    <div style="font-size:11px;color:var(--ink-3,#8c8678);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin:12px 0 4px">Previous recommendations — status</div>
+                    <div style="font-size:11px;color:var(--ink-3,#8c8678);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin:12px 0 4px">Previous recommendations: status</div>
                     <sc-for list="{{ faSynthPrior }}" as="sp" hint-placeholder-count="2">
                       <div style="font-size:12px;color:var(--ink-2,#6c6759);padding:2px 0 2px 14px;text-indent:-10px">· {{ sp.text }}</div>
                     </sc-for>
@@ -2774,7 +2774,7 @@
               <span style="font-size:12.5px;color:var(--ink-3,#8c8678)">{{ refBlurb }}</span>
             </div>
             <sc-if value="{{ refStale }}" hint-placeholder-val="{{ false }}">
-              <div style="font-size:11.5px;color:var(--warn-dim,#977f3e);background:var(--warn-bg,#efe6d1);border-radius:7px;padding:7px 11px;margin-bottom:14px">This run was diagnosed with a newer taxonomy version than this reference covers — entries may be missing or stale.</div>
+              <div style="font-size:11.5px;color:var(--warn-dim,#977f3e);background:var(--warn-bg,#efe6d1);border-radius:7px;padding:7px 11px;margin-bottom:14px">This run was diagnosed with a newer taxonomy version than this reference covers. Entries may be missing or stale.</div>
             </sc-if>
             <sc-if value="{{ refLoading }}" hint-placeholder-val="{{ false }}">
               <div style="padding:80px 0;text-align:center;color:var(--ink-3,#8c8678);font-family:'IBM Plex Mono',monospace;font-size:12.5px">Loading reference…</div>
@@ -2822,7 +2822,7 @@
                     <sc-for list="{{ rm.citations }}" as="ct" hint-placeholder-count="3">
                       <div style="font-size:12px;padding:3px 0">
                         <a href="{{ ct.url }}" target="_blank" rel="noopener" style="color:var(--ink,#2a2722);border-bottom:1px dotted currentColor;text-decoration:none" style-hover="color:var(--accent,#b06a3c) !important">{{ ct.title }}</a>
-                        <span style="color:var(--ink-4,#a8a294)"> — {{ ct.meta }}</span>
+                        <span style="color:var(--ink-4,#a8a294)"> ({{ ct.meta }})</span>
                         <div style="color:var(--ink-3,#8c8678);font-size:11.5px">{{ ct.relevance }}</div>
                       </div>
                     </sc-for>
@@ -3023,7 +3023,7 @@
         }
         // Deep links: the hash seeds the view before loadRun(), whose
         // reconciliation then validates every piece against the loaded
-        // data — a stale or mistyped link degrades instead of breaking.
+        // data. A stale or mistyped link degrades instead of breaking.
         applyHash(runs){
           var p=new URLSearchParams(location.hash.slice(1));
           var run=runs.find(function(r){ return r.id===p.get('run'); })||runs[0];
@@ -3046,11 +3046,11 @@
           var req0=this._viewReq;
           __loadJson('./runs.json').catch(function(){ return null; }).then(function(mf){
             if(req0!==self._viewReq) return;
-            var runs=(mf&&mf.runs&&mf.runs.length)?mf.runs:[{id:'results', label:'CIF pilot — results.json', path:'./results.json'}];
+            var runs=(mf&&mf.runs&&mf.runs.length)?mf.runs:[{id:'results', label:'CIF pilot · results.json', path:'./results.json'}];
             self.applyHash(runs);
           });
           // Pasting a link into an already-open tab only fires hashchange
-          // (same document) — honor it via the same seed-and-validate path.
+          // (same document). Honor it via the same seed-and-validate path.
           // Our own writes use replaceState, which never fires this event.
           window.addEventListener('hashchange', function(){
             if(!self.state.runs.length) return;
@@ -3085,7 +3085,7 @@
         // honor them; only the pieces the new run lacks fall back to defaults.
         loadRun(run){
           var self=this;
-          // runs.json can resolve to zero runs — there is nothing to fetch,
+          // runs.json can resolve to zero runs; there is nothing to fetch,
           // just clear to an empty state.
           if(!run){ this.setState({data:null, dataRaw:null, judge:null, error:null, currentRun:null, openMenu:null, runOpen:false, faMenu:null}); return; }
           var prev={screen:this.state.screen, model:this.state.model, judge:this.state.judge,
@@ -3227,7 +3227,7 @@
             {label:'Criterion-level pass rate', value:fmtPct(crate), sub:passedCrit+' / '+totalCrit+' checks', colorCss:'color:var(--pass,#4f7a51)'},
             {label:'Prompt-level full-pass rate', value:fmtPct(frate), sub:fullCount+' / '+prompts.length+' prompts', colorCss:'color:var(--fail,#a8483b)'},
             {label:'Prompts evaluated', value:String(nPrompts), sub:useCases.length+' use cases', colorCss:'color:var(--ink,#2a2722)'},
-            {label:'Criteria evaluated', value:String(nCrit), sub:critMin+'–'+critMax+' per prompt', colorCss:'color:var(--ink,#2a2722)'},
+            {label:'Criteria evaluated', value:String(nCrit), sub:critMin+' to '+critMax+' per prompt', colorCss:'color:var(--ink,#2a2722)'},
             {label:'Models compared', value:String(models.length), sub:models.map(prettyModel).join(' · '), colorCss:'color:var(--ink,#2a2722)'},
           ];
           const gapCritBar='height:100%;width:'+crate+'%;background:var(--pass,#4f7a51);border-radius:7px';
@@ -3356,7 +3356,7 @@
           const taxByKey={}; faTax.forEach(t=>{taxByKey[t.key]=t;});
           const promptById={}; prompts.forEach(p=>{promptById[p.id]=p;});
           // judge_concurrence is a string pre-3.3 ("opus_only" etc.) and a
-          // {pass,fail,abstain} vote dict in 3.3 — a row is "disputed" when a
+          // {pass,fail,abstain} vote dict in 3.3; a row is "disputed" when a
           // second judge passed the criterion (opus_only / any panel pass vote).
           const disputed=(jc)=>{
             if(!jc) return false;
@@ -3379,7 +3379,7 @@
               perModel: models.map(m=>prettyModel(m)+' '+(b.byModel[m]||0)).join(' · '),
               solidStyle:'height:100%;width:'+(100*solid/faMax)+'%;background:'+(dim?'var(--ink-4,#a8a294)':'var(--bar-strong,#3a362e)')+';border-radius:5px 0 0 5px;flex:none',
               dimStyle:'height:100%;width:'+(100*b.disputed/faMax)+'%;background:var(--ink-5,#cec8b8);border-radius:0 5px 5px 0;flex:none',
-              note: dim?'judge-noise candidate — excluded from the training read':(t.training_implication||'') };
+              note: dim?'judge-noise candidate: excluded from the training read':(t.training_implication||'') };
           });
           const faBlurb= fa
             ? ('Root causes for '+(fa.counts&&fa.counts.diagnosed)+' failed criteria across '+(fa.counts&&fa.counts.cells)+' response cells · diagnosed on '+(fa.verdict_basis||'')+' verdicts by '+(fa.diagnose_judge||'')+' · taxonomy v'+fa.taxonomy_version)
@@ -3410,9 +3410,9 @@
             else if(n===1) faSolo++; else faMixed++;
           });
           const faLadderCards=[
-            {label:'Failed by ALL '+models.length+' models', value:String(faShared), sub:'scale-resistant — prime training targets', colorCss:'color:var(--fail,#a8483b)'},
+            {label:'Failed by ALL '+models.length+' models', value:String(faShared), sub:'scale-resistant: prime training targets', colorCss:'color:var(--fail,#a8483b)'},
             {label:'Failed by exactly one model', value:String(faSolo), sub:'scale (or luck) already fixes these', colorCss:'color:var(--pass,#4f7a51)'},
-            {label:'Failed by some models', value:String(faMixed), sub:'mixed — draw noise candidates', colorCss:'color:var(--ink,#2a2722)'},
+            {label:'Failed by some models', value:String(faMixed), sub:'mixed: draw noise candidates', colorCss:'color:var(--ink,#2a2722)'},
           ];
           const faTopShared=Object.keys(faSharedCauses).sort((a,b)=>faSharedCauses[b]-faSharedCauses[a]).slice(0,3)
             .map(c=>((taxByKey[c]||{}).label||c)+' ('+faSharedCauses[c]+')').join(' · ');
@@ -3458,7 +3458,7 @@
           const faTableCount=faRows.length, faTableEmpty=faRows.length===0;
           const faSynth=(fa&&fa.synthesis)||null;
           const faSynthAvailable=!!faSynth;
-          const faSynthPred= faSynth ? (faSynth.predecessor ? ('vs '+faSynth.predecessor) : 'first analyzed experiment — no predecessor baseline') : '';
+          const faSynthPred= faSynth ? (faSynth.predecessor ? ('vs '+faSynth.predecessor) : 'first analyzed experiment: no predecessor baseline') : '';
           const faSynthComparison=((faSynth&&faSynth.comparison)||[]).map(t=>({text:String(t)}));
           const faSynthPrior=((faSynth&&faSynth.prior_recommendations_review)||[]).map(t=>({text:String(t)}));
           const faSynthHasPrior=faSynthPrior.length>0;
@@ -3502,8 +3502,8 @@
           const ag=(rawPanel&&rawPanel.agreement)||null;
           const hasAgreement=!!ag;
           const agJudges=hasPanel ? (meta.judges||[]) : [];
-          const fmtAgPct=(v)=> v==null ? '—' : (Math.round(v*10)/10).toFixed(1)+'%';
-          const agKappa= ag ? (ag.fleiss_kappa==null ? '—' : (Math.round(ag.fleiss_kappa*1000)/1000).toFixed(3)) : '—';
+          const fmtAgPct=(v)=> v==null ? 'N/A' : (Math.round(v*10)/10).toFixed(1)+'%';
+          const agKappa= ag ? (ag.fleiss_kappa==null ? 'N/A' : (Math.round(ag.fleiss_kappa*1000)/1000).toFixed(3)) : 'N/A';
           const agAbstain= agJudges.map(j=>({ label:prettyJudge(j), value:String((ag&&ag.abstentions&&ag.abstentions[j])||0) }));
           const agMatrixCols=agJudges.map(j=>({label:prettyJudge(j)}));
           const agCellCss=(self,v)=>'text-align:center;font-family:\'IBM Plex Mono\',monospace;font-size:12px;'+(self?'color:var(--ink-5,#cec8b8)':(v!=null?'color:var(--ink,#2a2722);font-weight:600':'color:var(--ink-5,#cec8b8)'));
@@ -3522,16 +3522,16 @@
             headerMeta, runMeta: nPrompts+' prompts · '+nCrit+' criteria',
             runBlurb:'Instruction-following eval · every prompt decomposed into atomic pass/fail criteria, graded automatically',
             runDetails:[
-              {label:'Models tested', value: models.map(prettyModel).join(' · ') || '—'},
-              {label:'Judge / grader', value: meta.judge || '—'},
+              {label:'Models tested', value: models.map(prettyModel).join(' · ') || 'N/A'},
+              {label:'Judge / grader', value: meta.judge || 'N/A'},
               {label:'Prompts evaluated', value: String(nPrompts)},
               {label:'Criteria graded', value: nCrit+' checks'},
-              {label:'Run date', value: meta.run_date ? (meta.run_date.replace('T',' ').slice(0,16)+' UTC') : '—'},
+              {label:'Run date', value: meta.run_date ? (meta.run_date.replace('T',' ').slice(0,16)+' UTC') : 'N/A'},
               {label:'Token limits', value: (meta.token_limit||meta.max_tokens||'Not recorded')},
               {label:'Benchmark', value:'ComplexConstraints (CIF)'},
-              {label:'Coverage', value: useCases.length+' use cases · '+promptStyles.length+' prompt styles'},{label:'Reasoning mode', value: meta.reasoning_enabled === false ? 'Disabled' : (meta.reasoning_enabled === true ? 'Enabled' : (meta.reasoning_enabled==null ? 'Not recorded' : String(meta.reasoning_enabled)))},{label:'Judge validation', value: (meta.validation && meta.validation.status === 'scored' && meta.validation.agreement_pct != null) ? (fmtPct(meta.validation.agreement_pct)+' agreement (n='+(meta.validation.n_scored||0)+')') : ((meta.validation && meta.validation.status === 'sampled')     ? ('sample drawn (n='+(meta.validation.n_sampled||0)+', ungraded)')     : 'not run')},{label:'Git commit', value: (meta.git && meta.git.commit) ? (meta.git.commit + (meta.git.dirty?' (dirty)':'')) : '—'},
+              {label:'Coverage', value: useCases.length+' use cases · '+promptStyles.length+' prompt styles'},{label:'Reasoning mode', value: meta.reasoning_enabled === false ? 'Disabled' : (meta.reasoning_enabled === true ? 'Enabled' : (meta.reasoning_enabled==null ? 'Not recorded' : String(meta.reasoning_enabled)))},{label:'Judge validation', value: (meta.validation && meta.validation.status === 'scored' && meta.validation.agreement_pct != null) ? (fmtPct(meta.validation.agreement_pct)+' agreement (n='+(meta.validation.n_scored||0)+')') : ((meta.validation && meta.validation.status === 'sampled')     ? ('sample drawn (n='+(meta.validation.n_sampled||0)+', ungraded)')     : 'not run')},{label:'Git commit', value: (meta.git && meta.git.commit) ? (meta.git.commit + (meta.git.dirty?' (dirty)':'')) : 'N/A'},
             ],
-            footDate:(meta.run_date||'').slice(0,10), footJudge:meta.judge||'—', footCrit:String(nCrit), footPrompts:String(nPrompts), footModels:String(models.length),
+            footDate:(meta.run_date||'').slice(0,10), footJudge:meta.judge||'N/A', footCrit:String(nCrit), footPrompts:String(nPrompts), footModels:String(models.length),
             footBenchUrl:(meta.dataset&&meta.dataset.source)||'https://huggingface.co/datasets/surgeai/ComplexConstraints',
             footBenchLabel:(meta.dataset&&meta.dataset.name)||'Complex Constraints Benchmark Set',
             isOverview:screen==='overview', isDrill:screen==='drilldown', isDetail:screen==='detail',
@@ -3570,8 +3570,8 @@
             detailId:dPrompt.id||'',
             metricCards, instrBars, styleBars, useBars, verifBars, compareRows, compareLegend,
             gapCritNum:fmtPct(crate), gapFullNum:fmtPct(frate), gapCritBar, gapFullBar,
-            gapCritNote:'— '+passedCrit+' of '+totalCrit+' atomic checks satisfied',
-            gapFullNote:'— '+fullCount+' of '+prompts.length+' prompts fully satisfied',
+            gapCritNote:'('+passedCrit+' of '+totalCrit+' atomic checks satisfied)',
+            gapFullNote:'('+fullCount+' of '+prompts.length+' prompts fully satisfied)',
             drillTitle, drillCount:rows.length, drillRows, drillEmpty:rows.length===0,
             hasFilters, filterMenus, anyMenuOpen, closeMenus:()=>this.setState({openMenu:null}),
             clearFilters:()=>this.setState({fInstr:null,fUse:null,fStyle:null,openMenu:null}),

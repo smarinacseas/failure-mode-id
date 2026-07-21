@@ -1,4 +1,4 @@
-"""SFT runner — Arms SA (coverage) and SB (precision). PREREG §5 + amendment
+"""SFT runner: Arms SA (coverage) and SB (precision). PREREG §5 + amendment
 2026-07-16 (c).
 
 Completion-only LoRA SFT: the user prompt is masked, the loss is on the teacher
@@ -57,7 +57,7 @@ def report_token_lengths(ds, tokenizer, max_length: int, out_path: Path | None =
           f"p95={stats['p95']} max={stats['max']} | >{max_length}: {trunc} "
           f"({stats['truncation_rate']*100:.2f}%)")
     if stats["truncation_rate"] > 0.01:
-        print(f"[FLAG] truncation {stats['truncation_rate']*100:.2f}% > 1% — bump max_length to 8192")
+        print(f"[FLAG] truncation {stats['truncation_rate']*100:.2f}% > 1%; bump max_length to 8192")
     if out_path:
         out_path.write_text(json.dumps(stats, indent=2))
     return stats
@@ -101,7 +101,7 @@ def main():
             print(f"[parity] {args.arm}: manifest target_n={m['target_n']} "
                   f"(of {m['source']['accepted']} accepted) <- {manifest_path.name}")
         else:
-            print(f"[parity] no manifest at {manifest_path} — using full accepted set")
+            print(f"[parity] no manifest at {manifest_path}; using full accepted set")
 
     tokenizer = load_tokenizer()
     ds = load_sft_dataset(args.cause, limit=args.limit, only_ids=only_ids)

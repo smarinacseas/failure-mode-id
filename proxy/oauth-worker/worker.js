@@ -1,11 +1,11 @@
 /**
- * ConstraintLens OAuth proxy — Cloudflare Worker.
+ * ConstraintLens OAuth proxy: Cloudflare Worker.
  *
  * GitHub Pages is static, so it can't hold the OAuth app's client secret.
  * This worker does exactly one privileged thing: exchange the authorization
  * `code` (POST /exchange) for a user access token, verify the user is on the
  * labeling allowlist, and hand the token back to dashboard/label.html.
- * The token never touches this worker again — all repo reads/writes happen
+ * The token never touches this worker again; all repo reads/writes happen
  * browser → api.github.com directly.
  *
  * Bindings (see wrangler.toml / SETUP.md):
@@ -103,7 +103,7 @@ export default {
     }
     const login = (await userRes.json()).login || "";
 
-    // 3. Allowlist gate — don't hand tokens to logins we don't recognize.
+    // 3. Allowlist gate: don't hand tokens to logins we don't recognize.
     //    (GitHub repo permissions are the real write barrier; this just keeps
     //    the labeling flow closed by default.)
     const allowedUsers = (env.ALLOWED_USERS || "")

@@ -1,4 +1,4 @@
-"""VerIH-style RLVR (GRPO) on Tinker — runbook script, not a library.
+"""VerIH-style RLVR (GRPO) on Tinker: runbook script, not a library.
 
 Trains `BASE_MODEL` with the native VerIH reward (training/verih_reward.py,
 faithful to data/verih/RLVR/verl/utils/reward_score/ih.py's compute_score)
@@ -6,7 +6,7 @@ over the real VerIH train split (data/verih/RLVR/dataset/verih/train.json,
 loaded via training/data.py::load_verih). GRPO mechanics (Datum construction,
 forward_backward/optim_step call shapes) are copied from the tinker_cookbook
 recipe at .venv/lib/python3.14/site-packages/tinker_cookbook/recipes/rl_loop.py
-(tinker==0.22.7, tinker_cookbook==0.4.3 — same versions proxy.py cites), with
+(tinker==0.22.7, tinker_cookbook==0.4.3, same versions proxy.py cites), with
 `get_reward(response, answer)` swapped for `rl_reward(text, gt)` and the
 GSM8K-specific dataset/convo-prefix machinery dropped.
 
@@ -17,16 +17,16 @@ not assumed), is documented inline below and summarized in the module-level
 CONFIG block.
 
 Durability (added after a live 402 killed a full run at step 151/225 with all
-151 steps lost — the only durable checkpoint was the base): every SAVE_EVERY
+151 steps lost; the only durable checkpoint was the base): every SAVE_EVERY
 steps we write BOTH a durable sampler checkpoint (save_weights_for_sampler,
 for intermediate eval) and a resumable training-state checkpoint (save_state,
 weights + optimizer), recording their paths in checkpoints.json atomically.
 On any exception OR Ctrl-C we attempt a durable `-partial` save before
-re-raising (that save may itself 402 — then checkpoints.json still holds the
+re-raising (that save may itself 402; then checkpoints.json still holds the
 last periodic step's paths). With RESUME=1, startup reloads the recorded
 training state via create_training_client_from_state_with_optimizer (the exact
 rl_loop.py / sl_loop.py resume pattern) and continues from next_step, reusing
-the ORIGINAL base checkpoint (never re-saved — the fair baseline must stay the
+the ORIGINAL base checkpoint (never re-saved; the fair baseline must stay the
 pre-training weights).
 
 Run:
@@ -61,12 +61,12 @@ from training.verih_reward import has_think_block, rl_reward
 # deliberate deviation from it)
 # --------------------------------------------------------------------------
 
-# VerIH's own checkpoint — confirmed live against Tinker's get_server_capabilities()
+# VerIH's own checkpoint, confirmed live against Tinker's get_server_capabilities()
 # this session (not assumed from VerIH's paper/repo).
 BASE_MODEL = os.environ.get("BASE_MODEL", "Qwen/Qwen3-8B")
 
 # DEVIATION: VerIH's train_grpo.sh does full fine-tuning (no LoRA). Full-FT
-# isn't how Tinker training clients work for a pilot of this size/budget —
+# isn't how Tinker training clients work for a pilot of this size/budget;
 # create_lora_training_client is the primitive available, so we LoRA.
 LORA_RANK = int(os.environ.get("LORA_RANK", "32"))
 
@@ -90,7 +90,7 @@ MAX_PROMPT_TOKENS = int(os.environ.get("MAX_PROMPT_TOKENS", "1024"))
 # DEVIATION: VerIH used lr=1e-6 for full-FT. LoRA adapters need a much
 # higher lr to move the (much smaller) trainable parameter count; 1e-5 is
 # the tinker_cookbook LoRA convention (rl_loop.py's own Config defaults to
-# 4e-5 for a from-scratch base model — we're more conservative here since
+# 4e-5 for a from-scratch base model; we're more conservative here since
 # we start from an already-instruction-tuned checkpoint).
 LEARNING_RATE = float(os.environ.get("LEARNING_RATE", "1e-5"))
 
@@ -100,7 +100,7 @@ TEMPERATURE = float(os.environ.get("TEMPERATURE", "1.0"))
 SEED = int(os.environ.get("SEED", "20260712"))
 
 # Durability cadence: save a durable sampler + resumable state checkpoint
-# every SAVE_EVERY completed steps (default 25 — one save per ~25 paid steps
+# every SAVE_EVERY completed steps (default 25, one save per ~25 paid steps
 # bounds worst-case loss to <SAVE_EVERY steps). RESUME=1 reloads the recorded
 # state on startup and continues from next_step.
 SAVE_EVERY = int(os.environ.get("SAVE_EVERY", "25"))
@@ -110,12 +110,12 @@ DATA_PATH = os.environ.get("DATA_PATH", "data/verih/RLVR/dataset/verih/train.jso
 CHECKPOINTS_PATH = os.environ.get("CHECKPOINTS_PATH", "training/checkpoints.json")
 
 # DEVIATION: VerIH's GRPO loss adds kl_loss_coef=0.001 against a frozen
-# reference model. rl_loop.py — the tinker_cookbook recipe this script's
-# Datum/forward_backward/optim_step shapes are reconciled against — has NO
+# reference model. rl_loop.py, the tinker_cookbook recipe this script's
+# Datum/forward_backward/optim_step shapes are reconciled against, has NO
 # reference-model KL term: forward_backward(datums, loss_fn="importance_sampling")
 # is the entire loss. We replicate the recipe's loss mechanism exactly rather
 # than bolt on a KL term the recipe doesn't support, so there is no KL
-# penalty in this training loop. (kl_loss_coef is small enough — 0.001 — that
+# penalty in this training loop. (kl_loss_coef is small enough, 0.001, that
 # VerIH's own ablations describe it as a mild regularizer, not core to the
 # method; omitting it is a scope cut, not a correctness bug.)
 
@@ -144,7 +144,7 @@ def _is_trainable_row(sample: dict) -> bool:
 def _build_pool(
     samples: list[dict], renderer, max_prompt_tokens: int
 ) -> tuple[list[dict], int, int]:
-    """Filter to trainable rows, render each prompt once (precompute — the
+    """Filter to trainable rows, render each prompt once (precompute; the
     per-step loop reuses these ModelInputs rather than re-tokenizing), and
     drop prompts over the length cap. Returns (pool, n_skipped_untrainable,
     n_skipped_overlong)."""
@@ -165,7 +165,7 @@ def _build_pool(
 
 def _batch_for_step(pool: list[dict], step: int, prompts_per_step: int) -> list[dict]:
     """Cycles through `pool` with wraparound so STEPS * PROMPTS_PER_STEP can
-    exceed len(pool) without index errors — the pool was shuffled once at
+    exceed len(pool) without index errors; the pool was shuffled once at
     startup (seeded), so wraparound repeats rows in the same relative order
     rather than reshuffling per lap. Index math (pure, resume-deterministic)
     lives in training/_rlvr_resume.batch_indices so it can be tested offline;
@@ -175,11 +175,11 @@ def _batch_for_step(pool: list[dict], step: int, prompts_per_step: int) -> list[
 
 
 def _save_named_checkpoint(training_client, name: str) -> str:
-    """Durable, retrievable-by-path checkpoint — NOT
+    """Durable, retrievable-by-path checkpoint, NOT
     save_weights_and_get_sampling_client(name=...). LIVE-VERIFY finding:
     against the installed tinker==0.22.7, TrainingClient.save_weights_and_get_sampling_client's
     `name` kwarg is deprecated and has NO effect ("checkpoints are always
-    ephemeral" — confirmed via inspect.signature + the method's own
+    ephemeral", confirmed via inspect.signature + the method's own
     DeprecationWarning text this session); its docstring directs callers who
     need a persistent, path-addressable checkpoint to
     save_weights_for_sampler(name=...) + create_sampling_client(model_path=...)
@@ -187,14 +187,14 @@ def _save_named_checkpoint(training_client, name: str) -> str:
     already assume (model_path=os.environ["BASE_CHECKPOINT"]). So: named,
     durable checkpoints (base/ft/partial) go through save_weights_for_sampler;
     the per-step rollout sampling client below intentionally does NOT use a
-    name (it's genuinely ephemeral — only used within that one step)."""
+    name (it's genuinely ephemeral, only used within that one step)."""
     result = training_client.save_weights_for_sampler(name, ttl_seconds=None).result()
     return result.path
 
 
 def _write_checkpoints(path: str, data: dict) -> None:
-    """Atomic write (tmp file + os.replace) so a crash mid-write — including a
-    402 that strikes between periodic saves — can never leave a truncated,
+    """Atomic write (tmp file + os.replace) so a crash mid-write (including a
+    402 that strikes between periodic saves) can never leave a truncated,
     unparseable checkpoints.json that would strand a resume."""
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -219,9 +219,9 @@ def main() -> None:
     # RESUME handling. resume_start_step (pure, tested offline) reads the
     # recorded next_step; resuming is true only when RESUME=1 AND a durable
     # state checkpoint was recorded. On resume we rebuild the training client
-    # FROM that state via create_training_client_from_state_with_optimizer —
+    # FROM that state via create_training_client_from_state_with_optimizer,
     # the exact pattern rl_loop.py and sl_loop.py use (restores weights AND
-    # optimizer moments, so Adam continues rather than cold-starting) — and do
+    # optimizer moments, so Adam continues rather than cold-starting), and do
     # NOT create a fresh LoRA client. On a fresh run we create the LoRA client
     # normally.
     existing = _read_checkpoints(CHECKPOINTS_PATH) if RESUME else {}
@@ -232,7 +232,7 @@ def main() -> None:
         training_client = service.create_training_client_from_state_with_optimizer(
             checkpoints["resume_state_path"]
         )
-        # REUSE the original base checkpoint path — never re-save base; the
+        # REUSE the original base checkpoint path; never re-save base; the
         # fair baseline must stay the pre-training weights (a re-save here
         # would capture already-trained weights and silently corrupt the
         # base-vs-ft comparison).
@@ -248,12 +248,12 @@ def main() -> None:
 
     # Tokenizer straight off the training client (TrainingClient.get_tokenizer
     # exists and avoids spinning up a throwaway SamplingClient just to read
-    # it — proxy.py reads it off a SamplingClient because that's the only
+    # it; proxy.py reads it off a SamplingClient because that's the only
     # client it holds; here we already have the training client). Renderer
     # choice ("qwen3") matches proxy.py's live-confirmed thinking renderer
     # for Qwen3-8B, and model_info.get_recommended_renderer_name(BASE_MODEL)
     # returns "qwen3" too, confirmed offline this session. Only the thinking
-    # renderer is needed here — VerIH's reward requires a <think> block, so
+    # renderer is needed here; VerIH's reward requires a <think> block, so
     # training always renders with thinking on; proxy.py's non-thinking
     # renderer pairing only matters for eval-time serving (Task 10).
     tokenizer = training_client.get_tokenizer()
@@ -268,7 +268,7 @@ def main() -> None:
     checkpoints.setdefault("steps", {})
 
     # Pool is rebuilt from the SAME seeded shuffle every run, so on resume it
-    # is byte-identical — that (plus batch_indices' determinism in step) is
+    # is byte-identical, that (plus batch_indices' determinism in step) is
     # what lets the loop simply start at start_step and continue the data
     # stream where the interrupted run left off.
     samples = load_verih(DATA_PATH)
@@ -282,7 +282,7 @@ def main() -> None:
         flush=True,
     )
     if not pool:
-        raise RuntimeError("no trainable rows survived filtering — check DATA_PATH / gt schema")
+        raise RuntimeError("no trainable rows survived filtering, check DATA_PATH / gt schema")
 
     sampling_params = tinker.SamplingParams(
         max_tokens=MAX_TOKENS, temperature=TEMPERATURE, stop=renderer.get_stop_sequences()
@@ -341,7 +341,7 @@ def main() -> None:
     try:
         for step in range(start_step, STEPS):
             t_start = time.time()
-            # Fresh, EPHEMERAL sampling client reflecting current weights —
+            # Fresh, EPHEMERAL sampling client reflecting current weights;
             # see _save_named_checkpoint's docstring for why no `name=` here.
             sampling_client = training_client.save_weights_and_get_sampling_client()
 
@@ -395,8 +395,8 @@ def main() -> None:
                 rewards_P.append(mean_reward_prompt)
 
                 # Standard GRPO practice: a group with zero-variance rewards
-                # (all pass or all fail) gives every advantage 0 — no
-                # gradient signal — so skip building datums for it.
+                # (all pass or all fail) gives every advantage 0, no
+                # gradient signal, so skip building datums for it.
                 if all(a == 0.0 for a in advantages_G):
                     n_degenerate_groups += 1
                     continue
@@ -454,12 +454,12 @@ def main() -> None:
                 _save_periodic(step)
     except BaseException as exc:
         # Broadened from KeyboardInterrupt-only: the live incident was an HTTP
-        # 402 raised from a sampling future — NOT a Ctrl-C — and the old guard
+        # 402 raised from a sampling future (NOT a Ctrl-C) and the old guard
         # let it kill the run with everything since the base lost. Now ANY
         # exception (402, network, KeyboardInterrupt, assertion) triggers a
         # best-effort durable `-partial` save before re-raising.
         print(
-            f"\n{type(exc).__name__} during training — attempting durable partial save "
+            f"\n{type(exc).__name__} during training, attempting durable partial save "
             f"before re-raising (training compute is money)",
             flush=True,
         )

@@ -1,11 +1,11 @@
 """Shared judge/classifier LLM call: provider-dispatched, streamed, generous budget.
 
-Anthropic branch — byte-identical to the pre-panel code: streamed with
+Anthropic branch: byte-identical to the pre-panel code, streamed with
 adaptive thinking (thinking tokens count against max_tokens, hence the
 generous JUDGE_MAX_TOKENS; streaming sidesteps the SDK's non-streaming
 timeout guard).
 
-OpenRouter branch — the same `router` client generation uses: streamed chat
+OpenRouter branch: the same `router` client generation uses, streamed chat
 completion with reasoning enabled, plus the per-chunk wall-clock deadline +
 watchdog pair generate.py grew after the E04 half-open-socket incident
 (judge calls share that exact failure surface). finish_reason is normalized
@@ -70,7 +70,7 @@ def _call_openrouter(spec: JudgeSpec, system: str, user_msg: str) -> tuple[str, 
         if close is not None:
             try:
                 close()
-            except Exception:  # noqa: BLE001 — teardown must never mask the abort
+            except Exception:  # noqa: BLE001 (teardown must never mask the abort)
                 pass
 
     def _abort() -> None:
@@ -103,7 +103,7 @@ def _call_openrouter(spec: JudgeSpec, system: str, user_msg: str) -> tuple[str, 
                 finish = choice.finish_reason
     except JudgeDeadlineExceeded:
         raise
-    except Exception as e:  # noqa: BLE001 — translate watchdog-induced teardown
+    except Exception as e:  # noqa: BLE001 (translate watchdog-induced teardown)
         if deadline_hit.is_set():
             raise JudgeDeadlineExceeded(
                 f"judge deadline exceeded for {spec.key} ({spec.model}): stream "
@@ -150,7 +150,7 @@ def call_json_chain(
             try:
                 raw, stop = call_json(spec, system, user_msg,
                                       label=f"{spec.client}:{spec.key}:{label_suffix}")
-            except Exception as e:  # noqa: BLE001 — post-retry transport failure
+            except Exception as e:  # noqa: BLE001 (post-retry transport failure)
                 last_err = f"{type(e).__name__}: {e}"
                 break                      # next chain member
             result, err = parse(raw, stop)
@@ -158,5 +158,5 @@ def call_json_chain(
                 return result, spec, ""
             last_err = err
             if stop == "refusal":
-                break                      # sticky per model — next member now
+                break                      # sticky per model, next member now
     return None, None, last_err

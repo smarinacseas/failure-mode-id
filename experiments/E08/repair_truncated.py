@@ -1,4 +1,4 @@
-"""E08 truncation repair — re-draw the finish_reason=length responses at a
+"""E08 truncation repair: re-draw the finish_reason=length responses at a
 larger answer budget, then re-grade / re-diagnose / re-aggregate via the normal
 resumable pipeline.
 
@@ -8,12 +8,12 @@ mid-answer. The deterministic decode-health detector shows this is truncation,
 not repetition (1 mechanical loop in the whole run), and it inflated the
 degenerate_output cause (99 of 107 such labels sit inside these 12 prompts).
 The pipeline's own default is max_tokens=8000 with a comment that 4000 truncates
-complex answers — so 1536 was far under the house budget.
+complex answers, so 1536 was far under the house budget.
 
 Scope of the fix: re-draw ONLY the truncated 12 at max_tokens=8192 (all other
 decode params frozen: reasoning off, temperature 0.6, seed 20260715, provider
 pin bf16/fp16). Same seed + a larger budget lets the truncated draw finish
-rather than being a fresh sample (best-effort — OpenRouter seeds are not
+rather than being a fresh sample (best-effort; OpenRouter seeds are not
 guaranteed deterministic). The other 63 responses finished naturally within
 1536 and are byte-identical at any higher budget, so they are left untouched;
 the repaired census is therefore "all 75 at an adequate budget", with the 12
@@ -22,7 +22,7 @@ repaired records flagged (`repair`, `max_tokens`) and a manifest written.
 Downstream (grade/diagnose/aggregate) is redone ONLY for the 12 via the normal
 resume path: this script drops the 12 ids from the grade/diagnosis artifacts,
 then `main.py grade|diagnose|aggregate` refills exactly those (done-ids are
-re-derived from the output files — verified in grade.py / diagnose.py).
+re-derived from the output files, verified in grade.py / diagnose.py).
 
 Usage (from repo root):
     uv run python experiments/E08/repair_truncated.py --probe        # smoke 1, no writes

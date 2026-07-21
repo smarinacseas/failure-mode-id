@@ -16,7 +16,7 @@ def data_offset(step: int, prompts_per_step: int) -> int:
     before wraparound. The pool is shuffled once from a fixed SEED, so this is
     a pure function of (step, prompts_per_step): on resume, starting the loop
     at the recorded next_step and calling this reproduces exactly the batch
-    offset the interrupted run would have used — the data stream continues
+    offset the interrupted run would have used; the data stream continues
     where it left off with no per-lap reshuffle."""
     return step * prompts_per_step
 
@@ -24,7 +24,7 @@ def data_offset(step: int, prompts_per_step: int) -> int:
 def batch_indices(pool_len: int, step: int, prompts_per_step: int) -> list[int]:
     """Pool indices for `step`'s batch, wrapping around a pool of `pool_len`.
     Deterministic in `step`, so a run that completes steps [0, k) then resumes
-    at step k yields the same overall index stream as an uninterrupted run —
+    at step k yields the same overall index stream as an uninterrupted run;
     that equivalence is the resume correctness guarantee (tested offline)."""
     if pool_len <= 0:
         raise ValueError("pool_len must be positive")
