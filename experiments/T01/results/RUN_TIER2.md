@@ -71,4 +71,53 @@ the stack+grader+k bias (numerator and reference graded identically) and satisfi
 - **Budget:** operator ceiling $35; estimate ~$31 (measured ~2.7k in / ~0.5k out tokens/call ×
   ~1,125 calls × opus $5/$25 per M). Spot-check already spent ~$1.3.
 
-## Results — ⏳ PENDING full 5-arm run
+## Results — ✅ full 5-arm run complete (2026-07-21)
+
+Ran 2026-07-20 23:31 → 2026-07-21 04:58 UTC (~5.4 h; 5 arms × 75 prompts × k=3 =
+1,125 decodes + 1,125 opus grades). Integrity: every arm 225/225 (prompt,decode)
+cells graded, **0 judge errors**, raw pass rates 0.41–0.46 (`analysis.json`).
+
+**⚠️ Cost overrun — recorded for provenance.** Actual ~**$121** for the full run
+(+~$6 spot-check) vs an estimated ~$31 and an operator ceiling of $35 — a ~3.5×
+overrun. Cause: the reused E08 judge protocol runs opus with adaptive thinking
+(`pipeline/_judge_llm.py:45`), ~3,761 output tok/call (~7.5× the ~500 estimated),
+billed at $25/M → ~$106 of the $121 is reasoning tokens. The estimate omitted
+them and the spot-check's *actual* API cost was never measured. Results are valid
+and maximally E08-comparable (thinking-on = census protocol). Process fix adopted:
+thinking-off by default + per-arm spend checkpoint against any ceiling (see the
+`judge-run-cost-protocol` operator memory).
+
+**Denominator (stack+grader+k bias canceled):** coverage **212** (of 254 E08-labeled),
+precision **266** (of 321) — the local-Arm-0 intersection dropped ~17%, matching the
+Step-2 false-recovery floor (the ~20% of E08 base-fails the untrained local base passes).
+
+**Recovery matrix** `Rec [95% prompt-clustered bootstrap CI]` (10k, seed 20260715):
+
+| arm | Rec(coverage) | Rec(precision) | Breakage |
+|-----|---------------|----------------|----------|
+| SA (SFT·cov)  | 0.052 [.021,.096] | 0.083 [.047,.128] | **0.228** |
+| SB (SFT·prec) | 0.052 [.023,.094] | 0.094 [.047,.156] | **0.260** |
+| RA (GRPO·cov) | 0.076 [.036,.130] | 0.068 [.036,.106] | 0.153 |
+| RB (GRPO·prec)| 0.085 [.045,.138] | 0.113 [.062,.175] | 0.154 |
+
+**What transfers, what doesn't** (descriptive; Tier-2 is underpowered for the
+interaction by design, PREREG §5):
+
+- **The Tier-1 coverage-GRPO advantage does NOT transfer.** RA recovered **74%** of
+  Tier-1 *synthetic*-coverage failures; on *naturalistic* CC-75 it recovers **7.6%**.
+  Recovery is uniformly low (5–11%) across all four arms. The Tier-2 interaction is
+  **≈ −0.005** (vs Tier-1's −0.34) — indistinguishable from 0, CIs overlapping. Read
+  plainly: **T1.4's headline coverage effect appears tied to T01's synthetic
+  constraint distribution, not a generalizing capability** (corroborates §6(d)'s
+  constraint-type-family / pool-authoring confound).
+- **The SFT-more-destructive pattern DOES transfer.** SFT arms break 22.8% / 26.0%
+  of base-passed criteria vs GRPO's 15.3% / 15.4%. This is now the **third
+  independent measurement** of the same behavior: §5.6 (Tier-1 on-task breakage),
+  H3 (off-task general-capability regression), and Tier-2 (CC-75 naturalistic
+  breakage). It is the robust, transfer-stable finding.
+
+**Stack-parity caveat (standing):** all recovery is measured local-vs-local (opus/k=3
+both sides), which cancels the Step-2 bias; but the 77.1% agreement / κ0.54 (§2)
+means CC-75 grades carry moderate single-judge/stack noise — held as a qualifier on
+the absolute numbers, not the qualitative transfer/non-transfer reading.
+
