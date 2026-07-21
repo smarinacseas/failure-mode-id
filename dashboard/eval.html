@@ -421,26 +421,6 @@
                         </sc-for>
                       </sc-if>
                     </sc-if>
-                    <div
-                      style="
-                        margin-top: 4px;
-                        padding: 9px 9px 5px;
-                        border-top: 1px solid var(--line, #e7e3d6);
-                        font-size: 10.5px;
-                        line-height: 1.5;
-                        color: var(--ink-4, #a8a294);
-                      "
-                    >
-                      Drop more runs into
-                      <span
-                        style="
-                          font-family: &quot;IBM Plex Mono&quot;, monospace;
-                          color: var(--ink-3, #8c8678);
-                        "
-                        >runs.json</span
-                      >
-                      to switch between experiments and compare.
-                    </div>
                   </div>
                 </sc-if>
               </div>
@@ -852,9 +832,7 @@
                   >
                     Judge agreement
                   </div>
-                  <span style="font-size: 11.5px; color: var(--ink-4, #a8a294)"
-                    >how often the panel's judges cast the same vote</span
-                  >
+                  <span class="fmid-tip" data-tip="judge-agreement" tabindex="0">i</span>
                 </div>
                 <div
                   style="
@@ -1091,15 +1069,7 @@
                   >
                     The constraint-satisfaction gap
                   </div>
-                </div>
-                <div
-                  style="
-                    font-size: 11.5px;
-                    color: var(--ink-3, #8c8678);
-                    font-family: &quot;IBM Plex Mono&quot;, monospace;
-                  "
-                >
-                  criterion-level vs prompt-level
+                  <span class="fmid-tip" data-tip-text="Criterion-level vs prompt-level: the top bar counts individual constraints, the bottom bar counts whole prompts where every constraint passed." tabindex="0">i</span>
                 </div>
               </div>
               <div style="display: flex; flex-direction: column; gap: 18px">
@@ -1238,6 +1208,7 @@
                     >
                       Pass rate by instruction type
                     </div>
+                    <span class="fmid-tip" data-tip-text="Constraint category breakdown, pass rate." tabindex="0">i</span>
                   </div>
                   <div
                     style="
@@ -1248,15 +1219,6 @@
                   >
                     click to drill in →
                   </div>
-                </div>
-                <div
-                  style="
-                    font-size: 11.5px;
-                    color: var(--ink-4, #9aa0ab);
-                    margin-bottom: 14px;
-                  "
-                >
-                  Constraint category breakdown · pass rate
                 </div>
                 <div
                   data-glide-container=""
@@ -1395,6 +1357,7 @@
                     >
                       Pass rate by prompt style
                     </div>
+                    <span class="fmid-tip" data-tip-text="By how the prompt is phrased." tabindex="0">i</span>
                   </div>
                   <div
                     style="
@@ -1405,15 +1368,6 @@
                   >
                     click to drill in →
                   </div>
-                </div>
-                <div
-                  style="
-                    font-size: 11.5px;
-                    color: var(--ink-4, #9aa0ab);
-                    margin-bottom: 14px;
-                  "
-                >
-                  By how the prompt is phrased
                 </div>
                 <div
                   data-glide-container=""
@@ -1547,6 +1501,7 @@
                     >
                       Pass rate by use case
                     </div>
+                    <span class="fmid-tip" data-tip-text="By task domain." tabindex="0">i</span>
                   </div>
                   <div
                     style="
@@ -1557,15 +1512,6 @@
                   >
                     click to drill in →
                   </div>
-                </div>
-                <div
-                  style="
-                    font-size: 11.5px;
-                    color: var(--ink-4, #9aa0ab);
-                    margin-bottom: 14px;
-                  "
-                >
-                  By task domain
                 </div>
                 <div
                   data-glide-container=""
@@ -1699,16 +1645,8 @@
                     >
                       Pass rate by verifiability
                     </div>
+                    <span class="fmid-tip" data-tip="verifiability" tabindex="0">i</span>
                   </div>
-                </div>
-                <div
-                  style="
-                    font-size: 11.5px;
-                    color: var(--ink-4, #9aa0ab);
-                    margin-bottom: 14px;
-                  "
-                >
-                  Deterministic checks vs judge-scored criteria
                 </div>
                 <div
                   data-glide-container=""
@@ -1830,6 +1768,7 @@
                     >
                       Model comparison
                     </div>
+                    <span class="fmid-tip" data-tip-text="Per-model pass rate by instruction type." tabindex="0">i</span>
                   </div>
                   <div
                     style="
@@ -1856,15 +1795,6 @@
                       >
                     </sc-for>
                   </div>
-                </div>
-                <div
-                  style="
-                    font-size: 11.5px;
-                    color: var(--ink-4, #9aa0ab);
-                    margin-bottom: 14px;
-                  "
-                >
-                  Per-model pass rate by instruction type
                 </div>
                 <div
                   style="
@@ -2702,8 +2632,7 @@
             <sc-if value="{{ faAvailable }}" hint-placeholder-val="{{ false }}">
               <!-- Root-cause Pareto -->
               <div style="background:var(--surface,#fff);border:1px solid var(--border,#e2e6ec);border-radius:12px;padding:16px 20px 18px;margin-bottom:14px">
-                <div style="font-family:'Newsreader',Georgia,serif;font-size:15px;font-weight:500;margin-bottom:4px">Root-cause Pareto</div>
-                <div style="font-size:11.5px;color:var(--ink-3,#8c8678);margin-bottom:14px">Failed criteria by diagnosed cause, all models · faded bar segments are judge-disputed rows (second judge passed the criterion)</div>
+                <div style="font-family:'Newsreader',Georgia,serif;font-size:15px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:8px">Root-cause Pareto<span class="fmid-tip" data-tip-text="Failed criteria by diagnosed cause, all models. Faded bar segments are judge-disputed rows, where a second judge passed the criterion." tabindex="0">i</span></div>
                 <sc-for list="{{ faPareto }}" as="pc" hint-placeholder-count="6">
                   <div style="display:grid;grid-template-columns:260px 1fr 46px;gap:12px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line,#e7e3d6)">
                     <div>
@@ -2900,8 +2829,7 @@
                   </sc-if>
                 </div>
               </sc-for>
-              <div style="font-family:'Newsreader',Georgia,serif;font-size:15px;font-weight:500;margin:22px 0 4px">Diagnostic categories</div>
-              <div style="font-size:11.5px;color:var(--ink-3,#8c8678);margin-bottom:12px">Measurement artifacts, not training targets — no dataset maps to these.</div>
+              <div style="font-family:'Newsreader',Georgia,serif;font-size:15px;font-weight:500;margin:22px 0 4px;display:flex;align-items:center;gap:8px">Diagnostic categories<span class="fmid-tip" data-tip-text="Measurement artifacts, not training targets; no dataset maps to these." tabindex="0">i</span></div>
               <sc-for list="{{ refDiagnostic }}" as="rd" hint-placeholder-count="3">
                 <div id="{{ rd.domId }}" style="background:var(--surface,#fff);border:1px solid var(--border,#e2e6ec);border-radius:12px;padding:14px 22px 15px;margin-bottom:10px">
                   <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
