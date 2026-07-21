@@ -43,11 +43,58 @@
         div[style*="grid-template-columns: 1fr 1fr"] {
           grid-template-columns: minmax(0, 1fr) !important;
         }
+        /* Root-cause Pareto rows: a fixed 260px label column plus a 46px
+     count column don't fit a mobile card's content width even with the
+     1fr bar shrunk to nothing. Stack label / bar / count instead. */
+        div[style*="grid-template-columns: 260px 1fr 46px"] {
+          grid-template-columns: minmax(0, 1fr) !important;
+        }
+        /* Free-text copy (rationale/notes) can contain long slash- or
+     underscore-joined tokens (e.g. "dropped/overridden/never_surfaced")
+     that don't have a space to break on; let them wrap instead of
+     pushing the page wider. */
+        p, div, span, li, td {
+          overflow-wrap: break-word;
+        }
         /* Header topbar and footer both need to wrap on narrow viewports. */
         div[style*="max-width: 1320px"][style*="padding: 13px 30px"],
         div[style*="max-width: 1320px"][style*="padding: 0px 30px 30px"] {
           flex-wrap: wrap !important;
           row-gap: 10px !important;
+        }
+        /* The run-selector segment sits next to logo+nav inside a nested
+     nowrap flex row; on narrow viewports there's no room left for it even
+     after its own text truncates (min-width:0 lets it shrink, but the
+     logo+nav items ahead of it alone can consume the viewport). Let that
+     inner row wrap, and force the run-selector onto its own full-width
+     line instead of collapsing/overflowing past the edge. */
+        div[style*="gap: 11px"][style*="min-width: 0"] {
+          flex-wrap: wrap !important;
+        }
+        div[style*="padding-left: 12px"][style*="margin-left: 2px"] {
+          flex-basis: 100% !important;
+          padding-left: 0 !important;
+          margin-left: 0 !important;
+          border-left: none !important;
+        }
+        /* Judge/Model segmented button groups: fine at 3-4 options, but
+     runs with a full judge panel (5 named judges + Panel) don't fit one
+     line on a narrow viewport. The pill group has no width of its own to
+     wrap against (it's shrink-to-fit inside a flex:none row), so give the
+     Judge row a definite full-width line first, then let the pill group
+     wrap within it. */
+        div[style*="padding-right: 14px"][style*="margin-right: 2px"] {
+          flex-basis: 100% !important;
+          padding-right: 0 !important;
+          margin-right: 0 !important;
+          border-right: none !important;
+          padding-bottom: 9px !important;
+          margin-bottom: 9px !important;
+          border-bottom: 1px solid var(--border, #e2e6ec) !important;
+        }
+        div[style*="border-radius: 8px"][style*="padding: 3px"][style*="gap: 2px"] {
+          flex-wrap: wrap !important;
+          max-width: 100% !important;
         }
         /* Popovers must stay inside the viewport. Without this the run
      selector's 262px-min-width dropdown blows out a 320px screen. */
