@@ -19,7 +19,7 @@ Where the assets the E-series and T-series runbooks depend on actually live
 | Per-run config freeze | `pipeline/run_config.py` | Freezes params to `runs/<slug>/experiment.json`; owns the E08 `tiebreaker_judge`, `provider_quantizations`, `seed` knobs. |
 | Candidate generation | `pipeline/generate.py` | Streamed, deadline-guarded, resumable; captures serving `provider` per response (§0.2). |
 | Judge grading | `pipeline/grade.py`, `pipeline/_judge_llm.py` | One blind judge call per (judge, prompt, response); Anthropic-batch + OpenRouter-pool transports; refusal/truncation/parse → artifact reason. |
-| Legacy consensus | `pipeline/_consensus.py` | N-judge majority + Fleiss κ + abstentions; ties/no-quorum → FAIL (E01–E07). |
+| Legacy consensus | `pipeline/_consensus.py` | N-judge majority + Fleiss κ + abstentions; ties/no-quorum → FAIL (E01-E07). |
 | **E08 panel policy** | `judging/panel.py` | Opus tie-break, EXCLUDE (undecidable/under-quorum, never FAIL), completeness gate (§0.3.3-5). `dispatch_consensus` selects legacy vs E08 per run. |
 | Criterion classifier | `pipeline/classify.py`, `prompts/classifier.txt` | Verifiability (auto vs judge) + gameability tags. |
 | Root-cause classifier | `pipeline/diagnose.py`, `pipeline/_taxonomy.py`, `prompts/judge.txt` | Blinded root-cause labels for consensus-FAIL criteria (EXCLUDE criteria are skipped under the E08 policy). |
@@ -29,12 +29,12 @@ Where the assets the E-series and T-series runbooks depend on actually live
 
 ## Per-run artifacts
 
-`runs/<slug>/` — `experiment.json` (frozen params), `responses/<key>.jsonl`,
+`runs/<slug>/`: `experiment.json` (frozen params), `responses/<key>.jsonl`,
 `grades/<judge>/<candidate>.jsonl`, `diagnosis/<candidate>.jsonl`,
 `criteria_tags.jsonl`, `run_manifest.json`, `NOTES.md`. Every stage is resumable
 (rerun the same command; only missing work executes).
 
-## Verifier sources (T01 — verifier library, Day 1–2)
+## Verifier sources (T01, verifier library, Day 1 to 2)
 
 | Resource | Path | Role |
 | --- | --- | --- |
@@ -43,7 +43,7 @@ Where the assets the E-series and T-series runbooks depend on actually live
 | IHEval | `data/verih/Eval/evals/iheval/` | Instruction-hierarchy eval. |
 | math / mmlu | `data/verih/Eval/evals/{math,mmlu}/` | Additional eval harnesses. |
 
-## Training track (T01 — contingent on Gate E→T)
+## Training track (T01, contingent on Gate E→T)
 
 | Asset | Path | Notes |
 | --- | --- | --- |
@@ -54,5 +54,5 @@ Where the assets the E-series and T-series runbooks depend on actually live
 
 ## Run reports
 
-`meta/*.md` — one standardized report per experiment (template: `meta/TEMPLATE.md`).
+`meta/*.md`: one standardized report per experiment (template: `meta/TEMPLATE.md`).
 Latest first; `meta/2026-07-13-t01-ihrlvr.md` is the training pilot writeup.

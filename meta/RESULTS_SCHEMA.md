@@ -1,9 +1,9 @@
-# `results.json` — deliverable schema
+# `results.json`: deliverable schema
 
 Every experiment produces one JSON file (`outputs/experiments/<slug>.json`)
 with the shape defined here. The **ConstraintLens dashboard**
 (`dashboard/index.html`, unpacked from the Claude Design bundle) binds
-against this schema once and renders any run — its Logic reads
+against this schema once and renders any run; its Logic reads
 `./runs.json` on load, then each run's JSON on selection.
 `scripts/dashboard_sync.py` mirrors every experiment into `dashboard/`
 and rebuilds `dashboard/runs.json`; `pipeline/aggregate.py` calls it
@@ -46,16 +46,16 @@ Current schema version: **`3.3`**.
 
 ### Changes in `3.2` (additive)
 
-Top-level `decode_health` block — mechanical repetition-loop census over
+Top-level `decode_health` block: mechanical repetition-loop census over
 stored responses and captured rejected generation attempts, per candidate
 model. Always present (pure computation, no judge cost). Records the
-standing ruling (2026-07-09) that ANY loop — reasoning or content, escaped
-or not — counts as a failure and is training signal. Documented in the
+standing ruling (2026-07-09) that ANY loop (reasoning or content, escaped
+or not) counts as a failure and is training signal. Documented in the
 `decode_health` section below.
 
 ### Changes in `3.1` (additive)
 
-Optional top-level `failure_analysis` block — root-cause diagnosis rows,
+Optional top-level `failure_analysis` block: root-cause diagnosis rows,
 `by_root_cause` rollups, taxonomy echo, and post-hoc judge-concurrence
 labels produced by the `diagnose` stage. Absent when the diagnose stage
 has not run for the experiment. Documented in the `failure_analysis`
@@ -63,7 +63,7 @@ section below.
 
 ### Changes in `3.0` (multi-judge)
 
-Top-level `by_judge` map added — one self-contained `{judge, judge_details,
+Top-level `by_judge` map added: one self-contained `{judge, judge_details,
 validation, summary, prompts}` view per grader, all over the SAME candidate
 responses. The top-level `summary` / `prompts` became the DEFAULT (first)
 judge's view, kept for single-judge readers. `meta.judges` (ordered grader
@@ -76,9 +76,9 @@ Three top-level dashboard-facing fields promoted from `meta.experiment` /
 knowing our nesting. Nested versions remain authoritative; these are
 display-only aliases.
 
-- `meta.run_date` — mirrors `meta.experiment.run_date`.
-- `meta.max_tokens` — mirrors `meta.config.candidate_max_tokens`.
-- `meta.reasoning_enabled` — extracted from `meta.config.candidate_extra_body.reasoning.enabled`; `null` if the pipeline didn't set it explicitly.
+- `meta.run_date`: mirrors `meta.experiment.run_date`.
+- `meta.max_tokens`: mirrors `meta.config.candidate_max_tokens`.
+- `meta.reasoning_enabled`: extracted from `meta.config.candidate_extra_body.reasoning.enabled`; `null` if the pipeline didn't set it explicitly.
 
 ### Breaking changes since `1.0`
 
@@ -92,10 +92,10 @@ display-only aliases.
 
 ## Design principles
 
-- **One file per experiment.** No cross-run joins in the deliverable — every field the dashboard needs to render a run is in that run's file.
-- **Extensive but not exhaustive.** Include what the dashboard displays, what the limitations panel needs to explain the run, and what a future reader needs to reproduce it. Do not include per-call latency logs, provider request IDs, raw response bodies, or debug traces — those live in sidecar files.
-- **Stable shape across runs.** Every experiment carries every key in this schema even when the value is null. Optional data is `null` / `[]` / `""`, never absent — with two documented exceptions where the *key itself* is absent: `failure_analysis` (diagnose stage hasn't run) and `panel` (fewer than 2 judges). See their rows in the table below.
-- **Human-readable JSON.** UTF-8, 2-space indent, no trailing whitespace. File size is expected to be 100 KB – 5 MB depending on `n_prompts × n_models × response length`.
+- **One file per experiment.** No cross-run joins in the deliverable: every field the dashboard needs to render a run is in that run's file.
+- **Extensive but not exhaustive.** Include what the dashboard displays, what the limitations panel needs to explain the run, and what a future reader needs to reproduce it. Do not include per-call latency logs, provider request IDs, raw response bodies, or debug traces; those live in sidecar files.
+- **Stable shape across runs.** Every experiment carries every key in this schema even when the value is null. Optional data is `null` / `[]` / `""`, never absent, with two documented exceptions where the *key itself* is absent: `failure_analysis` (diagnose stage hasn't run) and `panel` (fewer than 2 judges). See their rows in the table below.
+- **Human-readable JSON.** UTF-8, 2-space indent, no trailing whitespace. File size is expected to be 100 KB to 5 MB depending on `n_prompts × n_models × response length`.
 
 ## Top-level shape
 
@@ -116,12 +116,12 @@ display-only aliases.
 | --- | --- | --- |
 | `schema_version` | str | Matches this document. Dashboards refuse to render mismatched majors. |
 | `meta` | object | Identity + configuration + validation status. |
-| `summary` | object | Six pre-computed aggregate breakdowns — the **default view**: the `panel` consensus when ≥ 2 judges form one, else the first judge's view (`meta.verdict_basis` records which). |
-| `prompts` | array | One entry per included prompt, in benchmark_id order — same default-view rule as `summary`. |
+| `summary` | object | Six pre-computed aggregate breakdowns (the **default view**): the `panel` consensus when ≥ 2 judges form one, else the first judge's view (`meta.verdict_basis` records which). |
+| `prompts` | array | One entry per included prompt, in benchmark_id order; same default-view rule as `summary`. |
 | `by_judge` | object | One self-contained `{judge, judge_details, validation, summary, prompts}` view per grader (schema 3.0). |
-| `panel` | object | **Optional** (schema 3.3) — present when the run has ≥ 2 judges; consensus verdicts + agreement stats over the same eligible prompts. One of two exceptions to the never-absent principle: absent on single-judge runs (nothing to form a panel out of). See its section below. |
-| `failure_analysis` | object | **Optional** (schema 3.1) — root-cause diagnosis; see its section below. The other exception to the never-absent principle: a missing key means the diagnose stage has not run. |
-| `decode_health` | object | Mechanical loop census (schema 3.2) — always present; see its section below. |
+| `panel` | object | **Optional** (schema 3.3): present when the run has ≥ 2 judges; consensus verdicts + agreement stats over the same eligible prompts. One of two exceptions to the never-absent principle: absent on single-judge runs (nothing to form a panel out of). See its section below. |
+| `failure_analysis` | object | **Optional** (schema 3.1): root-cause diagnosis; see its section below. The other exception to the never-absent principle: a missing key means the diagnose stage has not run. |
+| `decode_health` | object | Mechanical loop census (schema 3.2): always present; see its section below. |
 
 ---
 
@@ -153,7 +153,7 @@ Benchmark identity + license. Constants for v1 (only changes if the benchmark it
 
 ### `meta.models`
 
-Ordered array of candidate **key strings** — the same short mnemonics used
+Ordered array of candidate **key strings**: the same short mnemonics used
 everywhere else in the file (`prompt.responses[key]`,
 `summary.criterion_pass_rate[key]`, `criterion.results[key]`). Array
 order is the order the dashboard renders model tabs / columns.
@@ -164,7 +164,7 @@ order is the order the dashboard renders model tabs / columns.
 
 ### `meta.model_details`
 
-Optional companion to `meta.models` — richer per-model info. The
+Optional companion to `meta.models`: richer per-model info. The
 ConstraintLens dashboard doesn't read this; kept for future consumers
 that need the provider-side IDs.
 
@@ -176,12 +176,12 @@ that need the provider-side IDs.
 
 ### `meta.judge`
 
-String — the **default grader's KEY** (e.g. `"claude-opus-4-8"`), i.e. the
+String: the **default grader's KEY** (e.g. `"claude-opus-4-8"`), i.e. the
 first entry of `meta.judges`. Kept for back-compat with single-judge
 dashboards; the dashboard renders this verbatim in the run-details panel and
 footer. Grading itself may involve every member of `meta.judges` (a panel,
 schema 3.0+); classification follows the separate, frozen
-`meta.config.classifier_chain` (schema 3.3) — `meta.judge` is no longer a
+`meta.config.classifier_chain` (schema 3.3); `meta.judge` is no longer a
 "grader/classifier" model ID, just the default judge's handle.
 
 ### `meta.judge_details`
@@ -195,10 +195,10 @@ Per-judge provenance for the default judge (same shape as each entry under
 | `model_id` | str | Provider-side model ID (e.g. `"claude-opus-4-8"`, `"openai/gpt-5.2"`). Equals `id` for Anthropic judges. |
 | `provider` | str | `"anthropic"` or `"openrouter"`. |
 | `role` | str | Always `"grader"`. |
-| `transport` | str | `"batch"` (Anthropic Message Batches) / `"sequential"` (Anthropic, one streamed call per cell) / `"pooled_stream"` (OpenRouter judges — no batch API there). |
+| `transport` | str | `"batch"` (Anthropic Message Batches) / `"sequential"` (Anthropic, one streamed call per cell) / `"pooled_stream"` (OpenRouter judges, no batch API there). |
 | `reasoning` | object | `{"type": "adaptive"}` for Anthropic judges; `{"enabled": true}` for OpenRouter judges. |
 | `family` | str | Model family (e.g. `"anthropic"`, `"openai"`, `"google"`, `"deepseek"`). |
-| `family_overlap` | bool | `true` if this judge shares a family with any candidate in `meta.models` — self-preference-bias risk flag. |
+| `family_overlap` | bool | `true` if this judge shares a family with any candidate in `meta.models`: self-preference-bias risk flag. |
 | `family_stake_note` | str | Human-readable statement of the self-preference-bias control. |
 
 ### `meta.counts`
@@ -210,8 +210,8 @@ Cross-referencing sums the dashboard uses as headers.
 | `n_prompts` | int | Prompts fully graded across all candidates. |
 | `n_criteria` | int | Sum of criteria across included prompts. |
 | `n_models` | int | Candidate count. |
-| `n_judges` | int | Judge count (schema 3.0) — length of `meta.judges`. |
-| `n_grade_cells` | int | `n_criteria × n_models` — the grid the pass-rate metrics aggregate over (per judge). |
+| `n_judges` | int | Judge count (schema 3.0): length of `meta.judges`. |
+| `n_grade_cells` | int | `n_criteria × n_models`: the grid the pass-rate metrics aggregate over (per judge). |
 
 ### `meta.categories`
 
@@ -231,7 +231,7 @@ their inner map. Keys inside each inner map are sorted alphabetically.
 ### `meta.config`
 
 Every runtime knob that could differ between experiments. `candidates`
-and `judge.id` live in `meta.models` / `meta.judge` respectively —
+and `judge.id` live in `meta.models` / `meta.judge` respectively:
 `config` is what a dashboard would surface in a "what was different
 about this run" panel.
 
@@ -292,8 +292,8 @@ The constraint-satisfaction gap surfaces as
 
 ## `prompts`
 
-Ordered array. One entry per included prompt (skipped prompts — those
-where any candidate was missing a response or grade — are logged during
+Ordered array. One entry per included prompt (skipped prompts, those
+where any candidate was missing a response or grade, are logged during
 aggregation and excluded here so cross-model comparison stays
 apples-to-apples).
 
@@ -325,7 +325,7 @@ Each `criteria[]` entry:
 
 ## `panel` (schema 3.3, optional)
 
-Present when the run has ≥ 2 judges (`meta.judges` has 2+ entries) — a
+Present when the run has ≥ 2 judges (`meta.judges` has 2+ entries): a
 provider-diverse panel of graders scoring the SAME candidate responses.
 Absent for single-judge runs (nothing to form a panel out of); this is the
 other exception to the never-absent shape principle, alongside
@@ -345,7 +345,7 @@ other exception to the never-absent shape principle, alongside
 | --- | --- | --- |
 | `judges` | array | Judge keys that fed the panel, same order as `meta.judges`. |
 | `summary` | object | Same six breakdowns as top-level `summary` (`criterion_pass_rate`, `full_prompt_pass_rate`, `by_instruction_type`, `by_prompt_style`, `by_use_case`, `by_verifiability`), computed over the panel's consensus verdicts. |
-| `prompts` | array | Same shape as top-level `prompts` — same keys, same `criteria[]` structure — except each criterion's `results[model_key]` is `{pass, reason, votes}` (below) instead of `{pass, reason}`. |
+| `prompts` | array | Same shape as top-level `prompts` (same keys, same `criteria[]` structure) except each criterion's `results[model_key]` is `{pass, reason, votes}` (below) instead of `{pass, reason}`. |
 | `agreement` | object | Pairwise + aggregate inter-judge agreement stats, see below. |
 
 Top-level `summary`/`prompts` mirror this block whenever it's present (see
@@ -356,7 +356,7 @@ judge's `by_judge` view instead.
 
 | key | type | notes |
 | --- | --- | --- |
-| `pass` | bool | Consensus verdict — majority PASS among the judges that cast a vote. |
+| `pass` | bool | Consensus verdict: majority PASS among the judges that cast a vote. |
 | `reason` | str | `""` on PASS. On FAIL: the most common reason text among the judges that voted FAIL, or `"panel_tie"` (equal PASS/FAIL split) / `"panel_no_quorum"` (fewer than quorum cast a vote). |
 | `votes` | `{"pass": int, "fail": int, "abstain": int}` | Vote split over all panel judges. Artifact FAILs (`judge_refusal` / `judge_parse_error` / `judge_truncated` / `missing_in_judge_output`) abstain rather than cast a vote; `loop_failure` FAILs are genuine FAIL votes. Quorum is `min(2, n_judges)`; fewer cast votes than quorum → FAIL `panel_no_quorum`; an even PASS/FAIL split among cast votes → FAIL `panel_tie`. Missing evidence always resolves to FAIL, never a silent drop. |
 
@@ -364,9 +364,9 @@ judge's `by_judge` view instead.
 
 | key | type | notes |
 | --- | --- | --- |
-| `pairwise` | `{judge_key → {judge_key → pct}}` | Percent agreement between each judge pair (0–100 scale), over cells where both judges cast a PASS/FAIL vote. Symmetric; a judge is never compared against itself. |
-| `fleiss_kappa` | float | Variable-rater generalization of Fleiss' kappa, over cells with ≥ 2 cast votes — a chance-corrected agreement statistic, NOT on the 0–100 scale (typical range roughly -1 to 1; higher is more agreement than chance). |
-| `with_consensus` | `{judge_key → pct}` | Each judge's percent agreement with the panel's own consensus verdict (0–100 scale). |
+| `pairwise` | `{judge_key → {judge_key → pct}}` | Percent agreement between each judge pair (0-100 scale), over cells where both judges cast a PASS/FAIL vote. Symmetric; a judge is never compared against itself. |
+| `fleiss_kappa` | float | Variable-rater generalization of Fleiss' kappa, over cells with ≥ 2 cast votes: a chance-corrected agreement statistic, NOT on the 0-100 scale (typical range roughly -1 to 1; higher is more agreement than chance). |
+| `with_consensus` | `{judge_key → pct}` | Each judge's percent agreement with the panel's own consensus verdict (0-100 scale). |
 | `abstentions` | `{judge_key → int}` | Count of cells that judge abstained on (artifact FAILs or a missing grade record for that judge). |
 
 ---
@@ -383,13 +383,13 @@ Absent key means the diagnose stage has not run for this experiment. `rows[*]` j
   "taxonomy": [ { "key": "constraint_dropped", "label": "…",
                   "description": "…", "training_implication": "…" } ],
   "diagnose_chain": ["claude-fable-5", "claude-opus-4-8"],  // analyst fallback chain
-  "diagnose_judge": "claude-fable-5",       // chain[0] — scalar echo for old readers
+  "diagnose_judge": "claude-fable-5",       // chain[0]: scalar echo for old readers
   "verdict_basis": "panel",                 // whose FAILs were diagnosed: panel
                                             // consensus (>=2 judges) or a judge key
   "diagnosed_at": "…",                       // ISO timestamp
   "counts": { "failed_criteria": 219, "diagnosed": 219, "cells": 54 },
-  "synthesis": { /* §4b — predecessor, comparison[], prior_recommendations_review[],
-                    recommendations[1–3 of {category, action, rationale,
+  "synthesis": { /* §4b: predecessor, comparison[], prior_recommendations_review[],
+                    recommendations[1-3 of {category, action, rationale,
                     expected_signal}], iteration_note. Optional: absent when
                     synthesis was skipped or failed. */ },
   "rows": [ {
@@ -398,7 +398,7 @@ Absent key means the diagnose stage has not run for this experiment. `rows[*]` j
     "secondary": null,                       // optional second label (compound failures)
     "confidence": "high|medium|low",
     "evidence": "shortest quote from trace/answer that shows it",
-    "rationale": "1–2 sentences",
+    "rationale": "1-2 sentences",
     "trace_status": "present|absent|truncated",
     "analyst": "claude-opus-4-8",            // chain member that produced this row
                                              // (null for pre-3.3 artifacts)
@@ -413,13 +413,13 @@ Absent key means the diagnose stage has not run for this experiment. `rows[*]` j
 ## `decode_health` (schema 3.2)
 
 Mechanical repetition-loop census computed by `pipeline/_decode_health.py`
-at aggregate time — pure computation over `runs/<slug>/responses/*.jsonl`
+at aggregate time: pure computation over `runs/<slug>/responses/*.jsonl`
 and the `runs/<slug>/rejected/*.jsonl` sidecars that `generate` writes for
 doomed attempts (empty completion, deadline abort). No judge involvement,
 so it is auto-verifiable and always present.
 
 Standing ruling (2026-07-09): any loop counts as a failure, including loops
-the model escaped before finishing (`n_loop_escaped`) — escaped loops waste
+the model escaped before finishing (`n_loop_escaped`); escaped loops waste
 tokens and escaping is unreliable; looping is trainable behavior.
 
 ```json
@@ -432,7 +432,7 @@ tokens and escaping is unreliable; looping is trainable behavior.
       "n_loop_reasoning": 6,          // loop detected in the thinking channel
       "n_loop_content": 1,            // loop detected in the visible answer
       "n_loop_any": 6,
-      "n_loop_escaped": 5,            // looped but finish_reason == "stop" — still failures
+      "n_loop_escaped": 5,            // looped but finish_reason == "stop", still failures
       "n_loop_died": 1,               // looped and never finished cleanly
       "n_nonstop_finish": 4,          // finish_reason != "stop" (length/error/null)
       "rejected_attempts": { "n_captured": 12, "n_looping": 9 }
@@ -448,14 +448,14 @@ tokens and escaping is unreliable; looping is trainable behavior.
 ```
 
 Caveat: `rejected_attempts` counts only attempts made after the capture
-hook landed (2026-07-09, mid-E07) — earlier retries were discarded before
+hook landed (2026-07-09, mid-E07); earlier retries were discarded before
 storage, so historical runs show `n_captured: 0`.
 
 ---
 
 ## Dashboard dropdown files
 
-### `dashboard/runs.json` — the ConstraintLens design's dropdown source
+### `dashboard/runs.json`: the ConstraintLens design's dropdown source
 
 Written by `scripts/dashboard_sync.py` (which is also invoked by
 `pipeline/aggregate.py` at the end of every tagged run). The design's
@@ -467,7 +467,7 @@ run's own JSON at `./<path>`.
   "runs": [
     {
       "id": "E01-smoke-3p",
-      "label": "E01-smoke-3p — First end-to-end pipeline exercise",
+      "label": "E01-smoke-3p: First end-to-end pipeline exercise",
       "date": "2026-07-01",
       "path": "./E01-smoke-3p.json",
       "n_prompts": 3,
@@ -481,7 +481,7 @@ run's own JSON at `./<path>`.
 The design only reads `id`, `label`, `date`, `path`; the extra fields
 are metadata for external tools.
 
-### `outputs/experiments/index.json` — legacy dashboard registry
+### `outputs/experiments/index.json`: legacy dashboard registry
 
 Carries one compact entry per tagged experiment. Kept because non-dashboard
 consumers (analysis notebooks, batch scripts) may still index off it.
@@ -520,7 +520,7 @@ entry with the same slug rather than duplicating.
 
 - **Patch bumps (`2.0` → `2.0.1`)**: fixes to this document only, no shape change.
 - **Minor bumps (`2.0` → `2.1`)**: additive-only. New optional key with a documented default. Existing dashboards keep rendering.
-- **Major bumps (`2.0` → `3.0`)**: breaking change — key removed, renamed, or has an incompatible type change. Dashboards must gate rendering on `schema_version` prefix.
+- **Major bumps (`2.0` → `3.0`)**: breaking change: key removed, renamed, or has an incompatible type change. Dashboards must gate rendering on `schema_version` prefix.
 
 When bumping, update `SCHEMA_VERSION` in `pipeline/_experiment.py`, add
 the change to this file (including a "Breaking changes since" section
