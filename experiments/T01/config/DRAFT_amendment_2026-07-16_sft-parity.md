@@ -1,4 +1,4 @@
-# DRAFT amendment — for reviewer approval, NOT yet committed to PREREG.md
+# DRAFT amendment: for reviewer approval, NOT yet committed to PREREG.md
 
 > Staging file. Do not append to `PREREG.md` until the wording is approved at the
 > T1.3 STOP. Verbatim candidate entry follows.
@@ -14,12 +14,12 @@
 > SB precision 123/270 (seed 20260715). See
 > `DRAFT_amendment_2026-07-16_coverage-recal.md`.
 
-### 2026-07-16 — SFT training-set down-sample to cross-cause parity
+### 2026-07-16: SFT training-set down-sample to cross-cause parity
 
 **Decision, and when it was made.** Before any real-arm training (SA/SB/RA/RB)
 had been run, the SFT accepted-pair sets are down-sampled to equal size across
-causes. The decision is based **solely on datagen process metrics** — the teacher
-acceptance yield measured at T1.2 — and **no outcome/eval data was consulted**
+causes. The decision is based **solely on datagen process metrics** (the teacher
+acceptance yield measured at T1.2) and **no outcome/eval data was consulted**
 (no arm has been scored; the GRPO LR probe informs only training-method
 hyperparameters, not this decision).
 
@@ -37,13 +37,13 @@ its **own** accepted set: sort by prompt_id, then `random.Random(20260715).sampl
 (repo seed convention). Coverage is the min-count cell, so its selection is the
 identity (204 of 204). Precision selects 204 of 270. Selections are materialized
 as ids-only manifests under `data/sft_manifests/{SA,SB}.json` (tracked; never any
-response text). Epochs stay at **2** (§5) — reduced n is **not** compensated with
+response text). Epochs stay at **2** (§5); reduced n is **not** compensated with
 extra epochs/steps, which would re-introduce the asymmetry as a tuning degree of
 freedom.
 
 **What is explicitly unchanged.** GRPO prompt pools (300/cause), all holdout data
 (`data/holdout/`, 200/cause), the 2-epoch schedule, the primary estimand and
-hypotheses (§§3–4), sample sizes for eval (§5), seeds (§7), and the statistical
+hypotheses (§§3-4), sample sizes for eval (§5), seeds (§7), and the statistical
 analysis (§6). Within-row data-fairness is preserved: both methods in a row still
 draw from the same cause's data; only the SFT cell size is equalized across rows.
 

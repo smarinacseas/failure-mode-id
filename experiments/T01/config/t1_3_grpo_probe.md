@@ -1,10 +1,10 @@
-# T1.3 GRPO LR probe — results & selection (provenance)
+# T1.3 GRPO LR probe: results & selection (provenance)
 
 One per-method probe (PREREG amendment 2026-07-16 (b)): coverage/RA, 50 prompts,
-2 epochs, **k=6 frozen**, sweep **LR only** over the pre-registered 5e-6–1e-5 range.
+2 epochs, **k=6 frozen**, sweep **LR only** over the pre-registered 5e-6 to 1e-5 range.
 7.5e-6 added because 5e-6 and 1e-5 both finished far inside the 3-hour cap. Backend:
 stock `model.generate()` (`use_vllm=False`), GC-on + cached generation, temp 0.9, β 0.04.
-All three ran a full **50 steps** (equal basis — no LR truncated by the cap).
+All three ran a full **50 steps** (equal basis: no LR truncated by the cap).
 
 ## Sweep table (per-step CSVs in results/probe/grpo_RA_coverage_lr*.csv)
 
@@ -23,23 +23,23 @@ reward_std (0.104 = most stable), with KL bounded (~0.0007) and format_ok 1.0.
 noisiest end (std 0.178). Frozen for **both** RL arms (RA, RB); no per-arm tuning.
 
 ## Health flags (carried to the STOP report)
-- **Reward starts high (~0.77) with limited headroom** — coverage base difficulty
-  is above the PREREG §5 30–70% band (see reward-calibration / base-difficulty check).
+- **Reward starts high (~0.77) with limited headroom**: coverage base difficulty
+  is above the PREREG §5 30 to 70% band (see reward-calibration / base-difficulty check).
 - **Mild length drift**: mean completion 296→~340 tok as reward rises ~0.08. Modest
   (answers ≪ M=2800-char cap; format_ok 1.0), but a pre-committed artifact tell
   (PREREG §8) to watch on the full run.
-- KL tiny throughout (β=0.04 default healthy — no collapse/blow-up; no β change needed).
+- KL tiny throughout (β=0.04 default healthy: no collapse/blow-up; no β change needed).
 - Cap-hit 0% at max_completion_length=1536; no bump needed.
 
 ## Throughput
-~226–230 tok/s (generate(), LoRA-taxed, KV-cache ON). Confirmed the cache path:
+~226 to 230 tok/s (generate(), LoRA-taxed, KV-cache ON). Confirmed the cache path:
 base+LoRA+cache = 260 tok/s vs base-no-LoRA = 477 (LoRA ≈1.8× tax); GC+use_cache
 matches GC-off speed. At ~19 s/step, a 50-step run ≈ 16 min ≪ 3-hour cap. Full-run
 projection: 300 prompts × 2 epochs ≈ 300 steps ≈ ~95 min/arm (length-drift dependent).
 
 ---
 
-## Re-probe on the HARDENED coverage pool (2026-07-16) — LR pick RE-CONFIRMED 7.5e-6
+## Re-probe on the HARDENED coverage pool (2026-07-16): LR pick RE-CONFIRMED 7.5e-6
 
 The pick above was made on the *easy* coverage pool (base reward ~0.77). That pool was
 recalibrated into band (coverage-recal amendment; base criterion-pass 86.4%→61.0%), so
@@ -47,11 +47,11 @@ the LR probe was re-run on the hardened pool. Same protocol: RA/coverage, 50 pro
 2 epochs, k=6, LR-only over {5e-6, 7.5e-6, 1e-5}, stock generate(), temp 0.9, β 0.04.
 Per-step CSVs: `results/probe/grpo_RA_coverage_lr*_hard.csv`; summaries `*_hard_summary.json`.
 
-**Base reward now ~0.435 at step 0 (was ~0.77) — good headroom, confirms the recal.**
+**Base reward now ~0.435 at step 0 (was ~0.77): good headroom, confirms the recal.**
 
-### Robust (windowed) table — single-endpoint metrics are noise at 2 prompts/step
+### Robust (windowed) table: single-endpoint metrics are noise at 2 prompts/step
 Reward is measured over 12 rollouts/step (2 unique prompts × k=6), so per-step reward is
-very noisy (bounces 0.28–0.71). Ranking is therefore on 10-step windows, NOT single rows.
+very noisy (bounces 0.28 to 0.71). Ranking is therefore on 10-step windows, NOT single rows.
 
 | LR | mean r[0:10] | mean r[40:50] | Δ(last−first) | slope (5-step smoothed) | end reward_std [40:50] | format_ok | KL@end |
 |----|-------------|--------------|---------------|-------------------------|------------------------|-----------|--------|
@@ -59,14 +59,14 @@ very noisy (bounces 0.28–0.71). Ranking is therefore on 10-step windows, NOT s
 | 7.5e-6 | 0.487 | 0.455 | −0.032 | −0.00020 | 0.202 | 1.00 | 0.0009 |
 | 1e-5   | 0.510 | 0.473 | −0.037 | −0.00020 | 0.188 | 1.00 | 0.0012 |
 
-### Selection: **7.5e-6 RE-CONFIRMED (frozen, no revision)** — the probe does not discriminate
+### Selection: **7.5e-6 RE-CONFIRMED (frozen, no revision)**; the probe does not discriminate
 Unlike the easy pool (all three clearly improved; 7.5e-6 won both slope and stability), on the
-hardened pool **none of the three improve** — all are flat-to-declining and statistically
+hardened pool **none of the three improve**; all are flat-to-declining and statistically
 indistinguishable (per-step reward Δ across LRs ≈ ±0.1 ≈ reward_std). The pre-committed rule
 ("steepest slope + lowest end-std") presumes a clean positive slope to rank; that premise is not
-met, and the raw last-row std that first appeared to favour 7.5e-6 (0.124) is itself noise — the
+met, and the raw last-row std that first appeared to favour 7.5e-6 (0.124) is itself noise: the
 windowed end-std makes 7.5e-6 the *highest* (0.202). With **no discriminating signal to revise**,
-7.5e-6 is kept: mid-range of the pre-registered 5e-6–1e-5 window, and the amendment commits to a
+7.5e-6 is kept: mid-range of the pre-registered 5e-6 to 1e-5 window, and the amendment commits to a
 single frozen LR for both arms with no per-arm tuning. Switching to 1e-5 on a 0.014 windowed-std
 difference would be exactly the researcher-DoF the stopping rule exists to prevent. (Reviewer
 decision, 2026-07-16.)
@@ -78,11 +78,11 @@ decision, 2026-07-16.)
   so the easy-pool mild-length-drift flag does not reproduce here.
 
 ### Pre-committed check for the REAL RA run (committed 2026-07-16, BEFORE the run starts)
-This is a monitoring gate on the full RA (coverage GRPO) run — **not** a re-opening of the LR
+This is a monitoring gate on the full RA (coverage GRPO) run, **not** a re-opening of the LR
 choice, which is frozen at 7.5e-6. At **step 50** of the real RA run (matching the probe scale),
 compute the windowed mean reward exactly as in the probe analysis: `mean(reward[0:10])` vs
 `mean(reward[40:50])` from the run's per-step log.
 - If the trend is **flat-or-declining** (not a clean positive slope), **PAUSE and report** before
-  continuing — this tests whether the probe's non-learning pattern replicates at the real run's
+  continuing: this tests whether the probe's non-learning pattern replicates at the real run's
   start (candidate remedies then: more steps, more prompts/step).
 - If it shows a **clear positive slope by step 50**, proceed uninterrupted to completion.

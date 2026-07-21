@@ -1,23 +1,23 @@
-# Coverage recalibration — pre-committed stopping rule (2026-07-16)
+# Coverage recalibration: pre-committed stopping rule (2026-07-16)
 
 Stated BEFORE the acceptance measurement of any version is read, to remove
 researcher degrees of freedom from the difficulty recalibration. (Retroactive
 disclosure: v1 and v2 were developed/measured at the *training-rollout* regime
-temp 0.9 / k=4 as an exploratory iteration signal — logged below — before this
+temp 0.9 / k=4 as an exploratory iteration signal (logged below) before this
 rule was written; the ACCEPTANCE decision uses only the eval-regime protocol.)
 
 ## Acceptance regime (the band is defined here)
 - **temp 0.6, k=3 decodes**, N=60 freshly composed coverage prompts, seed 20260715.
 - Matches PREREG §5 Tier-1 eval decode (temp 0.6, k=3) and the original T1.2
   `calibrate.py` (temp 0.6). Difficulty measured at the training-rollout regime
-  (temp 0.9) is NOT the acceptance metric — it can understate pass rate.
+  (temp 0.9) is NOT the acceptance metric; it can understate pass rate.
 
 ## Rule
 1. **Cap: 3 generator versions.**
 2. **Accept the FIRST version whose mean criterion-pass ∈ [30%, 70%] at the
    acceptance regime.** No selection within-band by closeness to any preferred
    point (no "pick the one nearest 50%").
-3. **One acceptance measurement per version** — no re-rolling a version's
+3. **One acceptance measurement per version**: no re-rolling a version's
    measurement to obtain a nicer number.
 4. If none of the 3 versions lands in-band, **STOP and escalate to the reviewer**
    (do not keep iterating).
@@ -33,7 +33,7 @@ rule was written; the ACCEPTANCE decision uses only the eval-regime protocol.)
   no_commas 95.0); **acceptance temp-0.6/k=3 mean = 61.0% → IN BAND → ACCEPTED**
   (per-type: start_phrase 7.5, keyword_include 38.6, end_phrase 47.3, keyword_exclude
   67.3, casing 80.9, no_commas 93.3, required_sections 95.0; 6.5 constraints/prompt).
-- v3: not run — v2 is the first version measured at the acceptance regime and is
+- v3: not run; v2 is the first version measured at the acceptance regime and is
   in-band, so the rule accepts it (no within-band tuning, no further versions).
 
 ## Outcome
